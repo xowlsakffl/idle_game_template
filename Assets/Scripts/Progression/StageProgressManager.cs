@@ -1,0 +1,157 @@
+using System;
+using UnityEngine;
+
+public sealed class StageProgressManager : MonoBehaviour
+{
+    private SaveManager saveManager;
+
+    public event Action Changed;
+
+    public string CurrentStageId { get; private set; } = GameData.FirstStageId;
+    public string HighestStageId { get; private set; } = GameData.FirstStageId;
+    public string SelectedStageId { get; private set; } = GameData.FirstStageId;
+    public ProgressMode Mode { get; private set; } = ProgressMode.AutoProgress;
+    public bool ChapterOneBossCleared { get; private set; }
+
+    public StageDefinition CurrentStage => GameData.GetStage(CurrentStageId);
+
+    public void Initialize(SaveManager save)
+    {
+        saveManager = save;
+
+        HighestStageId = saveManager.LoadString(SaveKeys.HighestStageId, GameData.FirstStageId);
+        CurrentStageId = saveManager.LoadString(SaveKeys.CurrentStageId, GameData.FirstStageId);
+        SelectedStageId = saveManager.LoadString(SaveKeys.SelectedStageId, GameData.FirstStageId);
+        Mode = saveManager.LoadEnum(SaveKeys.ProgressMode, ProgressMode.AutoProgress);
+        ChapterOneBossCleared = saveManager.LoadBool(SaveKeys.ChapterOneBossCleared, false);
+
+        NormalizeState();
+        SaveProgress();
+        NotifyChanged();
+    }
+
+    public void HandleStageCleared()
+    {
+        StageDefinition clearedStage = CurrentStage;
+
+        if (clearedStage.Type == StageType.Boss)
+        {
+            ChapterOneBossCleared = true;
+            HighestStageId = GameData.MaxStageId(HighestStageId, clearedStage.Id);
+            CurrentStageId = GameData.BossFallbackStageId;
+            SelectedStageId = CurrentStageId;
+            Mode = ProgressMode.RepeatSelected;
+            SaveProgress();
+            NotifyChanged();
+            return;
+        }
+
+        if (Mode == ProgressMode.AutoProgress)
+        {
+            string nextStageId = GameData.GetNextStageId(clearedStage.Id);
+            if (!string.IsNullOrEmpty(nextStageId))
+            {
+                CurrentStageId = nextStageId;
+                HighestStageId = GameData.MaxStageId(HighestStageId, nextStageId);
+            }
+            else
+            {
+                CurrentStageId = clearedStage.Id;
+            }
+        }
+        else
+        {
+            CurrentStageId = string.IsNullOrEmpty(SelectedStageId) ? clearedStage.Id : SelectedStageId;
+        }
+
+        SaveProgress();
+        NotifyChanged();
+    }
+
+    public void HandleBossFailed()
+    {
+        string fallbackStageId = CurrentStage.FailureStageId;
+        if (string.IsNullOrEmpty(fallbackStageId))
+        {
+            fallbackStageId = GameData.GetPreviousNormalStageId(CurrentStageId);
+        }
+
+        CurrentStageId = fallbackStageId;
+        SelectedStageId = fallbackStageId;
+        Mode = ProgressMode.BossBlocked;
+
+        SaveProgress();
+        NotifyChanged();
+    }
+
+    public bool SelectStage(string stageId)
+    {
+        if (!GameData.IsStageUnlocked(stageId, HighestStageId))
+        {
+            return false;
+        }
+
+        CurrentStageId = stageId;
+        SelectedStageId = stageId;
+        Mode = ProgressMode.RepeatSelected;
+
+        SaveProgress();
+        NotifyChanged();
+        return true;
+    }
+
+    public void ResumeAutoProgress()
+    {
+        Mode = ProgressMode.AutoProgress;
+
+        if (ChapterOneBossCleared)
+        {
+            CurrentStageId = GameData.BossFallbackStageId;
+        }
+        else
+        {
+            CurrentStageId = HighestStageId;
+        }
+
+        SaveProgress();
+        NotifyChanged();
+    }
+
+    public string GetOfflineRewardStageId()
+    {
+        StageDefinition stage = CurrentStage;
+        return stage.Type == StageType.Boss ? GameData.GetPreviousNormalStageId(stage.Id) : stage.Id;
+    }
+
+    private void NormalizeState()
+    {
+        CurrentStageId = GameData.GetStage(CurrentStageId).Id;
+        HighestStageId = GameData.GetStage(HighestStageId).Id;
+        SelectedStageId = GameData.GetStage(SelectedStageId).Id;
+
+        if (!GameData.IsStageUnlocked(CurrentStageId, HighestStageId))
+        {
+            CurrentStageId = HighestStageId;
+        }
+
+        if (!GameData.IsStageUnlocked(SelectedStageId, HighestStageId))
+        {
+            SelectedStageId = CurrentStageId;
+        }
+    }
+
+    private void SaveProgress()
+    {
+        saveManager.SaveString(SaveKeys.HighestStageId, HighestStageId);
+        saveManager.SaveString(SaveKeys.CurrentStageId, CurrentStageId);
+        saveManager.SaveString(SaveKeys.SelectedStageId, SelectedStageId);
+        saveManager.SaveString(SaveKeys.ProgressMode, Mode.ToString());
+        saveManager.SaveBool(SaveKeys.ChapterOneBossCleared, ChapterOneBossCleared);
+        saveManager.Flush();
+    }
+
+    private void NotifyChanged()
+    {
+        Changed?.Invoke();
+    }
+}

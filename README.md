@@ -6,9 +6,9 @@
 
 ## 문서 목록
 
-- [MVP_SPEC.md](MVP_SPEC.md): 1차 MVP 게임 기획서
-- [DATA_TABLES.md](DATA_TABLES.md): 초기 영웅, 적, 스테이지, 보스, 뽑기, 저장 데이터
-- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md): Unity 구현 순서와 완료 기준
+- [MVP_SPEC.md](doc/MVP_SPEC.md): 1차 MVP 게임 기획서
+- [DATA_TABLES.md](doc/DATA_TABLES.md): 초기 영웅, 적, 스테이지, 보스, 뽑기, 저장 데이터
+- [IMPLEMENTATION_PLAN.md](doc/IMPLEMENTATION_PLAN.md): Unity 구현 순서와 완료 기준
 
 ## 확정된 방향
 
