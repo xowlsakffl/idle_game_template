@@ -1,6 +1,9 @@
 public static class SaveKeys
 {
     public const string Gold = "gold";
+    public const string Ruby = "ruby";
+    public const string HeroExpItem = "heroExpItem";
+    public const string HeroSummonTicket = "heroSummonTicket";
     public const string HighestStageId = "highestStageId";
     public const string CurrentStageId = "currentStageId";
     public const string SelectedStageId = "selectedStageId";

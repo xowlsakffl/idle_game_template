@@ -54,9 +54,9 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         int cost = hero.LevelUpCost;
-        if (!wallet.SpendGold(cost))
+        if (!wallet.SpendHeroExpItem(cost))
         {
-            LastBattleLog = hero.Definition.DisplayName + " 레벨업 실패: 골드 부족";
+            LastBattleLog = hero.Definition.DisplayName + " 레벨업 실패: EXP 아이템 부족";
             NotifyChanged();
             return false;
         }
@@ -193,7 +193,9 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         int gold = GameData.GetEnemyGold(stage);
+        int heroExp = GameData.GetEnemyHeroExpItem(stage);
         wallet.AddGold(gold);
+        wallet.AddHeroExpItem(heroExp);
         KillsThisStage += 1;
 
         if (KillsThisStage >= RequiredKills)
@@ -204,7 +206,7 @@ public sealed class BattleManager : MonoBehaviour
             return;
         }
 
-        LastBattleLog = stage.Id + " 처치 " + KillsThisStage + "/" + RequiredKills + ", +" + gold + " 골드";
+        LastBattleLog = stage.Id + " 처치 " + KillsThisStage + "/" + RequiredKills + ", +" + gold + " 골드, +" + heroExp + " EXP";
         SpawnTarget();
     }
 

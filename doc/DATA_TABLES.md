@@ -118,6 +118,41 @@
 
 1차 MVP에서는 유료 재화와 광고 보상 없이 뽑기 시스템만 검증한다.
 
+## 목표 재화 데이터
+
+현재 코드의 골드 레벨업은 임시 구현이다. 목표 구조에서는 히어로 레벨업과 능력 성장을 분리한다.
+
+| ID | 이름 | 획득처 | 사용처 | 1차 MVP |
+| --- | --- | --- | --- | --- |
+| gold | 골드 | 일반 전투, 오프라인 보상 | 능력 성장 | 예 |
+| ruby | 루비 보석 | 테스트 지급, 퀘스트, 상점 | 뽑기권 부족 시 뽑기 | 예 |
+| heroExpItem | 히어로 경험치 아이템 | 전투, 던전, 보상 | 히어로 레벨업 | 예 |
+| eventSummonTicket | 이벤트 뽑기권 | 이벤트 보상 | 이벤트 뽑기 | 보류 |
+| heroSummonTicket | 히어로 뽑기권 | 보상, 상점 | 히어로 뽑기 | 예 |
+| sealSummonTicket | 인장 뽑기권 | 보상, 상점 | 인장 뽑기 | 보류 |
+| equipmentSummonTicket | 장비 뽑기권 | 보상, 상점 | 장비 뽑기 | 보류 |
+
+## 목표 능력 성장 데이터
+
+| ID | 이름 | 기본값 | 증가 방식 | 1차 MVP |
+| --- | --- | ---: | --- | --- |
+| attackPower | 공격력 | 0 | 레벨당 고정 수치 증가 | 예 |
+| maxHp | 체력 | 100 | 레벨당 고정 수치 증가 | 보류 |
+| criticalChance | 치명타 확률 | 0% | 레벨당 확률 증가, 상한 필요 | 예 |
+| criticalDamage | 치명타 데미지 | 150% | 레벨당 배율 증가 | 예 |
+| doubleCriticalChance | 더블 치명타 확률 | 0% | 치명타 후 추가 확률 | 보류 |
+| doubleCriticalBonusDamage | 더블 치명타 추가 데미지 | 0% | 더블 치명타 추가 배율 | 보류 |
+| finalDamage | 최종 데미지 | 100% | 최종 곱연산 배율 | 보류 |
+
+## 목표 뽑기 데이터
+
+| ID | 이름 | 우선 소모 재화 | 대체 소모 재화 | MVP 처리 |
+| --- | --- | --- | --- | --- |
+| eventSummon | 이벤트 뽑기 | eventSummonTicket | ruby | 보류 |
+| heroSummon | 히어로 뽑기 | heroSummonTicket | ruby | 구현 |
+| sealSummon | 인장 뽑기 | sealSummonTicket | ruby | 보류 |
+| equipmentSummon | 장비 뽑기 | equipmentSummonTicket | ruby | 보류 |
+
 ## 오프라인 보상 데이터
 
 보스 스테이지는 오프라인 보상 기준으로 사용하지 않는다. 현재 위치가 보스라면 직전 일반 스테이지를 기준으로 계산한다.
@@ -140,6 +175,9 @@
 | 키 | 타입 | 설명 |
 | --- | --- | --- |
 | gold | long | 보유 골드 |
+| ruby | long | 보유 루비 |
+| heroExpItem | long | 히어로 레벨업 경험치 아이템 |
+| heroSummonTicket | long | 히어로 뽑기권 |
 | highestStageId | string | 최고 도달 스테이지, 예: 1-20 |
 | currentStageId | string | 현재 전투 또는 파밍 스테이지 |
 | selectedStageId | string | 유저가 선택한 반복 스테이지 |

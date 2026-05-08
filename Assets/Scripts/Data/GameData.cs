@@ -128,6 +128,12 @@ public static class GameData
         return Mathf.FloorToInt(enemy.BaseGold * stage.GoldMultiplier);
     }
 
+    public static int GetEnemyHeroExpItem(StageDefinition stage)
+    {
+        int baseReward = Mathf.CeilToInt(GetEnemyGold(stage) * 0.6f);
+        return Mathf.Max(1, baseReward);
+    }
+
     public static int GetBossHp(StageDefinition stage)
     {
         BossDefinition boss = GetBoss(stage.TargetId);

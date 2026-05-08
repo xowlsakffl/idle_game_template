@@ -43,7 +43,7 @@ public sealed class GameBootstrap : MonoBehaviour
         progressManager.Initialize(saveManager);
         wallet.Initialize(saveManager);
         battleManager.Initialize(progressManager, wallet, saveManager);
-        gachaManager.Initialize(battleManager);
+        gachaManager.Initialize(battleManager, wallet);
 
         ApplyOfflineReward();
 

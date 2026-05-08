@@ -4,21 +4,32 @@ using UnityEngine;
 
 public sealed class GachaManager : MonoBehaviour
 {
+    private const int RubyCostPerHeroSummon = 150;
+
     private readonly System.Random random = new System.Random();
     private BattleManager battleManager;
+    private CurrencyWallet wallet;
 
     public event Action Changed;
 
     public string LastResult { get; private set; } = "뽑기 대기";
 
-    public void Initialize(BattleManager battle)
+    public void Initialize(BattleManager battle, CurrencyWallet currency)
     {
         battleManager = battle;
+        wallet = currency;
     }
 
     public void Roll(int count)
     {
         count = Mathf.Clamp(count, 1, 10);
+        if (!wallet.SpendHeroSummonCost(count, RubyCostPerHeroSummon))
+        {
+            LastResult = "히어로 뽑기 실패: 뽑기권과 루비 부족";
+            Changed?.Invoke();
+            return;
+        }
+
         var result = new StringBuilder();
 
         for (int i = 0; i < count; i++)
