@@ -45,14 +45,15 @@ public sealed class GameHud : MonoBehaviour
 
     private void CreateEventSystemIfNeeded()
     {
-        if (FindObjectOfType<EventSystem>() != null)
+        if (FindAnyObjectByType<EventSystem>() != null)
         {
             return;
         }
 
         GameObject eventSystemObject = new GameObject("EventSystem");
         eventSystemObject.AddComponent<EventSystem>();
-        eventSystemObject.AddComponent<InputSystemUIInputModule>();
+        InputSystemUIInputModule inputModule = eventSystemObject.AddComponent<InputSystemUIInputModule>();
+        inputModule.AssignDefaultActions();
     }
 
     private void CreateHud()
@@ -156,7 +157,7 @@ public sealed class GameHud : MonoBehaviour
         GameObject gridObject = new GameObject("StageGrid", typeof(RectTransform));
         gridObject.transform.SetParent(panel.transform, false);
         GridLayoutGroup grid = gridObject.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(235, 64);
+        grid.cellSize = new Vector2(228, 64);
         grid.spacing = new Vector2(12, 12);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 4;

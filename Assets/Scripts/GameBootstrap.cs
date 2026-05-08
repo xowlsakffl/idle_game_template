@@ -13,7 +13,7 @@ public sealed class GameBootstrap : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateRuntime()
     {
-        if (FindObjectOfType<GameBootstrap>() != null)
+        if (FindAnyObjectByType<GameBootstrap>() != null)
         {
             return;
         }
