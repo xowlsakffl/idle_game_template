@@ -15,6 +15,7 @@ public sealed class GameHud : MonoBehaviour
 
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
+    private AbilityManager abilityManager;
     private BattleManager battleManager;
     private GachaManager gachaManager;
 
@@ -34,6 +35,7 @@ public sealed class GameHud : MonoBehaviour
     private GameObject summonPanel;
     private Text gachaText;
 
+    private readonly Dictionary<AbilityKind, Text> abilityButtonTexts = new Dictionary<AbilityKind, Text>();
     private readonly Dictionary<string, Text> heroButtonTexts = new Dictionary<string, Text>();
     private readonly Dictionary<string, Button> stageButtons = new Dictionary<string, Button>();
     private readonly Dictionary<HudTab, Button> tabButtons = new Dictionary<HudTab, Button>();
@@ -41,11 +43,13 @@ public sealed class GameHud : MonoBehaviour
     public void Initialize(
         StageProgressManager progress,
         CurrencyWallet currency,
+        AbilityManager abilities,
         BattleManager battle,
         GachaManager gacha)
     {
         progressManager = progress;
         wallet = currency;
+        abilityManager = abilities;
         battleManager = battle;
         gachaManager = gacha;
 
@@ -54,6 +58,7 @@ public sealed class GameHud : MonoBehaviour
 
         progressManager.Changed += UpdateView;
         wallet.Changed += UpdateView;
+        abilityManager.Changed += UpdateView;
         battleManager.Changed += UpdateView;
         gachaManager.Changed += UpdateView;
 
@@ -194,22 +199,32 @@ public sealed class GameHud : MonoBehaviour
         layout.childForceExpandHeight = false;
 
         Text title = CreateText("GrowthTitle", parent, 36, FontStyle.Bold, TextAnchor.MiddleLeft);
-        title.text = "성장 - 히어로 레벨업은 EXP 아이템 사용";
+        title.text = "성장 - 골드 능력치 / EXP 히어로 레벨업";
         AddLayoutElement(title.gameObject, -1, 58);
+
+        foreach (AbilityState ability in abilityManager.States)
+        {
+            Button button = CreateButton(ability.Definition.DisplayName, parent, 27, new Color(0.31f, 0.29f, 0.20f, 1f));
+            AddLayoutElement(button.gameObject, -1, 104);
+
+            AbilityKind kind = ability.Definition.Kind;
+            button.onClick.AddListener(() => abilityManager.TryLevelUp(kind));
+            abilityButtonTexts[kind] = button.GetComponentInChildren<Text>();
+        }
+
+        Text heroTitle = CreateText("HeroGrowthTitle", parent, 30, FontStyle.Bold, TextAnchor.MiddleLeft);
+        heroTitle.text = "히어로";
+        AddLayoutElement(heroTitle.gameObject, -1, 46);
 
         foreach (HeroDefinition hero in GameData.Heroes)
         {
             Button button = CreateButton(hero.DisplayName, parent, 28, new Color(0.23f, 0.29f, 0.37f, 1f));
-            AddLayoutElement(button.gameObject, -1, 126);
+            AddLayoutElement(button.gameObject, -1, 106);
 
             string heroId = hero.Id;
             button.onClick.AddListener(() => battleManager.TryLevelUpHero(heroId));
             heroButtonTexts[hero.Id] = button.GetComponentInChildren<Text>();
         }
-
-        Text note = CreateText("GrowthNote", parent, 24, FontStyle.Normal, TextAnchor.UpperLeft);
-        note.text = "다음 단계: 공격력 / 치명타 확률 / 치명타 데미지 계정 성장 탭 추가";
-        AddLayoutElement(note.gameObject, -1, 90);
     }
 
     private void CreateStagePanel(Transform parent)
@@ -339,7 +354,24 @@ public sealed class GameHud : MonoBehaviour
         }
 
         logText.text = battleManager.LastBattleLog;
+        if (!string.IsNullOrEmpty(battleManager.LastDamageLog))
+        {
+            logText.text += "\n" + battleManager.LastDamageLog;
+        }
+
         gachaText.text = gachaManager.LastResult;
+
+        foreach (AbilityState ability in abilityManager.States)
+        {
+            if (abilityButtonTexts.TryGetValue(ability.Definition.Kind, out Text text))
+            {
+                string costText = ability.IsMaxed ? "MAX" : "Cost Gold " + ability.LevelUpCost;
+                text.text = ability.Definition.DisplayName
+                    + "  Lv." + ability.Level
+                    + "\n" + abilityManager.GetDisplayValue(ability)
+                    + "  " + costText;
+            }
+        }
 
         foreach (HeroState hero in battleManager.Heroes)
         {

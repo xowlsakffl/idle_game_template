@@ -52,6 +52,13 @@ public static class GameData
         new StageDefinition("1-20", 1, 20, StageType.Boss, "B001", 1.00f, 1.00f, 1, BossFallbackStageId)
     };
 
+    private static readonly AbilityDefinition[] abilities =
+    {
+        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "모든 히어로 기본 데미지 증가", 5, 0, 0, 25, 1.25f),
+        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "치명타 발생 확률 증가", 5, 0, 100, 50, 1.30f),
+        new AbilityDefinition(AbilityKind.CriticalDamage, "치명타 데미지 증가", "치명타 데미지 배율 증가", 5, 150, 0, 75, 1.30f)
+    };
+
     private static readonly Dictionary<string, HeroDefinition> heroesById = BuildHeroMap();
     private static readonly Dictionary<string, EnemyDefinition> enemiesById = BuildEnemyMap();
     private static readonly Dictionary<string, BossDefinition> bossesById = BuildBossMap();
@@ -60,6 +67,7 @@ public static class GameData
 
     public static IReadOnlyList<HeroDefinition> Heroes => heroes;
     public static IReadOnlyList<StageDefinition> Stages => stages;
+    public static IReadOnlyList<AbilityDefinition> Abilities => abilities;
 
     public static HeroDefinition GetHero(string id)
     {

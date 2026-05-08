@@ -46,6 +46,24 @@ public sealed class CurrencyWallet : MonoBehaviour
         NotifyChanged();
     }
 
+    public bool SpendGold(long amount)
+    {
+        if (amount <= 0)
+        {
+            return true;
+        }
+
+        if (Gold < amount)
+        {
+            return false;
+        }
+
+        Gold -= amount;
+        Save();
+        NotifyChanged();
+        return true;
+    }
+
     public bool SpendHeroExpItem(long amount)
     {
         if (amount <= 0)

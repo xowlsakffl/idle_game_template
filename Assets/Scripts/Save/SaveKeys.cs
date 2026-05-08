@@ -20,4 +20,9 @@ public static class SaveKeys
     {
         return "hero." + heroId + ".shards";
     }
+
+    public static string AbilityLevel(AbilityKind kind)
+    {
+        return "ability." + kind + ".level";
+    }
 }

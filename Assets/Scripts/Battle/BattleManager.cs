@@ -4,9 +4,11 @@ using UnityEngine;
 
 public sealed class BattleManager : MonoBehaviour
 {
+    private readonly System.Random random = new System.Random();
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
     private SaveManager saveManager;
+    private AbilityManager abilityManager;
     private List<HeroState> heroes;
     private bool initialized;
 
@@ -21,12 +23,14 @@ public sealed class BattleManager : MonoBehaviour
     public float BossTimeRemaining { get; private set; }
     public bool IsBossFight { get; private set; }
     public string LastBattleLog { get; private set; } = "전투 준비 중";
+    public string LastDamageLog { get; private set; } = string.Empty;
 
-    public void Initialize(StageProgressManager progress, CurrencyWallet currency, SaveManager save)
+    public void Initialize(StageProgressManager progress, CurrencyWallet currency, SaveManager save, AbilityManager abilities)
     {
         progressManager = progress;
         wallet = currency;
         saveManager = save;
+        abilityManager = abilities;
         heroes = saveManager.LoadHeroes();
 
         progressManager.Changed += StartStage;
@@ -139,7 +143,7 @@ public sealed class BattleManager : MonoBehaviour
             }
 
             hero.AttackCooldown += hero.Definition.AttackInterval;
-            DealDamage(hero.AttackPower);
+            DealDamage(hero);
 
             if (TargetHp <= 0)
             {
@@ -165,9 +169,12 @@ public sealed class BattleManager : MonoBehaviour
         }
     }
 
-    private void DealDamage(int damage)
+    private void DealDamage(HeroState hero)
     {
+        int damage = CalculateDamage(hero, out bool isCritical);
         TargetHp = Mathf.Max(0, TargetHp - Mathf.Max(1, damage));
+        LastDamageLog = hero.Definition.DisplayName + " -" + damage + (isCritical ? " CRIT" : string.Empty);
+
         if (TargetHp <= 0)
         {
             HandleTargetDefeated();
@@ -176,6 +183,18 @@ public sealed class BattleManager : MonoBehaviour
         {
             NotifyChanged();
         }
+    }
+
+    private int CalculateDamage(HeroState hero, out bool isCritical)
+    {
+        int baseDamage = hero.AttackPower + abilityManager.AttackPowerBonus;
+        isCritical = random.NextDouble() < abilityManager.CriticalChance;
+        if (!isCritical)
+        {
+            return Mathf.Max(1, baseDamage);
+        }
+
+        return Mathf.Max(1, Mathf.FloorToInt(baseDamage * abilityManager.CriticalDamageMultiplier));
     }
 
     private void HandleTargetDefeated()

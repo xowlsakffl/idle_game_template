@@ -144,6 +144,14 @@
 | doubleCriticalBonusDamage | 더블 치명타 추가 데미지 | 0% | 더블 치명타 추가 배율 | 보류 |
 | finalDamage | 최종 데미지 | 100% | 최종 곱연산 배율 | 보류 |
 
+현재 구현된 능력 성장 비용:
+
+| ID | 비용 공식 | 최대 레벨 |
+| --- | --- | ---: |
+| attackPower | floor(25 * 다음 레벨^1.25) | 없음 |
+| criticalChance | floor(50 * 다음 레벨^1.30) | 100 |
+| criticalDamage | floor(75 * 다음 레벨^1.30) | 없음 |
+
 ## 목표 뽑기 데이터
 
 | ID | 이름 | 우선 소모 재화 | 대체 소모 재화 | MVP 처리 |

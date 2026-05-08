@@ -237,12 +237,12 @@ Assets/
 다음 구현에서는 아래 순서만 반영한다.
 
 ```text
-1. CurrencyWallet을 gold, ruby, heroExpItem, heroSummonTicket 지원으로 확장
-2. 히어로 레벨업 비용을 gold에서 heroExpItem으로 변경
-3. 전투 보상에 heroExpItem 소량 지급 추가
-4. 계정 능력 성장 데이터 추가
-5. 공격력, 치명타 확률, 치명타 데미지만 실제 데미지 계산에 반영
-6. 히어로 뽑기는 heroSummonTicket 우선, 부족하면 ruby 소모로 변경
+1. CurrencyWallet을 gold, ruby, heroExpItem, heroSummonTicket 지원으로 확장 - 완료
+2. 히어로 레벨업 비용을 gold에서 heroExpItem으로 변경 - 완료
+3. 전투 보상에 heroExpItem 소량 지급 추가 - 완료
+4. 계정 능력 성장 데이터 추가 - 완료
+5. 공격력, 치명타 확률, 치명타 데미지만 실제 데미지 계산에 반영 - 완료
+6. 히어로 뽑기는 heroSummonTicket 우선, 부족하면 ruby 소모로 변경 - 완료
 ```
 
 이벤트 뽑기, 인장 뽑기, 장비 뽑기는 구조만 고려하고 실제 구현은 히어로 뽑기 루프가 안정된 뒤에 한다.

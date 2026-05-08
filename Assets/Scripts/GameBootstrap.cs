@@ -6,6 +6,7 @@ public sealed class GameBootstrap : MonoBehaviour
     private SaveManager saveManager;
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
+    private AbilityManager abilityManager;
     private BattleManager battleManager;
     private GachaManager gachaManager;
     private bool initialized;
@@ -37,18 +38,20 @@ public sealed class GameBootstrap : MonoBehaviour
         saveManager = gameObject.AddComponent<SaveManager>();
         progressManager = gameObject.AddComponent<StageProgressManager>();
         wallet = gameObject.AddComponent<CurrencyWallet>();
+        abilityManager = gameObject.AddComponent<AbilityManager>();
         battleManager = gameObject.AddComponent<BattleManager>();
         gachaManager = gameObject.AddComponent<GachaManager>();
 
         progressManager.Initialize(saveManager);
         wallet.Initialize(saveManager);
-        battleManager.Initialize(progressManager, wallet, saveManager);
+        abilityManager.Initialize(wallet, saveManager);
+        battleManager.Initialize(progressManager, wallet, saveManager, abilityManager);
         gachaManager.Initialize(battleManager, wallet);
 
         ApplyOfflineReward();
 
         GameHud hud = gameObject.AddComponent<GameHud>();
-        hud.Initialize(progressManager, wallet, battleManager, gachaManager);
+        hud.Initialize(progressManager, wallet, abilityManager, battleManager, gachaManager);
     }
 
     private void OnApplicationPause(bool pauseStatus)
