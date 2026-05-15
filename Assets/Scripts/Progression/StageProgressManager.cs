@@ -117,6 +117,27 @@ public sealed class StageProgressManager : MonoBehaviour
         NotifyChanged();
     }
 
+    public void DebugJumpToStage(string stageId, ProgressMode mode)
+    {
+        StageDefinition stage = GameData.GetStage(stageId);
+        CurrentStageId = stage.Id;
+        SelectedStageId = stage.Id;
+        HighestStageId = GameData.MaxStageId(HighestStageId, stage.Id);
+        Mode = mode;
+
+        SaveProgress();
+        NotifyChanged();
+    }
+
+    public void DebugUnlockThrough(string stageId)
+    {
+        StageDefinition stage = GameData.GetStage(stageId);
+        HighestStageId = GameData.MaxStageId(HighestStageId, stage.Id);
+
+        SaveProgress();
+        NotifyChanged();
+    }
+
     public string GetOfflineRewardStageId()
     {
         StageDefinition stage = CurrentStage;

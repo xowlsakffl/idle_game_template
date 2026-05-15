@@ -48,7 +48,8 @@ public sealed class SaveManager : MonoBehaviour
         {
             int level = PlayerPrefs.GetInt(SaveKeys.HeroLevel(definition.Id), 1);
             int shards = PlayerPrefs.GetInt(SaveKeys.HeroShards(definition.Id), 0);
-            heroes.Add(new HeroState(definition, level, shards));
+            int stars = PlayerPrefs.GetInt(SaveKeys.HeroStars(definition.Id), 0);
+            heroes.Add(new HeroState(definition, level, shards, stars));
         }
 
         return heroes;
@@ -58,6 +59,7 @@ public sealed class SaveManager : MonoBehaviour
     {
         PlayerPrefs.SetInt(SaveKeys.HeroLevel(hero.Definition.Id), hero.Level);
         PlayerPrefs.SetInt(SaveKeys.HeroShards(hero.Definition.Id), hero.Shards);
+        PlayerPrefs.SetInt(SaveKeys.HeroStars(hero.Definition.Id), hero.Stars);
     }
 
     public DateTime? LoadLastOnlineUtc()

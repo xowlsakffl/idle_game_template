@@ -4,8 +4,18 @@ using UnityEngine;
 public enum AbilityKind
 {
     AttackPower,
+    MaxHp,
     CriticalChance,
-    CriticalDamage
+    CriticalDamage,
+    DoubleCriticalChance,
+    DoubleCriticalBonusDamage,
+    FinalDamage
+}
+
+public enum AbilityDisplayKind
+{
+    Flat,
+    Percent
 }
 
 [Serializable]
@@ -15,11 +25,12 @@ public sealed class AbilityDefinition
         AbilityKind kind,
         string displayName,
         string description,
-        int valuePerLevel,
-        int baseValue,
+        double valuePerLevel,
+        double baseValue,
         int maxLevel,
-        int baseCost,
-        float costGrowth)
+        long baseCost,
+        float costGrowth,
+        AbilityDisplayKind displayKind)
     {
         Kind = kind;
         DisplayName = displayName;
@@ -29,21 +40,23 @@ public sealed class AbilityDefinition
         MaxLevel = maxLevel;
         BaseCost = baseCost;
         CostGrowth = costGrowth;
+        DisplayKind = displayKind;
     }
 
     public AbilityKind Kind { get; }
     public string Id => Kind.ToString();
     public string DisplayName { get; }
     public string Description { get; }
-    public int ValuePerLevel { get; }
-    public int BaseValue { get; }
+    public double ValuePerLevel { get; }
+    public double BaseValue { get; }
     public int MaxLevel { get; }
-    public int BaseCost { get; }
+    public long BaseCost { get; }
     public float CostGrowth { get; }
+    public AbilityDisplayKind DisplayKind { get; }
 
-    public int GetRawValue(int level)
+    public double GetValue(int level)
     {
-        return BaseValue + Mathf.Max(0, level) * ValuePerLevel;
+        return BaseValue + Math.Max(0, level) * ValuePerLevel;
     }
 
     public long GetLevelUpCost(int level)
@@ -54,7 +67,52 @@ public sealed class AbilityDefinition
         }
 
         int nextLevel = Mathf.Max(1, level + 1);
-        return Mathf.FloorToInt(BaseCost * Mathf.Pow(nextLevel, CostGrowth));
+        double cost = BaseCost * Math.Pow(nextLevel, CostGrowth);
+        if (double.IsNaN(cost) || cost <= 0d)
+        {
+            return 1;
+        }
+
+        if (cost >= long.MaxValue)
+        {
+            return long.MaxValue;
+        }
+
+        return Math.Max(1L, (long)Math.Floor(cost));
+    }
+
+    public string FormatValue(int level)
+    {
+        double value = GetValue(level);
+        return DisplayKind == AbilityDisplayKind.Percent
+            ? value.ToString("0.#") + "%"
+            : FormatShortNumber(value);
+    }
+
+    public static string FormatShortNumber(double value)
+    {
+        double abs = Math.Abs(value);
+        if (abs >= 1000000000000d)
+        {
+            return (value / 1000000000000d).ToString("0.##") + "T";
+        }
+
+        if (abs >= 1000000000d)
+        {
+            return (value / 1000000000d).ToString("0.##") + "B";
+        }
+
+        if (abs >= 1000000d)
+        {
+            return (value / 1000000d).ToString("0.##") + "M";
+        }
+
+        if (abs >= 1000d)
+        {
+            return (value / 1000d).ToString("0.##") + "K";
+        }
+
+        return value.ToString(value % 1d == 0d ? "0" : "0.#");
     }
 }
 
@@ -69,6 +127,6 @@ public sealed class AbilityState
     public AbilityDefinition Definition { get; }
     public int Level { get; set; }
     public bool IsMaxed => Definition.MaxLevel > 0 && Level >= Definition.MaxLevel;
-    public int RawValue => Definition.GetRawValue(Level);
+    public double Value => Definition.GetValue(Level);
     public long LevelUpCost => Definition.GetLevelUpCost(Level);
 }

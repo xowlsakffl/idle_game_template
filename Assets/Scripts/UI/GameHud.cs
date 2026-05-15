@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -9,17 +10,25 @@ public sealed class GameHud : MonoBehaviour
     private enum HudTab
     {
         Growth,
+        Hero,
         Stage,
-        Summon
+        Summon,
+        Shop,
+        Support,
+        Debug
     }
 
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
     private AbilityManager abilityManager;
+    private GameSpeedManager speedManager;
     private BattleManager battleManager;
     private GachaManager gachaManager;
+    private Action resetSaveAction;
 
     private HudTab activeTab = HudTab.Growth;
+    private bool contentPanelOpen = true;
+    private GameObject canvasObject;
 
     private Text resourceText;
     private Text stageText;
@@ -27,42 +36,238 @@ public sealed class GameHud : MonoBehaviour
     private Text targetText;
     private Text hpText;
     private Text progressText;
+    private Text supportText;
     private Text logText;
+    private Text rewardText;
+    private Text damagePopupText;
+    private Text supportSummaryText;
+    private Text totalCombatPowerText;
+    private Text growthNoticeText;
+    private Text fieldStagePillText;
+    private Text guideQuestText;
+    private Text damageMeterText;
+    private Text centerSpawnText;
     private Image hpFill;
+    private RectTransform battlefieldRect;
+    private LayoutElement battleLayoutElement;
+    private LayoutElement contentLayoutElement;
+    private int observedHitSequence = -1;
+    private float hitFlashRemaining;
 
+    private GameObject contentRoot;
     private GameObject growthPanel;
+    private GameObject heroPanel;
     private GameObject stagePanel;
     private GameObject summonPanel;
+    private GameObject shopPanel;
+    private GameObject supportPanel;
+    private GameObject debugPanel;
+    private GameObject guideQuestDot;
     private Text gachaText;
+    private Text debugText;
+    private int selectedGrowthLevelStep = 1;
+    private string growthNoticeMessage = string.Empty;
+    private float growthNoticeUntil;
 
     private readonly Dictionary<AbilityKind, Text> abilityButtonTexts = new Dictionary<AbilityKind, Text>();
+    private readonly Dictionary<AbilityKind, Text> abilityCostBadgeTexts = new Dictionary<AbilityKind, Text>();
     private readonly Dictionary<string, Text> heroButtonTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<AbilityKind, GameObject> abilityNotificationDots = new Dictionary<AbilityKind, GameObject>();
+    private readonly Dictionary<string, GameObject> heroNotificationDots = new Dictionary<string, GameObject>();
+    private readonly Dictionary<string, Text> skillStatusTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<string, Text> petStatusTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<string, Image> heroBattleImages = new Dictionary<string, Image>();
+    private readonly Dictionary<string, Text> heroBattleTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<string, RectTransform> heroBattleRects = new Dictionary<string, RectTransform>();
+    private readonly Dictionary<int, Button> growthStepButtons = new Dictionary<int, Button>();
     private readonly Dictionary<string, Button> stageButtons = new Dictionary<string, Button>();
+    private readonly Dictionary<int, Button> speedButtons = new Dictionary<int, Button>();
     private readonly Dictionary<HudTab, Button> tabButtons = new Dictionary<HudTab, Button>();
+    private readonly Dictionary<HudTab, string> tabButtonLabels = new Dictionary<HudTab, string>();
+    private readonly Dictionary<HudTab, List<GameObject>> tabNotificationDots = new Dictionary<HudTab, List<GameObject>>();
+    private readonly List<Image> enemyBattleImages = new List<Image>();
+    private readonly List<Text> enemyBattleTexts = new List<Text>();
+    private readonly List<RectTransform> enemyBattleRects = new List<RectTransform>();
 
     public void Initialize(
         StageProgressManager progress,
         CurrencyWallet currency,
         AbilityManager abilities,
+        GameSpeedManager speed,
         BattleManager battle,
-        GachaManager gacha)
+        GachaManager gacha,
+        Action resetSave)
     {
+        UnsubscribeEvents();
+
         progressManager = progress;
         wallet = currency;
         abilityManager = abilities;
+        speedManager = speed;
         battleManager = battle;
         gachaManager = gacha;
+        resetSaveAction = resetSave;
 
+        ResetRuntimeUiState();
         CreateEventSystemIfNeeded();
+        DestroyExistingHudCanvas();
         CreateHud();
 
+        SubscribeEvents();
+
+        UpdateView();
+    }
+
+    private void Update()
+    {
+        if (battleManager == null || damagePopupText == null)
+        {
+            return;
+        }
+
+        if (observedHitSequence != battleManager.HitSequence)
+        {
+            observedHitSequence = battleManager.HitSequence;
+            hitFlashRemaining = 0.28f;
+        }
+
+        if (hitFlashRemaining > 0f)
+        {
+            hitFlashRemaining = Mathf.Max(0f, hitFlashRemaining - Time.deltaTime);
+        }
+
+        if (growthNoticeText != null
+            && !string.IsNullOrEmpty(growthNoticeMessage)
+            && Time.unscaledTime >= growthNoticeUntil)
+        {
+            growthNoticeMessage = string.Empty;
+            growthNoticeText.text = string.Empty;
+        }
+
+        RefreshBattlefieldVisuals();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeEvents();
+    }
+
+    private void SubscribeEvents()
+    {
         progressManager.Changed += UpdateView;
         wallet.Changed += UpdateView;
         abilityManager.Changed += UpdateView;
+        speedManager.Changed += UpdateView;
         battleManager.Changed += UpdateView;
         gachaManager.Changed += UpdateView;
+    }
 
-        UpdateView();
+    private void UnsubscribeEvents()
+    {
+        if (progressManager != null)
+        {
+            progressManager.Changed -= UpdateView;
+        }
+
+        if (wallet != null)
+        {
+            wallet.Changed -= UpdateView;
+        }
+
+        if (abilityManager != null)
+        {
+            abilityManager.Changed -= UpdateView;
+        }
+
+        if (speedManager != null)
+        {
+            speedManager.Changed -= UpdateView;
+        }
+
+        if (battleManager != null)
+        {
+            battleManager.Changed -= UpdateView;
+        }
+
+        if (gachaManager != null)
+        {
+            gachaManager.Changed -= UpdateView;
+        }
+    }
+
+    private void ResetRuntimeUiState()
+    {
+        resourceText = null;
+        stageText = null;
+        modeText = null;
+        targetText = null;
+        hpText = null;
+        progressText = null;
+        supportText = null;
+        logText = null;
+        rewardText = null;
+        damagePopupText = null;
+        supportSummaryText = null;
+        totalCombatPowerText = null;
+        growthNoticeText = null;
+        fieldStagePillText = null;
+        guideQuestText = null;
+        damageMeterText = null;
+        centerSpawnText = null;
+        hpFill = null;
+        battlefieldRect = null;
+        battleLayoutElement = null;
+        contentLayoutElement = null;
+        observedHitSequence = -1;
+        hitFlashRemaining = 0f;
+
+        contentPanelOpen = true;
+        contentRoot = null;
+        growthPanel = null;
+        heroPanel = null;
+        stagePanel = null;
+        summonPanel = null;
+        shopPanel = null;
+        supportPanel = null;
+        debugPanel = null;
+        guideQuestDot = null;
+        gachaText = null;
+        debugText = null;
+        selectedGrowthLevelStep = 1;
+        growthNoticeMessage = string.Empty;
+        growthNoticeUntil = 0f;
+
+        abilityButtonTexts.Clear();
+        abilityCostBadgeTexts.Clear();
+        heroButtonTexts.Clear();
+        abilityNotificationDots.Clear();
+        heroNotificationDots.Clear();
+        skillStatusTexts.Clear();
+        petStatusTexts.Clear();
+        heroBattleImages.Clear();
+        heroBattleTexts.Clear();
+        heroBattleRects.Clear();
+        growthStepButtons.Clear();
+        stageButtons.Clear();
+        speedButtons.Clear();
+        tabButtons.Clear();
+        tabButtonLabels.Clear();
+        tabNotificationDots.Clear();
+        enemyBattleImages.Clear();
+        enemyBattleTexts.Clear();
+        enemyBattleRects.Clear();
+    }
+
+    private void DestroyExistingHudCanvas()
+    {
+        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude);
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas.gameObject.name == "IdleGameCanvas")
+            {
+                Destroy(canvas.gameObject);
+            }
+        }
     }
 
     private void CreateEventSystemIfNeeded()
@@ -80,7 +285,7 @@ public sealed class GameHud : MonoBehaviour
 
     private void CreateHud()
     {
-        GameObject canvasObject = new GameObject("IdleGameCanvas", typeof(RectTransform));
+        canvasObject = new GameObject("IdleGameCanvas", typeof(RectTransform));
         Canvas canvas = canvasObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvasObject.AddComponent<GraphicRaycaster>();
@@ -98,8 +303,8 @@ public sealed class GameHud : MonoBehaviour
         rootRect.offsetMax = Vector2.zero;
 
         VerticalLayoutGroup rootLayout = root.AddComponent<VerticalLayoutGroup>();
-        rootLayout.padding = new RectOffset(24, 24, 24, 24);
-        rootLayout.spacing = 14;
+        rootLayout.padding = new RectOffset(0, 0, 0, 0);
+        rootLayout.spacing = 0;
         rootLayout.childControlWidth = true;
         rootLayout.childControlHeight = true;
         rootLayout.childForceExpandWidth = true;
@@ -109,42 +314,83 @@ public sealed class GameHud : MonoBehaviour
         CreateBattlePanel(root.transform);
         CreateContentPanels(root.transform);
         CreateBottomNav(root.transform);
+        CreateFloatingActionRails(root.transform);
     }
 
     private void CreateHeader(Transform parent)
     {
-        GameObject panel = CreatePanel("Header", parent, new Color(0.12f, 0.16f, 0.22f, 1f));
-        AddLayoutElement(panel, -1, 190);
+        GameObject panel = CreatePanel("Header", parent, new Color(0.02f, 0.025f, 0.035f, 0.98f));
+        AddLayoutElement(panel, -1, 160);
 
-        VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(24, 24, 18, 18);
-        layout.spacing = 8;
+        GameObject avatar = CreatePanel("PlayerAvatar", panel.transform, new Color(0.12f, 0.22f, 0.32f, 1f));
+        RectTransform avatarRect = avatar.GetComponent<RectTransform>();
+        avatarRect.anchorMin = new Vector2(0f, 0.5f);
+        avatarRect.anchorMax = new Vector2(0f, 0.5f);
+        avatarRect.pivot = new Vector2(0f, 0.5f);
+        avatarRect.sizeDelta = new Vector2(112f, 112f);
+        avatarRect.anchoredPosition = new Vector2(22f, 0f);
 
-        resourceText = CreateText("Resources", panel.transform, 34, FontStyle.Bold, TextAnchor.MiddleLeft);
-        AddLayoutElement(resourceText.gameObject, -1, 48);
+        Text avatarText = CreateText("AvatarText", avatar.transform, 38, FontStyle.Bold, TextAnchor.MiddleCenter);
+        avatarText.text = "G";
+        StretchToParent(avatarText.gameObject);
 
-        stageText = CreateText("Stage", panel.transform, 32, FontStyle.Bold, TextAnchor.MiddleLeft);
-        AddLayoutElement(stageText.gameObject, -1, 44);
+        stageText = CreateText("Stage", panel.transform, 31, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform stageRect = stageText.GetComponent<RectTransform>();
+        stageRect.anchorMin = new Vector2(0f, 0.5f);
+        stageRect.anchorMax = new Vector2(0f, 0.5f);
+        stageRect.pivot = new Vector2(0f, 0.5f);
+        stageRect.sizeDelta = new Vector2(360f, 44f);
+        stageRect.anchoredPosition = new Vector2(152f, 24f);
 
-        modeText = CreateText("Mode", panel.transform, 25, FontStyle.Normal, TextAnchor.MiddleLeft);
-        AddLayoutElement(modeText.gameObject, -1, 38);
+        modeText = CreateText("Mode", panel.transform, 22, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform modeRect = modeText.GetComponent<RectTransform>();
+        modeRect.anchorMin = new Vector2(0f, 0.5f);
+        modeRect.anchorMax = new Vector2(0f, 0.5f);
+        modeRect.pivot = new Vector2(0f, 0.5f);
+        modeRect.sizeDelta = new Vector2(360f, 34f);
+        modeRect.anchoredPosition = new Vector2(152f, -20f);
+
+        GameObject resourcePill = CreatePanel("ResourcePill", panel.transform, new Color(0.09f, 0.10f, 0.13f, 0.95f));
+        RectTransform resourceRect = resourcePill.GetComponent<RectTransform>();
+        resourceRect.anchorMin = new Vector2(1f, 0.5f);
+        resourceRect.anchorMax = new Vector2(1f, 0.5f);
+        resourceRect.pivot = new Vector2(1f, 0.5f);
+        resourceRect.sizeDelta = new Vector2(520f, 66f);
+        resourceRect.anchoredPosition = new Vector2(-112f, 18f);
+        resourceText = CreateText("Resources", resourcePill.transform, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
+        StretchToParent(resourceText.gameObject);
+
+        Button menuButton = CreateButton("≡", panel.transform, 36, new Color(0.12f, 0.16f, 0.22f, 1f));
+        RectTransform menuRect = menuButton.GetComponent<RectTransform>();
+        menuRect.anchorMin = new Vector2(1f, 0.5f);
+        menuRect.anchorMax = new Vector2(1f, 0.5f);
+        menuRect.pivot = new Vector2(1f, 0.5f);
+        menuRect.sizeDelta = new Vector2(76f, 66f);
+        menuRect.anchoredPosition = new Vector2(-22f, 18f);
     }
 
     private void CreateBattlePanel(Transform parent)
     {
-        GameObject panel = CreatePanel("Battle", parent, new Color(0.10f, 0.11f, 0.14f, 1f));
-        AddLayoutElement(panel, -1, 500);
+        GameObject panel = CreatePanel("Battle", parent, new Color(0.14f, 0.16f, 0.20f, 1f));
+        battleLayoutElement = AddLayoutElement(panel, -1, 870);
 
-        VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(30, 30, 28, 28);
-        layout.spacing = 18;
-        layout.childAlignment = TextAnchor.MiddleCenter;
+        CreateBattlefieldPanel(panel.transform);
 
-        targetText = CreateText("Target", panel.transform, 44, FontStyle.Bold, TextAnchor.MiddleCenter);
-        AddLayoutElement(targetText.gameObject, -1, 58);
+        targetText = CreateText("Target", panel.transform, 36, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform targetRect = targetText.GetComponent<RectTransform>();
+        targetRect.anchorMin = new Vector2(0.5f, 1f);
+        targetRect.anchorMax = new Vector2(0.5f, 1f);
+        targetRect.pivot = new Vector2(0.5f, 1f);
+        targetRect.sizeDelta = new Vector2(420f, 48f);
+        targetRect.anchoredPosition = new Vector2(0f, -88f);
 
         GameObject hpBar = CreatePanel("HpBar", panel.transform, new Color(0.03f, 0.04f, 0.05f, 1f));
-        AddLayoutElement(hpBar, -1, 54);
+        RectTransform hpRect = hpBar.GetComponent<RectTransform>();
+        hpRect.anchorMin = new Vector2(0.5f, 1f);
+        hpRect.anchorMax = new Vector2(0.5f, 1f);
+        hpRect.pivot = new Vector2(0.5f, 1f);
+        hpRect.sizeDelta = new Vector2(360f, 34f);
+        hpRect.anchoredPosition = new Vector2(0f, -136f);
         hpFill = CreatePanel("HpFill", hpBar.transform, new Color(0.86f, 0.18f, 0.16f, 1f)).GetComponent<Image>();
         RectTransform fillRect = hpFill.GetComponent<RectTransform>();
         fillRect.anchorMin = Vector2.zero;
@@ -159,71 +405,317 @@ public sealed class GameHud : MonoBehaviour
         hpTextRect.offsetMin = Vector2.zero;
         hpTextRect.offsetMax = Vector2.zero;
 
-        progressText = CreateText("Progress", panel.transform, 34, FontStyle.Bold, TextAnchor.MiddleCenter);
-        AddLayoutElement(progressText.gameObject, -1, 54);
+        progressText = CreateText("Progress", panel.transform, 30, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform progressRect = progressText.GetComponent<RectTransform>();
+        progressRect.anchorMin = new Vector2(0.5f, 1f);
+        progressRect.anchorMax = new Vector2(0.5f, 1f);
+        progressRect.pivot = new Vector2(0.5f, 1f);
+        progressRect.sizeDelta = new Vector2(450f, 42f);
+        progressRect.anchoredPosition = new Vector2(0f, -174f);
 
-        logText = CreateText("Log", panel.transform, 26, FontStyle.Normal, TextAnchor.MiddleCenter);
-        AddLayoutElement(logText.gameObject, -1, 92);
+        supportText = CreateText("Support", panel.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform supportRect = supportText.GetComponent<RectTransform>();
+        supportRect.anchorMin = new Vector2(0f, 1f);
+        supportRect.anchorMax = new Vector2(0f, 1f);
+        supportRect.pivot = new Vector2(0f, 1f);
+        supportRect.sizeDelta = new Vector2(330f, 86f);
+        supportRect.anchoredPosition = new Vector2(26f, -214f);
+
+        CreateCombatSpeedControls(panel.transform);
+
+        logText = CreateText("Log", panel.transform, 22, FontStyle.Bold, TextAnchor.LowerLeft);
+        RectTransform logRect = logText.GetComponent<RectTransform>();
+        logRect.anchorMin = new Vector2(0f, 0f);
+        logRect.anchorMax = new Vector2(0f, 0f);
+        logRect.pivot = new Vector2(0f, 0f);
+        logRect.sizeDelta = new Vector2(460f, 80f);
+        logRect.anchoredPosition = new Vector2(26f, 26f);
+
+        rewardText = CreateText("Reward", panel.transform, 22, FontStyle.Bold, TextAnchor.LowerLeft);
+        rewardText.color = new Color(1f, 0.86f, 0.36f, 1f);
+        RectTransform rewardRect = rewardText.GetComponent<RectTransform>();
+        rewardRect.anchorMin = new Vector2(0f, 0f);
+        rewardRect.anchorMax = new Vector2(0f, 0f);
+        rewardRect.pivot = new Vector2(0f, 0f);
+        rewardRect.sizeDelta = new Vector2(460f, 38f);
+        rewardRect.anchoredPosition = new Vector2(26f, 106f);
+
+        targetText.transform.SetAsLastSibling();
+        hpBar.transform.SetAsLastSibling();
+        progressText.transform.SetAsLastSibling();
+        supportText.transform.SetAsLastSibling();
+        logText.transform.SetAsLastSibling();
+        rewardText.transform.SetAsLastSibling();
+    }
+
+    private void CreateBattlefieldPanel(Transform parent)
+    {
+        GameObject field = CreatePanel("Battlefield", parent, new Color(0.18f, 0.20f, 0.24f, 1f));
+        StretchToParent(field);
+        battlefieldRect = field.GetComponent<RectTransform>();
+
+        centerSpawnText = CreateText("SpawnPortal", field.transform, 82, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform portalRect = centerSpawnText.GetComponent<RectTransform>();
+        portalRect.anchorMin = new Vector2(0.5f, 0.5f);
+        portalRect.anchorMax = new Vector2(0.5f, 0.5f);
+        portalRect.pivot = new Vector2(0.5f, 0.5f);
+        portalRect.sizeDelta = new Vector2(120f, 120f);
+        portalRect.anchoredPosition = Vector2.zero;
+        centerSpawnText.text = "●";
+        centerSpawnText.color = new Color(0.95f, 0.12f, 0.10f, 0.85f);
+
+        GameObject stagePill = CreatePanel("FieldStagePill", field.transform, new Color(0.88f, 0.90f, 0.92f, 0.94f));
+        RectTransform pillRect = stagePill.GetComponent<RectTransform>();
+        pillRect.anchorMin = new Vector2(0.5f, 1f);
+        pillRect.anchorMax = new Vector2(0.5f, 1f);
+        pillRect.pivot = new Vector2(0.5f, 1f);
+        pillRect.sizeDelta = new Vector2(210f, 58f);
+        pillRect.anchoredPosition = new Vector2(0f, -10f);
+        fieldStagePillText = CreateText("FieldStagePillText", stagePill.transform, 27, FontStyle.Bold, TextAnchor.MiddleCenter);
+        fieldStagePillText.color = new Color(0.04f, 0.05f, 0.07f, 1f);
+        StretchToParent(fieldStagePillText.gameObject);
+
+        damagePopupText = CreateText("DamagePopup", field.transform, 32, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform damageRect = damagePopupText.GetComponent<RectTransform>();
+        damageRect.anchorMin = new Vector2(0.5f, 0.5f);
+        damageRect.anchorMax = new Vector2(0.5f, 0.5f);
+        damageRect.pivot = new Vector2(0.5f, 0.5f);
+        damageRect.sizeDelta = new Vector2(260f, 92f);
+        damageRect.anchoredPosition = new Vector2(0f, 18f);
+
+        GameObject damageMeter = CreatePanel("DamageMeter", field.transform, new Color(0.02f, 0.025f, 0.035f, 0.76f));
+        RectTransform damageMeterRect = damageMeter.GetComponent<RectTransform>();
+        damageMeterRect.anchorMin = new Vector2(1f, 0f);
+        damageMeterRect.anchorMax = new Vector2(1f, 0f);
+        damageMeterRect.pivot = new Vector2(1f, 0f);
+        damageMeterRect.sizeDelta = new Vector2(250f, 132f);
+        damageMeterRect.anchoredPosition = new Vector2(-12f, 12f);
+        damageMeterText = CreateText("DamageMeterText", damageMeter.transform, 20, FontStyle.Bold, TextAnchor.UpperLeft);
+        RectTransform damageMeterTextRect = damageMeterText.GetComponent<RectTransform>();
+        damageMeterTextRect.anchorMin = Vector2.zero;
+        damageMeterTextRect.anchorMax = Vector2.one;
+        damageMeterTextRect.offsetMin = new Vector2(12f, 8f);
+        damageMeterTextRect.offsetMax = new Vector2(-12f, -8f);
+
+        GameObject guideQuest = CreatePanel("GuideQuestCard", field.transform, new Color(0.03f, 0.04f, 0.06f, 0.78f));
+        RectTransform guideRect = guideQuest.GetComponent<RectTransform>();
+        guideRect.anchorMin = new Vector2(1f, 1f);
+        guideRect.anchorMax = new Vector2(1f, 1f);
+        guideRect.pivot = new Vector2(1f, 1f);
+        guideRect.sizeDelta = new Vector2(310f, 86f);
+        guideRect.anchoredPosition = new Vector2(-12f, -80f);
+        guideQuestText = CreateText("GuideQuestText", guideQuest.transform, 21, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform guideTextRect = guideQuestText.GetComponent<RectTransform>();
+        guideTextRect.anchorMin = Vector2.zero;
+        guideTextRect.anchorMax = Vector2.one;
+        guideTextRect.offsetMin = new Vector2(18f, 8f);
+        guideTextRect.offsetMax = new Vector2(-18f, -8f);
+        guideQuestDot = CreateNotificationDot(guideQuest.transform, 34f, new Vector2(-12f, -12f));
+
+        foreach (HeroDefinition hero in GameData.Heroes)
+        {
+            GameObject actor = CreateBattleActor(hero.Id + "HeroActor", field.transform, new Vector2(74f, 74f), new Color(0.16f, 0.24f, 0.34f, 1f));
+            Image image = actor.GetComponent<Image>();
+            Text label = CreateText(hero.Id + "BattleLabel", actor.transform, 19, FontStyle.Bold, TextAnchor.MiddleCenter);
+            StretchToParent(label.gameObject);
+            label.text = GetRarityBadge(hero.Rarity) + "\n" + GetShortHeroLabel(hero);
+            heroBattleRects[hero.Id] = actor.GetComponent<RectTransform>();
+            heroBattleImages[hero.Id] = image;
+            heroBattleTexts[hero.Id] = label;
+        }
+
+        for (int i = 0; i < GameData.MaxVisibleEnemies; i++)
+        {
+            GameObject enemy = CreateBattleActor("EnemyActor" + i, field.transform, new Vector2(58f, 58f), new Color(0.56f, 0.13f, 0.11f, 1f));
+            Image image = enemy.GetComponent<Image>();
+            Text label = CreateText("Enemy" + i + "Text", enemy.transform, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
+            StretchToParent(label.gameObject);
+            label.text = "M";
+            enemyBattleRects.Add(enemy.GetComponent<RectTransform>());
+            enemyBattleImages.Add(image);
+            enemyBattleTexts.Add(label);
+        }
+
+        stagePill.transform.SetAsLastSibling();
+        guideQuest.transform.SetAsLastSibling();
+        damageMeter.transform.SetAsLastSibling();
+        damagePopupText.transform.SetAsLastSibling();
+    }
+
+    private void CreateCombatSpeedControls(Transform parent)
+    {
+        GameObject speedRow = new GameObject("CombatSpeedButtons", typeof(RectTransform));
+        speedRow.transform.SetParent(parent, false);
+        RectTransform speedRect = speedRow.GetComponent<RectTransform>();
+        speedRect.anchorMin = new Vector2(1f, 0f);
+        speedRect.anchorMax = new Vector2(1f, 0f);
+        speedRect.pivot = new Vector2(1f, 0f);
+        speedRect.sizeDelta = new Vector2(310f, 74f);
+        speedRect.anchoredPosition = new Vector2(-26f, 154f);
+
+        HorizontalLayoutGroup row = speedRow.AddComponent<HorizontalLayoutGroup>();
+        row.spacing = 10;
+        row.childControlWidth = true;
+        row.childControlHeight = true;
+        row.childForceExpandWidth = true;
+        row.childForceExpandHeight = true;
+
+        CreateSpeedButton(speedRow.transform, GameSpeedManager.NormalSpeed);
+        CreateSpeedButton(speedRow.transform, GameSpeedManager.FreeSpeed);
+        CreateSpeedButton(speedRow.transform, GameSpeedManager.PremiumSpeed);
+    }
+
+    private void CreateSpeedButton(Transform parent, int multiplier)
+    {
+        Button button = CreateButton(multiplier + "x", parent, 26, new Color(0.18f, 0.24f, 0.32f, 1f));
+        button.onClick.AddListener(() => speedManager.TrySelectSpeed(multiplier));
+        speedButtons[multiplier] = button;
     }
 
     private void CreateContentPanels(Transform parent)
     {
-        GameObject contentRoot = CreatePanel("Content", parent, new Color(0.09f, 0.10f, 0.13f, 1f));
-        AddLayoutElement(contentRoot, -1, 1000);
+        contentRoot = CreatePanel("Content", parent, new Color(0.09f, 0.10f, 0.13f, 1f));
+        contentLayoutElement = AddLayoutElement(contentRoot, -1, 760);
 
         RectTransform contentRect = contentRoot.GetComponent<RectTransform>();
         contentRect.anchorMin = new Vector2(0f, 0f);
         contentRect.anchorMax = new Vector2(1f, 1f);
 
         growthPanel = CreatePanel("GrowthPanel", contentRoot.transform, new Color(0.13f, 0.16f, 0.22f, 1f));
+        heroPanel = CreatePanel("HeroPanel", contentRoot.transform, new Color(0.12f, 0.16f, 0.23f, 1f));
         stagePanel = CreatePanel("StagePanel", contentRoot.transform, new Color(0.12f, 0.15f, 0.19f, 1f));
         summonPanel = CreatePanel("SummonPanel", contentRoot.transform, new Color(0.15f, 0.13f, 0.19f, 1f));
+        shopPanel = CreatePanel("ShopPanel", contentRoot.transform, new Color(0.16f, 0.13f, 0.10f, 1f));
+        supportPanel = CreatePanel("SupportPanel", contentRoot.transform, new Color(0.11f, 0.15f, 0.16f, 1f));
 
         StretchToParent(growthPanel);
+        StretchToParent(heroPanel);
         StretchToParent(stagePanel);
         StretchToParent(summonPanel);
+        StretchToParent(shopPanel);
+        StretchToParent(supportPanel);
 
         CreateGrowthPanel(growthPanel.transform);
+        CreateHeroPanel(heroPanel.transform);
         CreateStagePanel(stagePanel.transform);
         CreateSummonPanel(summonPanel.transform);
+        CreateShopPanel(shopPanel.transform);
+        CreateSupportPanel(supportPanel.transform);
+
+        if (IsDebugPanelEnabled())
+        {
+            debugPanel = CreatePanel("DebugPanel", contentRoot.transform, new Color(0.13f, 0.13f, 0.13f, 1f));
+            StretchToParent(debugPanel);
+            CreateDebugPanel(debugPanel.transform);
+        }
     }
 
     private void CreateGrowthPanel(Transform parent)
     {
         VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(24, 24, 22, 22);
-        layout.spacing = 16;
+        layout.spacing = 6;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
 
-        Text title = CreateText("GrowthTitle", parent, 36, FontStyle.Bold, TextAnchor.MiddleLeft);
-        title.text = "성장 - 골드 능력치 / EXP 히어로 레벨업";
-        AddLayoutElement(title.gameObject, -1, 58);
+        Text title = CreateText("GrowthTitle", parent, 32, FontStyle.Bold, TextAnchor.MiddleLeft);
+        title.text = "성장";
+        AddLayoutElement(title.gameObject, -1, 38);
+
+        totalCombatPowerText = CreateText("TotalCombatPower", parent, 28, FontStyle.Bold, TextAnchor.MiddleLeft);
+        totalCombatPowerText.text = "종합 전투력 0";
+        AddLayoutElement(totalCombatPowerText.gameObject, -1, 42);
+
+        growthNoticeText = CreateText("GrowthNotice", parent, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
+        growthNoticeText.color = new Color(1f, 0.55f, 0.34f, 1f);
+        AddLayoutElement(growthNoticeText.gameObject, -1, 30);
+
+        GameObject stepRow = new GameObject("GrowthStepRow", typeof(RectTransform));
+        stepRow.transform.SetParent(parent, false);
+        HorizontalLayoutGroup stepLayout = stepRow.AddComponent<HorizontalLayoutGroup>();
+        stepLayout.spacing = 10;
+        stepLayout.childControlWidth = true;
+        stepLayout.childControlHeight = true;
+        stepLayout.childForceExpandWidth = true;
+        stepLayout.childForceExpandHeight = true;
+        AddLayoutElement(stepRow, -1, 50);
+
+        int[] steps = { 1, 10, 100, 1000 };
+        foreach (int step in steps)
+        {
+            Button stepButton = CreateButton(step + "x", stepRow.transform, 24, new Color(0.18f, 0.24f, 0.38f, 1f));
+            int capturedStep = step;
+            stepButton.onClick.AddListener(() =>
+            {
+                selectedGrowthLevelStep = capturedStep;
+                UpdateView();
+            });
+            growthStepButtons[step] = stepButton;
+        }
 
         foreach (AbilityState ability in abilityManager.States)
         {
-            Button button = CreateButton(ability.Definition.DisplayName, parent, 27, new Color(0.31f, 0.29f, 0.20f, 1f));
-            AddLayoutElement(button.gameObject, -1, 104);
+            Button button = CreateButton(ability.Definition.DisplayName, parent, 22, new Color(0.48f, 0.54f, 0.66f, 1f));
+            AddLayoutElement(button.gameObject, -1, 64);
 
             AbilityKind kind = ability.Definition.Kind;
-            button.onClick.AddListener(() => abilityManager.TryLevelUp(kind));
-            abilityButtonTexts[kind] = button.GetComponentInChildren<Text>();
-        }
+            button.onClick.AddListener(() => TryLevelUpAbilityFromHud(kind));
+            Text rowText = button.GetComponentInChildren<Text>();
+            rowText.alignment = TextAnchor.MiddleLeft;
+            rowText.color = Color.white;
+            RectTransform rowTextRect = rowText.GetComponent<RectTransform>();
+            rowTextRect.anchorMin = Vector2.zero;
+            rowTextRect.anchorMax = new Vector2(0.70f, 1f);
+            rowTextRect.offsetMin = new Vector2(24f, 4f);
+            rowTextRect.offsetMax = new Vector2(-8f, -4f);
+            abilityButtonTexts[kind] = rowText;
 
-        Text heroTitle = CreateText("HeroGrowthTitle", parent, 30, FontStyle.Bold, TextAnchor.MiddleLeft);
+            GameObject costBadge = CreatePanel(ability.Definition.Id + "CostBadge", button.transform, new Color(0.56f, 0.88f, 0.24f, 1f));
+            RectTransform costBadgeRect = costBadge.GetComponent<RectTransform>();
+            costBadgeRect.anchorMin = new Vector2(0.73f, 0.14f);
+            costBadgeRect.anchorMax = new Vector2(0.98f, 0.86f);
+            costBadgeRect.offsetMin = Vector2.zero;
+            costBadgeRect.offsetMax = Vector2.zero;
+            Text costText = CreateText(ability.Definition.Id + "CostText", costBadge.transform, 22, FontStyle.Bold, TextAnchor.MiddleCenter);
+            costText.color = new Color(0.04f, 0.06f, 0.05f, 1f);
+            StretchToParent(costText.gameObject);
+            abilityCostBadgeTexts[kind] = costText;
+
+            abilityNotificationDots[kind] = CreateNotificationDot(button.transform, 40f, new Vector2(-16f, -16f));
+        }
+    }
+
+    private void CreateHeroPanel(Transform parent)
+    {
+        VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(24, 24, 22, 22);
+        layout.spacing = 10;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        Text heroTitle = CreateText("HeroGrowthTitle", parent, 28, FontStyle.Bold, TextAnchor.MiddleLeft);
         heroTitle.text = "히어로";
-        AddLayoutElement(heroTitle.gameObject, -1, 46);
+        AddLayoutElement(heroTitle.gameObject, -1, 50);
 
         foreach (HeroDefinition hero in GameData.Heroes)
         {
-            Button button = CreateButton(hero.DisplayName, parent, 28, new Color(0.23f, 0.29f, 0.37f, 1f));
-            AddLayoutElement(button.gameObject, -1, 106);
+            Button button = CreateButton(hero.DisplayName, parent, 24, new Color(0.23f, 0.29f, 0.37f, 1f));
+            AddLayoutElement(button.gameObject, -1, 82);
 
             string heroId = hero.Id;
-            button.onClick.AddListener(() => battleManager.TryLevelUpHero(heroId));
+            button.onClick.AddListener(() =>
+            {
+                if (!battleManager.TryStarUpHero(heroId))
+                {
+                    battleManager.TryLevelUpHero(heroId);
+                }
+            });
             heroButtonTexts[hero.Id] = button.GetComponentInChildren<Text>();
+            heroNotificationDots[hero.Id] = CreateNotificationDot(button.transform, 40f, new Vector2(-16f, -16f));
         }
     }
 
@@ -297,31 +789,256 @@ public sealed class GameHud : MonoBehaviour
         AddLayoutElement(gachaText.gameObject, -1, 420);
     }
 
-    private void CreateBottomNav(Transform parent)
+    private void CreateShopPanel(Transform parent)
     {
-        GameObject panel = CreatePanel("BottomNav", parent, new Color(0.10f, 0.13f, 0.19f, 1f));
-        AddLayoutElement(panel, -1, 150);
-
-        HorizontalLayoutGroup layout = panel.AddComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(18, 18, 18, 18);
+        VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(24, 24, 22, 22);
         layout.spacing = 16;
         layout.childControlWidth = true;
+        layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
 
-        CreateTabButton(panel.transform, HudTab.Growth, "성장");
-        CreateTabButton(panel.transform, HudTab.Stage, "스테이지");
-        CreateTabButton(panel.transform, HudTab.Summon, "소환");
+        Text title = CreateText("ShopTitle", parent, 36, FontStyle.Bold, TextAnchor.MiddleLeft);
+        title.text = "상점";
+        AddLayoutElement(title.gameObject, -1, 58);
+
+        Button speedProduct = CreateButton("4x", parent, 30, new Color(0.42f, 0.28f, 0.14f, 1f));
+        AddLayoutElement(speedProduct.gameObject, -1, 96);
+        speedProduct.onClick.AddListener(() => speedManager.TrySelectSpeed(GameSpeedManager.PremiumSpeed));
+
+        Button rubyProduct = CreateButton("Ruby", parent, 30, new Color(0.36f, 0.18f, 0.42f, 1f));
+        AddLayoutElement(rubyProduct.gameObject, -1, 96);
+
+        Button ticketProduct = CreateButton("Ticket", parent, 30, new Color(0.24f, 0.30f, 0.42f, 1f));
+        AddLayoutElement(ticketProduct.gameObject, -1, 96);
+    }
+
+    private void CreateSupportPanel(Transform parent)
+    {
+        VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(24, 24, 22, 22);
+        layout.spacing = 14;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        Text title = CreateText("SupportTitle", parent, 34, FontStyle.Bold, TextAnchor.MiddleLeft);
+        title.text = "지원 - 자동 스킬과 펫";
+        AddLayoutElement(title.gameObject, -1, 54);
+
+        supportSummaryText = CreateText("PartySupportInfo", parent, 26, FontStyle.Bold, TextAnchor.MiddleLeft);
+        AddLayoutElement(supportSummaryText.gameObject, -1, 46);
+
+        Text skillTitle = CreateText("SkillSupportTitle", parent, 28, FontStyle.Bold, TextAnchor.MiddleLeft);
+        skillTitle.text = "자동 스킬";
+        AddLayoutElement(skillTitle.gameObject, -1, 42);
+
+        foreach (CombatSkillState skill in battleManager.Skills)
+        {
+            GameObject row = CreatePanel(skill.Definition.Id + "SupportRow", parent, new Color(0.19f, 0.24f, 0.28f, 1f));
+            AddLayoutElement(row, -1, 96);
+            Text text = CreateText(skill.Definition.Id + "SupportText", row.transform, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
+            RectTransform textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(18, 8);
+            textRect.offsetMax = new Vector2(-18, -8);
+            skillStatusTexts[skill.Definition.Id] = text;
+        }
+
+        Text petTitle = CreateText("PetSupportTitle", parent, 28, FontStyle.Bold, TextAnchor.MiddleLeft);
+        petTitle.text = "펫";
+        AddLayoutElement(petTitle.gameObject, -1, 42);
+
+        foreach (PetState pet in battleManager.Pets)
+        {
+            GameObject row = CreatePanel(pet.Definition.Id + "SupportRow", parent, new Color(0.18f, 0.26f, 0.22f, 1f));
+            AddLayoutElement(row, -1, 106);
+            Text text = CreateText(pet.Definition.Id + "SupportText", row.transform, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
+            RectTransform textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(18, 8);
+            textRect.offsetMax = new Vector2(-18, -8);
+            petStatusTexts[pet.Definition.Id] = text;
+        }
+    }
+
+    private void CreateDebugPanel(Transform parent)
+    {
+        VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(24, 24, 22, 22);
+        layout.spacing = 16;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        Text title = CreateText("DebugTitle", parent, 36, FontStyle.Bold, TextAnchor.MiddleLeft);
+        title.text = "QA 디버그";
+        AddLayoutElement(title.gameObject, -1, 58);
+
+        GameObject gridObject = new GameObject("DebugGrid", typeof(RectTransform));
+        gridObject.transform.SetParent(parent, false);
+        GridLayoutGroup grid = gridObject.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(300, 82);
+        grid.spacing = new Vector2(16, 16);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 3;
+        AddLayoutElement(gridObject, -1, 420);
+
+        CreateDebugButton("Gold +5000", gridObject.transform, () => wallet.AddGold(5000));
+        CreateDebugButton("EXP +5000", gridObject.transform, () => wallet.AddHeroExpItem(5000));
+        CreateDebugButton("Ruby +1500", gridObject.transform, () => wallet.AddRuby(1500));
+        CreateDebugButton("Ticket +10", gridObject.transform, () => wallet.AddHeroSummonTicket(10));
+        CreateDebugButton("Hero Lv +5", gridObject.transform, () => battleManager.DebugLevelAllHeroes(5));
+        CreateDebugButton("Unlock 4x", gridObject.transform, () => speedManager.DebugSetFourTimesEntitlement(true));
+        CreateDebugButton("Unlock All", gridObject.transform, () => progressManager.DebugUnlockThrough(GameData.ChapterOneBossStageId));
+        CreateDebugButton("1-19 Repeat", gridObject.transform, () => progressManager.DebugJumpToStage(GameData.BossFallbackStageId, ProgressMode.RepeatSelected));
+        CreateDebugButton("1-20 Boss", gridObject.transform, () => progressManager.DebugJumpToStage(GameData.ChapterOneBossStageId, ProgressMode.AutoProgress));
+        CreateDebugButton("Reset Save", gridObject.transform, () => resetSaveAction?.Invoke(), new Color(0.45f, 0.16f, 0.14f, 1f), false);
+
+        GameObject speedRow = new GameObject("SpeedButtons", typeof(RectTransform));
+        speedRow.transform.SetParent(parent, false);
+        HorizontalLayoutGroup row = speedRow.AddComponent<HorizontalLayoutGroup>();
+        row.spacing = 16;
+        row.childControlWidth = true;
+        row.childForceExpandWidth = true;
+        AddLayoutElement(speedRow, -1, 90);
+
+        CreateDebugButton("Time x1", speedRow.transform, () => SetTimeScale(1f));
+        CreateDebugButton("Time x5", speedRow.transform, () => SetTimeScale(5f));
+        CreateDebugButton("Time x20", speedRow.transform, () => SetTimeScale(20f));
+
+        debugText = CreateText("DebugStatus", parent, 26, FontStyle.Normal, TextAnchor.UpperLeft);
+        AddLayoutElement(debugText.gameObject, -1, 260);
+    }
+
+    private void CreateDebugButton(string label, Transform parent, Action action)
+    {
+        CreateDebugButton(label, parent, action, new Color(0.23f, 0.25f, 0.28f, 1f));
+    }
+
+    private void CreateDebugButton(string label, Transform parent, Action action, Color color, bool refreshAfter = true)
+    {
+        Button button = CreateButton(label, parent, 25, color);
+        button.onClick.AddListener(() =>
+        {
+            action?.Invoke();
+            if (refreshAfter)
+            {
+                UpdateView();
+            }
+        });
+    }
+
+    private void CreateBottomNav(Transform parent)
+    {
+        GameObject panel = CreatePanel("BottomNav", parent, new Color(0.08f, 0.11f, 0.17f, 1f));
+        AddLayoutElement(panel, -1, 130);
+
+        HorizontalLayoutGroup layout = panel.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(10, 10, 10, 10);
+        layout.spacing = 8;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = true;
+
+        CreateTabButton(panel.transform, HudTab.Growth, "⚔\n성장");
+        CreateTabButton(panel.transform, HudTab.Hero, "★\n히어로");
+        CreateTabButton(panel.transform, HudTab.Summon, "◇\n소환");
+        CreateTabButton(panel.transform, HudTab.Stage, "▣\n던전 배틀");
+        CreateTabButton(panel.transform, HudTab.Shop, "▤\n상점");
+    }
+
+    private void CreateFloatingActionRails(Transform parent)
+    {
+        GameObject rightRail = new GameObject("RightActionRail", typeof(RectTransform));
+        rightRail.transform.SetParent(parent, false);
+        LayoutElement ignoreLayout = rightRail.AddComponent<LayoutElement>();
+        ignoreLayout.ignoreLayout = true;
+
+        RectTransform rightRect = rightRail.GetComponent<RectTransform>();
+        rightRect.anchorMin = new Vector2(1f, 0.5f);
+        rightRect.anchorMax = new Vector2(1f, 0.5f);
+        rightRect.pivot = new Vector2(1f, 0.5f);
+        rightRect.sizeDelta = new Vector2(122f, 470f);
+        rightRect.anchoredPosition = new Vector2(-20f, 120f);
+
+        VerticalLayoutGroup rightLayout = rightRail.AddComponent<VerticalLayoutGroup>();
+        rightLayout.spacing = 16;
+        rightLayout.childAlignment = TextAnchor.UpperCenter;
+        rightLayout.childControlWidth = true;
+        rightLayout.childControlHeight = false;
+        rightLayout.childForceExpandWidth = true;
+        rightLayout.childForceExpandHeight = false;
+
+        CreateFloatingTabButton(rightRail.transform, HudTab.Hero, "영웅", new Color(0.32f, 0.24f, 0.18f, 0.96f));
+        CreateFloatingTabButton(rightRail.transform, HudTab.Shop, "상점", new Color(0.32f, 0.18f, 0.38f, 0.96f));
+        CreateFloatingTabButton(rightRail.transform, HudTab.Stage, "맵", new Color(0.18f, 0.27f, 0.37f, 0.96f));
+        CreateFloatingTabButton(rightRail.transform, HudTab.Support, "지원", new Color(0.18f, 0.32f, 0.27f, 0.96f));
+
+        GameObject leftRail = new GameObject("LeftActionRail", typeof(RectTransform));
+        leftRail.transform.SetParent(parent, false);
+        LayoutElement leftIgnoreLayout = leftRail.AddComponent<LayoutElement>();
+        leftIgnoreLayout.ignoreLayout = true;
+
+        RectTransform leftRect = leftRail.GetComponent<RectTransform>();
+        leftRect.anchorMin = new Vector2(0f, 0.5f);
+        leftRect.anchorMax = new Vector2(0f, 0.5f);
+        leftRect.pivot = new Vector2(0f, 0.5f);
+        leftRect.sizeDelta = new Vector2(156f, 300f);
+        leftRect.anchoredPosition = new Vector2(20f, -240f);
+
+        VerticalLayoutGroup leftLayout = leftRail.AddComponent<VerticalLayoutGroup>();
+        leftLayout.spacing = 16;
+        leftLayout.childAlignment = TextAnchor.LowerCenter;
+        leftLayout.childControlWidth = true;
+        leftLayout.childControlHeight = false;
+        leftLayout.childForceExpandWidth = true;
+        leftLayout.childForceExpandHeight = false;
+
+        CreateFloatingTabButton(leftRail.transform, HudTab.Stage, "탑", new Color(0.20f, 0.22f, 0.36f, 0.96f));
+        CreateFloatingTabButton(leftRail.transform, HudTab.Support, "길드", new Color(0.24f, 0.18f, 0.34f, 0.96f));
+        CreateFloatingTabButton(leftRail.transform, HudTab.Growth, "마을", new Color(0.12f, 0.34f, 0.44f, 0.96f));
+    }
+
+    private void CreateFloatingTabButton(Transform parent, HudTab tab, string label, Color color)
+    {
+        Button button = CreateButton(label, parent, 23, color);
+        AddLayoutElement(button.gameObject, -1, 82);
+        RegisterTabNotificationDot(tab, CreateNotificationDot(button.transform, 36f, new Vector2(-12f, -12f)));
+        button.onClick.AddListener(() =>
+        {
+            activeTab = tab;
+            contentPanelOpen = true;
+            UpdateView();
+        });
     }
 
     private void CreateTabButton(Transform parent, HudTab tab, string label)
     {
-        Button button = CreateButton(label, parent, 30, new Color(0.20f, 0.25f, 0.34f, 1f));
+        Button button = CreateButton(label, parent, 24, new Color(0.13f, 0.17f, 0.25f, 1f));
+        RegisterTabNotificationDot(tab, CreateNotificationDot(button.transform, 38f, new Vector2(-14f, -14f)));
         button.onClick.AddListener(() =>
         {
-            activeTab = tab;
+            if (tab == HudTab.Growth && activeTab == HudTab.Growth && contentPanelOpen)
+            {
+                contentPanelOpen = false;
+            }
+            else
+            {
+                activeTab = tab;
+                contentPanelOpen = true;
+            }
+
             UpdateView();
         });
         tabButtons[tab] = button;
+        tabButtonLabels[tab] = label;
     }
 
     private void UpdateView()
@@ -332,12 +1049,18 @@ public sealed class GameHud : MonoBehaviour
         }
 
         StageDefinition stage = progressManager.CurrentStage;
-        resourceText.text = "Gold " + wallet.Gold
-            + "    EXP " + wallet.HeroExpItem
-            + "    Ruby " + wallet.Ruby
-            + "    Ticket " + wallet.HeroSummonTicket;
-        stageText.text = "Stage " + stage.Id + "    Highest " + progressManager.HighestStageId;
-        modeText.text = "Mode: " + GetModeLabel(progressManager.Mode);
+        resourceText.text = "G " + FormatShortNumber(wallet.Gold)
+            + "    R " + FormatShortNumber(wallet.Ruby)
+            + "    T " + FormatShortNumber(wallet.HeroSummonTicket)
+            + "    x" + speedManager.CurrentMultiplier;
+        stageText.text = "Guardian";
+        modeText.text = "전투력 " + FormatShortNumber(battleManager.TotalCombatPower)
+            + "    " + GetModeLabel(progressManager.Mode)
+            + "    MAX " + progressManager.HighestStageId;
+        if (fieldStagePillText != null)
+        {
+            fieldStagePillText.text = battleManager.IsBossFight ? stage.Id + " BOSS" : stage.Id;
+        }
 
         targetText.text = battleManager.TargetName;
         hpText.text = "HP " + battleManager.TargetHp + " / " + battleManager.TargetMaxHp;
@@ -350,8 +1073,31 @@ public sealed class GameHud : MonoBehaviour
         }
         else
         {
-            progressText.text = "Kills: " + battleManager.KillsThisStage + " / " + battleManager.RequiredKills;
+            progressText.text = "Kills: " + battleManager.KillsThisStage + " / " + battleManager.RequiredKills
+                + "    Visible " + battleManager.VisibleEnemyCount;
         }
+
+        if (guideQuestText != null)
+        {
+            string questGoal = battleManager.IsBossFight
+                ? "보스 처치"
+                : "스테이지 " + stage.Id + " 클리어";
+            string questProgress = battleManager.IsBossFight
+                ? Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초 남음"
+                : battleManager.KillsThisStage + "/" + battleManager.RequiredKills;
+            guideQuestText.text = "가이드 퀘스트\n" + questGoal + "  " + questProgress;
+        }
+
+        if (damageMeterText != null)
+        {
+            string source = string.IsNullOrEmpty(battleManager.LastHitSourceName) ? "대기" : battleManager.LastHitSourceName;
+            damageMeterText.text = "데미지 미터기"
+                + "\n" + source + "  " + FormatShortNumber(battleManager.LastHitDamage)
+                + "\n파티 ATK " + FormatShortNumber(battleManager.PartyAttackPower)
+                + "\n전투력 " + FormatShortNumber(battleManager.TotalCombatPower);
+        }
+
+        supportText.text = battleManager.SupportStatusText;
 
         logText.text = battleManager.LastBattleLog;
         if (!string.IsNullOrEmpty(battleManager.LastDamageLog))
@@ -359,29 +1105,126 @@ public sealed class GameHud : MonoBehaviour
             logText.text += "\n" + battleManager.LastDamageLog;
         }
 
+        rewardText.text = battleManager.LastRewardLog;
+        RefreshBattlefieldVisuals();
+
         gachaText.text = gachaManager.LastResult;
 
+        if (totalCombatPowerText != null)
+        {
+            totalCombatPowerText.text = "종합 전투력  " + FormatShortNumber(battleManager.TotalCombatPower);
+        }
+
+        if (growthNoticeText != null)
+        {
+            growthNoticeText.text = Time.unscaledTime < growthNoticeUntil ? growthNoticeMessage : string.Empty;
+        }
+
+        foreach (KeyValuePair<int, Button> pair in growthStepButtons)
+        {
+            bool selected = pair.Key == selectedGrowthLevelStep;
+            SetButtonColor(pair.Value, selected ? new Color(0.32f, 0.29f, 0.18f, 1f) : new Color(0.18f, 0.24f, 0.38f, 1f));
+
+            Text text = pair.Value.GetComponentInChildren<Text>(true);
+            if (text != null)
+            {
+                text.text = selected ? "[" + pair.Key + "x]" : pair.Key + "x";
+                text.color = selected ? new Color(1f, 0.91f, 0.40f, 1f) : Color.white;
+            }
+        }
+
+        bool hasGrowthAttention = false;
         foreach (AbilityState ability in abilityManager.States)
         {
             if (abilityButtonTexts.TryGetValue(ability.Definition.Kind, out Text text))
             {
-                string costText = ability.IsMaxed ? "MAX" : "Cost Gold " + ability.LevelUpCost;
+                int cappedLevels = abilityManager.GetCappedLevelCount(ability, selectedGrowthLevelStep);
+                long selectedCost = abilityManager.GetLevelUpCost(ability, cappedLevels);
+                bool canBuySelected = !ability.IsMaxed && cappedLevels > 0 && selectedCost > 0 && selectedCost <= wallet.Gold;
+                bool canBuyOne = !ability.IsMaxed && ability.LevelUpCost > 0 && ability.LevelUpCost <= wallet.Gold;
+                hasGrowthAttention |= canBuyOne;
+                SetNotificationDot(abilityNotificationDots, ability.Definition.Kind, canBuySelected);
+
+                string costText = ability.IsMaxed ? "MAX" : "G " + FormatShortNumber(selectedCost);
+                string levelText = ability.IsMaxed ? "MAX" : "Lv." + ability.Level + "/" + ability.Definition.MaxLevel;
                 text.text = ability.Definition.DisplayName
-                    + "  Lv." + ability.Level
-                    + "\n" + abilityManager.GetDisplayValue(ability)
-                    + "  " + costText;
+                    + "  " + levelText
+                    + "\n" + abilityManager.GetDisplayValue(ability);
+
+                Button rowButton = text.GetComponentInParent<Button>();
+                if (rowButton != null)
+                {
+                    SetButtonColor(rowButton, ability.IsMaxed
+                        ? new Color(0.26f, 0.30f, 0.39f, 1f)
+                        : canBuySelected ? new Color(0.48f, 0.54f, 0.66f, 1f) : new Color(0.24f, 0.26f, 0.30f, 1f));
+                }
+
+                if (abilityCostBadgeTexts.TryGetValue(ability.Definition.Kind, out Text costBadgeText))
+                {
+                    costBadgeText.text = costText;
+                    costBadgeText.color = ability.IsMaxed ? new Color(1f, 0.88f, 0.24f, 1f) : new Color(0.04f, 0.06f, 0.05f, 1f);
+                    Image badgeImage = costBadgeText.GetComponentInParent<Image>();
+                    if (badgeImage != null)
+                    {
+                        badgeImage.color = ability.IsMaxed
+                            ? new Color(0.14f, 0.19f, 0.31f, 1f)
+                            : canBuySelected ? new Color(0.56f, 0.88f, 0.24f, 1f) : new Color(0.20f, 0.24f, 0.33f, 1f);
+                    }
+                }
             }
         }
 
+        bool hasHeroAttention = false;
         foreach (HeroState hero in battleManager.Heroes)
         {
             if (heroButtonTexts.TryGetValue(hero.Definition.Id, out Text text))
             {
-                text.text = hero.Definition.DisplayName
+                bool canLevel = hero.LevelUpCost <= wallet.HeroExpItem;
+                bool needsAttention = hero.CanStarUp || canLevel;
+                hasHeroAttention |= needsAttention;
+                SetNotificationDot(heroNotificationDots, hero.Definition.Id, needsAttention);
+
+                string starCostText = hero.IsMaxStars
+                    ? "S MAX"
+                    : "S " + hero.Shards + "/" + hero.StarUpCost;
+                string actionText = hero.CanStarUp ? "STAR!" : canLevel ? "LV!" : "EXP " + FormatShortNumber(hero.LevelUpCost);
+
+                text.text = GetRarityBadge(hero.Definition.Rarity) + " " + GetShortHeroLabel(hero.Definition)
+                    + "  S" + hero.Stars + "/" + HeroDefinition.MaxStars
                     + "  Lv." + hero.Level
-                    + "\nATK " + hero.AttackPower
-                    + "  Cost EXP " + hero.LevelUpCost
-                    + "  Shard " + hero.Shards;
+                    + "\nATK " + FormatShortNumber(hero.AttackPower)
+                    + "  " + starCostText
+                    + "  " + actionText;
+            }
+        }
+
+        if (supportSummaryText != null)
+        {
+            supportSummaryText.text = "Party ATK " + FormatShortNumber(battleManager.PartyAttackPower)
+                + "    Pet Gold +" + battleManager.PetGoldBonusPercent.ToString("0.#") + "%";
+        }
+
+        foreach (CombatSkillState skill in battleManager.Skills)
+        {
+            if (skillStatusTexts.TryGetValue(skill.Definition.Id, out Text text))
+            {
+                double projectedDamage = battleManager.PartyAttackPower * skill.Definition.PartyAttackMultiplier;
+                text.text = skill.Definition.DisplayName
+                    + "    Cooldown " + Mathf.CeilToInt(skill.CooldownRemaining) + "s"
+                    + "\nDamage " + FormatShortNumber(projectedDamage)
+                    + "    Party ATK x" + skill.Definition.PartyAttackMultiplier.ToString("0.0");
+            }
+        }
+
+        foreach (PetState pet in battleManager.Pets)
+        {
+            if (petStatusTexts.TryGetValue(pet.Definition.Id, out Text text))
+            {
+                text.text = pet.Definition.DisplayName
+                    + "    Next " + Mathf.CeilToInt(pet.AttackCooldown) + "s"
+                    + "\nATK " + pet.Definition.AttackPower
+                    + "    Interval " + pet.Definition.AttackInterval.ToString("0.0") + "s"
+                    + "    Gold +" + battleManager.PetGoldBonusPercent.ToString("0.#") + "%";
             }
         }
 
@@ -396,18 +1239,348 @@ public sealed class GameHud : MonoBehaviour
             }
         }
 
-        growthPanel.SetActive(activeTab == HudTab.Growth);
-        stagePanel.SetActive(activeTab == HudTab.Stage);
-        summonPanel.SetActive(activeTab == HudTab.Summon);
+        foreach (KeyValuePair<int, Button> pair in speedButtons)
+        {
+            int multiplier = pair.Key;
+            Button button = pair.Value;
+            bool canUse = speedManager.CanUseSpeed(multiplier);
+            button.interactable = canUse;
+
+            Text text = button.GetComponentInChildren<Text>(true);
+            if (text != null)
+            {
+                string label = multiplier + "x";
+                if (multiplier == GameSpeedManager.PremiumSpeed && !canUse)
+                {
+                    label += " Locked";
+                }
+                else if (multiplier == speedManager.CurrentMultiplier)
+                {
+                    label = "[" + label + "]";
+                }
+
+                text.text = label;
+            }
+        }
+
+        if (debugText != null)
+        {
+            debugText.text = "Time Scale x" + Time.timeScale.ToString("0.##")
+                + "\nCombat Speed x" + speedManager.CurrentMultiplier
+                + "\n4x Entitlement: " + speedManager.HasFourTimesSpeedEntitlement
+                + "\nOffline Reward Stage: " + progressManager.GetOfflineRewardStageId()
+                + "\nBoss Cleared: " + progressManager.ChapterOneBossCleared
+                + "\nLast Battle: " + battleManager.LastBattleLog;
+        }
+
+        bool hasSummonAttention = wallet.HeroSummonTicket > 0 || wallet.Ruby >= 150;
+        bool hasStageAttention = progressManager.Mode == ProgressMode.BossBlocked;
+        if (guideQuestDot != null)
+        {
+            guideQuestDot.SetActive(hasStageAttention);
+        }
+
+        bool hasSupportAttention = false;
+        foreach (CombatSkillState skill in battleManager.Skills)
+        {
+            if (skill.CooldownRemaining <= 0.5f)
+            {
+                hasSupportAttention = true;
+                break;
+            }
+        }
+
+        SetTabNotificationDots(HudTab.Growth, hasGrowthAttention);
+        SetTabNotificationDots(HudTab.Hero, hasHeroAttention);
+        SetTabNotificationDots(HudTab.Summon, hasSummonAttention);
+        SetTabNotificationDots(HudTab.Stage, hasStageAttention);
+        SetTabNotificationDots(HudTab.Shop, false);
+        SetTabNotificationDots(HudTab.Support, hasSupportAttention);
+        SetTabNotificationDots(HudTab.Debug, false);
+
+        if (battleLayoutElement != null)
+        {
+            battleLayoutElement.preferredHeight = contentPanelOpen ? 870f : 1630f;
+        }
+
+        if (contentLayoutElement != null)
+        {
+            contentLayoutElement.preferredHeight = contentPanelOpen ? 760f : 0f;
+        }
+
+        if (contentRoot != null)
+        {
+            contentRoot.SetActive(contentPanelOpen);
+        }
+
+        growthPanel.SetActive(contentPanelOpen && activeTab == HudTab.Growth);
+        heroPanel.SetActive(contentPanelOpen && activeTab == HudTab.Hero);
+        stagePanel.SetActive(contentPanelOpen && activeTab == HudTab.Stage);
+        summonPanel.SetActive(contentPanelOpen && activeTab == HudTab.Summon);
+        shopPanel.SetActive(contentPanelOpen && activeTab == HudTab.Shop);
+        supportPanel.SetActive(contentPanelOpen && activeTab == HudTab.Support);
+        if (debugPanel != null)
+        {
+            debugPanel.SetActive(contentPanelOpen && activeTab == HudTab.Debug);
+        }
 
         foreach (KeyValuePair<HudTab, Button> pair in tabButtons)
         {
             Text text = pair.Value.GetComponentInChildren<Text>(true);
             if (text != null)
             {
-                text.color = pair.Key == activeTab ? new Color(1f, 0.91f, 0.40f, 1f) : Color.white;
+                bool activeAndOpen = contentPanelOpen && pair.Key == activeTab;
+                string label = tabButtonLabels.TryGetValue(pair.Key, out string savedLabel) ? savedLabel : text.text;
+                text.text = pair.Key == HudTab.Growth && activeAndOpen ? "X\n성장" : label;
+                text.color = activeAndOpen ? new Color(1f, 0.91f, 0.40f, 1f) : Color.white;
             }
         }
+    }
+
+    private void SetTimeScale(float scale)
+    {
+        Time.timeScale = Mathf.Max(0.1f, scale);
+        UpdateView();
+    }
+
+    private void TryLevelUpAbilityFromHud(AbilityKind kind)
+    {
+        AbilityState ability = FindAbilityState(kind);
+        if (ability == null)
+        {
+            return;
+        }
+
+        int cappedLevels = abilityManager.GetCappedLevelCount(ability, selectedGrowthLevelStep);
+        long cost = abilityManager.GetLevelUpCost(ability, cappedLevels);
+        if (ability.IsMaxed)
+        {
+            ShowGrowthNotice("이미 최대 레벨입니다.");
+            return;
+        }
+
+        if (cappedLevels <= 0 || cost <= 0 || wallet.Gold < cost)
+        {
+            ShowGrowthNotice("골드가 부족합니다.");
+            return;
+        }
+
+        if (!abilityManager.TryLevelUp(kind, selectedGrowthLevelStep))
+        {
+            ShowGrowthNotice("골드가 부족합니다.");
+        }
+    }
+
+    private AbilityState FindAbilityState(AbilityKind kind)
+    {
+        foreach (AbilityState ability in abilityManager.States)
+        {
+            if (ability.Definition.Kind == kind)
+            {
+                return ability;
+            }
+        }
+
+        return null;
+    }
+
+    private void ShowGrowthNotice(string message)
+    {
+        growthNoticeMessage = message;
+        growthNoticeUntil = Time.unscaledTime + 1.6f;
+        if (growthNoticeText != null)
+        {
+            growthNoticeText.text = message;
+        }
+    }
+
+    private void RegisterTabNotificationDot(HudTab tab, GameObject dot)
+    {
+        if (!tabNotificationDots.TryGetValue(tab, out List<GameObject> dots))
+        {
+            dots = new List<GameObject>();
+            tabNotificationDots[tab] = dots;
+        }
+
+        dots.Add(dot);
+        dot.SetActive(false);
+    }
+
+    private void SetTabNotificationDots(HudTab tab, bool visible)
+    {
+        if (!tabNotificationDots.TryGetValue(tab, out List<GameObject> dots))
+        {
+            return;
+        }
+
+        foreach (GameObject dot in dots)
+        {
+            if (dot != null)
+            {
+                dot.SetActive(visible);
+            }
+        }
+    }
+
+    private void SetNotificationDot<TKey>(Dictionary<TKey, GameObject> dots, TKey key, bool visible)
+    {
+        if (dots.TryGetValue(key, out GameObject dot) && dot != null)
+        {
+            dot.SetActive(visible);
+        }
+    }
+
+    private void RefreshBattlefieldVisuals()
+    {
+        if (battleManager == null || damagePopupText == null || battlefieldRect == null)
+        {
+            return;
+        }
+
+        bool flashActive = hitFlashRemaining > 0f;
+        float flashRatio = hitFlashRemaining / 0.28f;
+        float time = Time.time;
+        float fieldWidth = Mathf.Max(760f, battlefieldRect.rect.width);
+        float fieldHeight = Mathf.Max(260f, battlefieldRect.rect.height);
+        Vector2[] heroFormation =
+        {
+            new Vector2(0f, -16f),
+            new Vector2(-86f, -26f),
+            new Vector2(86f, -26f),
+            new Vector2(-48f, 56f),
+            new Vector2(48f, 56f)
+        };
+
+        int heroIndex = 0;
+        foreach (HeroState hero in battleManager.Heroes)
+        {
+            if (!heroBattleImages.TryGetValue(hero.Definition.Id, out Image image))
+            {
+                continue;
+            }
+
+            bool isLastSource = battleManager.LastHitSourceName == hero.Definition.DisplayName && flashActive;
+            float bob = Mathf.Sin(time * 4.5f + heroIndex * 0.7f) * 5f;
+            float attackLift = isLastSource ? 28f * flashRatio : 0f;
+            if (heroBattleRects.TryGetValue(hero.Definition.Id, out RectTransform heroRect))
+            {
+                Vector2 formationPosition = heroFormation[heroIndex % heroFormation.Length];
+                heroRect.anchoredPosition = formationPosition + new Vector2(0f, bob + attackLift);
+                heroRect.localScale = Vector3.one * (isLastSource ? 1f + 0.18f * flashRatio : 1f);
+            }
+
+            Color baseColor = GetRarityColor(hero.Definition.Rarity);
+            image.color = isLastSource
+                ? Color.Lerp(baseColor, new Color(1f, 0.86f, 0.22f, 1f), flashRatio)
+                : baseColor;
+
+            if (heroBattleTexts.TryGetValue(hero.Definition.Id, out Text text))
+            {
+                text.text = GetRarityBadge(hero.Definition.Rarity) + "\n" + GetShortHeroLabel(hero.Definition);
+            }
+
+            heroIndex += 1;
+        }
+
+        if (centerSpawnText != null)
+        {
+            RectTransform portalRect = centerSpawnText.GetComponent<RectTransform>();
+            float pulse = 1f + Mathf.Sin(time * 5.6f) * 0.13f;
+            portalRect.localScale = new Vector3(pulse, pulse, 1f);
+            centerSpawnText.text = "◎";
+            centerSpawnText.color = battleManager.IsBossFight
+                ? new Color(1f, 0.70f, 0.16f, 0.72f)
+                : new Color(0.35f, 0.72f, 1f, 0.42f + Mathf.Sin(time * 3.2f) * 0.12f);
+        }
+
+        int visible = Mathf.Clamp(battleManager.VisibleEnemyCount, 0, enemyBattleImages.Count);
+        int firstIndex = battleManager.KillsThisStage % Mathf.Max(1, enemyBattleImages.Count);
+        for (int i = 0; i < enemyBattleImages.Count; i++)
+        {
+            bool active = i < visible;
+            int shiftedIndex = (i + firstIndex) % enemyBattleImages.Count;
+            Image image = enemyBattleImages[shiftedIndex];
+            Text text = enemyBattleTexts[shiftedIndex];
+            RectTransform enemyRect = enemyBattleRects[shiftedIndex];
+
+            if (!active)
+            {
+                enemyRect.anchoredPosition = Vector2.zero;
+                enemyRect.localScale = Vector3.zero;
+                image.color = new Color(0.13f, 0.10f, 0.10f, 0f);
+                text.text = string.Empty;
+                continue;
+            }
+
+            bool frontTarget = i == 0 && flashActive;
+            if (battleManager.IsBossFight)
+            {
+                enemyRect.anchoredPosition = new Vector2(
+                    Mathf.Sin(time * 1.4f) * 18f,
+                    Mathf.Cos(time * 1.1f) * 10f + fieldHeight * 0.18f);
+                enemyRect.localScale = Vector3.one * (frontTarget ? 1.65f + 0.18f * flashRatio : 1.52f);
+            }
+            else
+            {
+                Vector2 direction = GetEnemySpreadDirection(i);
+                float cycle = Mathf.Repeat(time * (0.18f + speedManager.CurrentMultiplier * 0.035f) + i * 0.11f + battleManager.KillsThisStage * 0.013f, 1f);
+                float approach = Mathf.SmoothStep(0f, 1f, cycle);
+                float spawnDistance = Mathf.Max(fieldWidth * 0.58f, fieldHeight * 0.58f);
+                float targetDistance = 112f + 18f * (i % 3);
+                float distance = Mathf.Lerp(spawnDistance, targetDistance, approach);
+                Vector2 drift = new Vector2(-direction.y, direction.x) * Mathf.Sin(time * 2.3f + i) * 11f;
+                enemyRect.anchoredPosition = direction * distance + drift;
+                enemyRect.localScale = Vector3.one * (0.68f + 0.30f * approach + (frontTarget ? 0.18f * flashRatio : 0f));
+            }
+
+            if (battleManager.IsBossFight)
+            {
+                image.color = frontTarget
+                    ? new Color(1f, 0.34f, 0.22f, 1f)
+                    : new Color(0.62f, 0.12f, 0.10f, 1f);
+                text.text = "BOSS";
+            }
+            else
+            {
+                image.color = frontTarget
+                    ? new Color(1f, 0.48f, 0.24f, 1f)
+                    : new Color(0.52f, 0.16f + 0.03f * (i % 3), 0.12f, 1f);
+                text.text = "M" + (battleManager.KillsThisStage + i + 1);
+            }
+        }
+
+        if (battleManager.HitSequence <= 0)
+        {
+            damagePopupText.text = "READY";
+            damagePopupText.color = new Color(0.72f, 0.78f, 0.86f, 1f);
+            return;
+        }
+
+        damagePopupText.text = battleManager.LastHitSourceName
+            + "\n-" + battleManager.LastHitDamage
+            + (battleManager.LastHitWasCritical ? " CRIT" : string.Empty);
+        damagePopupText.color = battleManager.LastHitWasCritical
+            ? new Color(1f, 0.91f, 0.24f, 1f)
+            : new Color(1f, 0.55f, 0.32f, 1f);
+
+        RectTransform damageRect = damagePopupText.GetComponent<RectTransform>();
+        damageRect.anchoredPosition = new Vector2(0f, 24f + 40f * flashRatio);
+        damageRect.localScale = Vector3.one * (1f + 0.25f * flashRatio);
+    }
+
+    private string GetShortHeroLabel(HeroDefinition hero)
+    {
+        if (hero.DisplayName.Length <= 2)
+        {
+            return hero.DisplayName;
+        }
+
+        return hero.DisplayName.Substring(hero.DisplayName.Length - 2);
+    }
+
+    private bool IsDebugPanelEnabled()
+    {
+        return Application.isEditor || Debug.isDebugBuild;
     }
 
     private string GetModeLabel(ProgressMode mode)
@@ -425,6 +1598,95 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
+    {
+        Text dot = CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
+        dot.text = "●";
+        dot.color = new Color(1f, 0.04f, 0.04f, 1f);
+        dot.raycastTarget = false;
+
+        RectTransform rect = dot.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.one;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(size, size);
+        rect.anchoredPosition = anchoredPosition;
+
+        dot.gameObject.SetActive(false);
+        return dot.gameObject;
+    }
+
+    private string GetRarityBadge(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Uncommon:
+                return "UC";
+            case HeroRarity.Rare:
+                return "R";
+            case HeroRarity.Epic:
+                return "E";
+            case HeroRarity.Legendary:
+                return "L";
+            case HeroRarity.Mythic:
+                return "M";
+            default:
+                return "?";
+        }
+    }
+
+    private Color GetRarityColor(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Uncommon:
+                return new Color(0.18f, 0.36f, 0.25f, 1f);
+            case HeroRarity.Rare:
+                return new Color(0.16f, 0.32f, 0.58f, 1f);
+            case HeroRarity.Epic:
+                return new Color(0.44f, 0.20f, 0.62f, 1f);
+            case HeroRarity.Legendary:
+                return new Color(0.76f, 0.47f, 0.12f, 1f);
+            case HeroRarity.Mythic:
+                return new Color(0.64f, 0.16f, 0.18f, 1f);
+            default:
+                return new Color(0.16f, 0.24f, 0.34f, 1f);
+        }
+    }
+
+    private Vector2 GetEnemySpreadDirection(int index)
+    {
+        float angle = index * 137.5f * Mathf.Deg2Rad;
+        Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+        return direction.sqrMagnitude <= 0.001f ? Vector2.right : direction.normalized;
+    }
+
+    private string FormatShortNumber(double value)
+    {
+        double abs = System.Math.Abs(value);
+        if (abs >= 1000000000000d)
+        {
+            return (value / 1000000000000d).ToString("0.##") + "T";
+        }
+
+        if (abs >= 1000000000d)
+        {
+            return (value / 1000000000d).ToString("0.##") + "B";
+        }
+
+        if (abs >= 1000000d)
+        {
+            return (value / 1000000d).ToString("0.##") + "M";
+        }
+
+        if (abs >= 1000d)
+        {
+            return (value / 1000d).ToString("0.##") + "K";
+        }
+
+        return value.ToString(value % 1d == 0d ? "0" : "0.#");
+    }
+
     private GameObject CreatePanel(string name, Transform parent, Color color)
     {
         GameObject panel = new GameObject(name, typeof(RectTransform));
@@ -434,16 +1696,26 @@ public sealed class GameHud : MonoBehaviour
         return panel;
     }
 
+    private GameObject CreateBattleActor(string name, Transform parent, Vector2 size, Color color)
+    {
+        GameObject actor = CreatePanel(name, parent, color);
+        Image image = actor.GetComponent<Image>();
+        image.raycastTarget = false;
+
+        RectTransform rect = actor.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = Vector2.zero;
+        return actor;
+    }
+
     private Button CreateButton(string label, Transform parent, int fontSize, Color color)
     {
         GameObject buttonObject = CreatePanel(label + "Button", parent, color);
         Button button = buttonObject.AddComponent<Button>();
-        ColorBlock colors = button.colors;
-        colors.normalColor = color;
-        colors.highlightedColor = color * 1.12f;
-        colors.pressedColor = color * 0.84f;
-        colors.disabledColor = new Color(0.12f, 0.12f, 0.12f, 0.55f);
-        button.colors = colors;
+        SetButtonColor(button, color);
 
         Text text = CreateText(label + "Text", buttonObject.transform, fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
         RectTransform textRect = text.GetComponent<RectTransform>();
@@ -454,6 +1726,22 @@ public sealed class GameHud : MonoBehaviour
         text.text = label;
 
         return button;
+    }
+
+    private void SetButtonColor(Button button, Color color)
+    {
+        ColorBlock colors = button.colors;
+        colors.normalColor = color;
+        colors.highlightedColor = color * 1.12f;
+        colors.pressedColor = color * 0.84f;
+        colors.disabledColor = new Color(0.12f, 0.12f, 0.12f, 0.55f);
+        button.colors = colors;
+
+        Image image = button.GetComponent<Image>();
+        if (image != null)
+        {
+            image.color = color;
+        }
     }
 
     private Text CreateText(string name, Transform parent, int fontSize, FontStyle fontStyle, TextAnchor alignment)
@@ -489,7 +1777,7 @@ public sealed class GameHud : MonoBehaviour
         rect.offsetMax = Vector2.zero;
     }
 
-    private void AddLayoutElement(GameObject target, float preferredWidth, float preferredHeight)
+    private LayoutElement AddLayoutElement(GameObject target, float preferredWidth, float preferredHeight)
     {
         LayoutElement element = target.AddComponent<LayoutElement>();
         if (preferredWidth > 0)
@@ -501,5 +1789,7 @@ public sealed class GameHud : MonoBehaviour
         {
             element.preferredHeight = preferredHeight;
         }
+
+        return element;
     }
 }

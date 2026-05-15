@@ -46,6 +46,30 @@ public sealed class CurrencyWallet : MonoBehaviour
         NotifyChanged();
     }
 
+    public void AddRuby(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        Ruby += amount;
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddHeroSummonTicket(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        HeroSummonTicket += amount;
+        Save();
+        NotifyChanged();
+    }
+
     public bool SpendGold(long amount)
     {
         if (amount <= 0)

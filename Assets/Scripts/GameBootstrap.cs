@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public sealed class GameBootstrap : MonoBehaviour
 {
@@ -7,8 +8,10 @@ public sealed class GameBootstrap : MonoBehaviour
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
     private AbilityManager abilityManager;
+    private GameSpeedManager speedManager;
     private BattleManager battleManager;
     private GachaManager gachaManager;
+    [NonSerialized]
     private bool initialized;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -35,23 +38,35 @@ public sealed class GameBootstrap : MonoBehaviour
         Application.targetFrameRate = 60;
         Screen.orientation = ScreenOrientation.Portrait;
 
-        saveManager = gameObject.AddComponent<SaveManager>();
-        progressManager = gameObject.AddComponent<StageProgressManager>();
-        wallet = gameObject.AddComponent<CurrencyWallet>();
-        abilityManager = gameObject.AddComponent<AbilityManager>();
-        battleManager = gameObject.AddComponent<BattleManager>();
-        gachaManager = gameObject.AddComponent<GachaManager>();
+        saveManager = GetOrAddComponent<SaveManager>();
+        progressManager = GetOrAddComponent<StageProgressManager>();
+        wallet = GetOrAddComponent<CurrencyWallet>();
+        abilityManager = GetOrAddComponent<AbilityManager>();
+        speedManager = GetOrAddComponent<GameSpeedManager>();
+        battleManager = GetOrAddComponent<BattleManager>();
+        gachaManager = GetOrAddComponent<GachaManager>();
 
         progressManager.Initialize(saveManager);
         wallet.Initialize(saveManager);
         abilityManager.Initialize(wallet, saveManager);
-        battleManager.Initialize(progressManager, wallet, saveManager, abilityManager);
+        speedManager.Initialize(saveManager);
+        battleManager.Initialize(progressManager, wallet, saveManager, abilityManager, speedManager);
         gachaManager.Initialize(battleManager, wallet);
 
         ApplyOfflineReward();
 
-        GameHud hud = gameObject.AddComponent<GameHud>();
-        hud.Initialize(progressManager, wallet, abilityManager, battleManager, gachaManager);
+        GameHud hud = GetOrAddComponent<GameHud>();
+        hud.Initialize(progressManager, wallet, abilityManager, speedManager, battleManager, gachaManager, DebugResetSaveAndReload);
+    }
+
+    private T GetOrAddComponent<T>() where T : Component
+    {
+        if (TryGetComponent(out T component))
+        {
+            return component;
+        }
+
+        return gameObject.AddComponent<T>();
     }
 
     private void OnApplicationPause(bool pauseStatus)
@@ -76,16 +91,10 @@ public sealed class GameBootstrap : MonoBehaviour
             return;
         }
 
-        double elapsedSeconds = (DateTime.UtcNow - lastOnlineUtc.Value).TotalSeconds;
-        if (elapsedSeconds <= 10)
-        {
-            SaveExitTime();
-            return;
-        }
-
-        double cappedSeconds = Math.Min(elapsedSeconds, 28800);
-        float goldPerSecond = GameData.GetOfflineGoldPerSecond(progressManager.GetOfflineRewardStageId());
-        long reward = (long)Math.Floor(cappedSeconds * goldPerSecond);
+        long reward = CalculateOfflineGoldReward(
+            lastOnlineUtc,
+            DateTime.UtcNow,
+            progressManager.GetOfflineRewardStageId());
 
         if (reward > 0)
         {
@@ -93,6 +102,24 @@ public sealed class GameBootstrap : MonoBehaviour
         }
 
         SaveExitTime();
+    }
+
+    public static long CalculateOfflineGoldReward(DateTime? lastOnlineUtc, DateTime currentUtc, string offlineRewardStageId)
+    {
+        if (!lastOnlineUtc.HasValue)
+        {
+            return 0;
+        }
+
+        double elapsedSeconds = (currentUtc.ToUniversalTime() - lastOnlineUtc.Value.ToUniversalTime()).TotalSeconds;
+        if (elapsedSeconds <= 10)
+        {
+            return 0;
+        }
+
+        double cappedSeconds = Math.Min(elapsedSeconds, 28800);
+        float goldPerSecond = GameData.GetOfflineGoldPerSecond(offlineRewardStageId);
+        return (long)Math.Floor(cappedSeconds * goldPerSecond);
     }
 
     private void SaveExitTime()
@@ -104,5 +131,23 @@ public sealed class GameBootstrap : MonoBehaviour
 
         saveManager.SaveLastOnlineUtc(DateTime.UtcNow);
         saveManager.Flush();
+    }
+
+    private void DebugResetSaveAndReload()
+    {
+        if (saveManager != null)
+        {
+            saveManager.ResetAll();
+        }
+
+        Time.timeScale = 1f;
+
+        string sceneName = SceneManager.GetActiveScene().name;
+        Destroy(gameObject);
+
+        if (!string.IsNullOrEmpty(sceneName))
+        {
+            SceneManager.LoadScene(sceneName);
+        }
     }
 }

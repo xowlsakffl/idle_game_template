@@ -10,6 +10,8 @@ public static class SaveKeys
     public const string ProgressMode = "progressMode";
     public const string ChapterOneBossCleared = "chapter1BossCleared";
     public const string LastOnlineUtcTicks = "lastOnlineUtcTicks";
+    public const string CombatSpeedMultiplier = "combatSpeedMultiplier";
+    public const string HasFourTimesSpeedEntitlement = "hasFourTimesSpeedEntitlement";
 
     public static string HeroLevel(string heroId)
     {
@@ -19,6 +21,11 @@ public static class SaveKeys
     public static string HeroShards(string heroId)
     {
         return "hero." + heroId + ".shards";
+    }
+
+    public static string HeroStars(string heroId)
+    {
+        return "hero." + heroId + ".stars";
     }
 
     public static string AbilityLevel(AbilityKind kind)

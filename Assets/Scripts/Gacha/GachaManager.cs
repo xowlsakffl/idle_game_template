@@ -34,9 +34,14 @@ public sealed class GachaManager : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            RollOne(out string rarity, out HeroDefinition hero, out int shards);
+            RollOne(out HeroDefinition hero, out int shards);
             battleManager.AddHeroShards(hero.Id, shards);
-            result.Append(rarity).Append(" ").Append(hero.DisplayName).Append(" +").Append(shards);
+            result.Append(hero.RarityLabel)
+                .Append(" ")
+                .Append(hero.DisplayName)
+                .Append(" +")
+                .Append(shards)
+                .Append(" 조각");
 
             if (i < count - 1)
             {
@@ -48,25 +53,71 @@ public sealed class GachaManager : MonoBehaviour
         Changed?.Invoke();
     }
 
-    private void RollOne(out string rarity, out HeroDefinition hero, out int shards)
+    private void RollOne(out HeroDefinition hero, out int shards)
     {
-        int value = random.Next(0, 100);
-        if (value < 70)
+        HeroRarity rarity = RollRarity();
+        hero = RollHero(rarity);
+        shards = hero.GetSummonShardReward();
+    }
+
+    private HeroRarity RollRarity()
+    {
+        int value = random.Next(0, 10000);
+        if (value < 5500)
         {
-            rarity = "Common";
-            shards = 1;
-        }
-        else if (value < 95)
-        {
-            rarity = "Rare";
-            shards = 3;
-        }
-        else
-        {
-            rarity = "Epic";
-            shards = 10;
+            return HeroRarity.Uncommon;
         }
 
-        hero = GameData.Heroes[random.Next(0, GameData.Heroes.Count)];
+        if (value < 8500)
+        {
+            return HeroRarity.Rare;
+        }
+
+        if (value < 9600)
+        {
+            return HeroRarity.Epic;
+        }
+
+        if (value < 9950)
+        {
+            return HeroRarity.Legendary;
+        }
+
+        return HeroRarity.Mythic;
+    }
+
+    private HeroDefinition RollHero(HeroRarity rarity)
+    {
+        int matchCount = 0;
+        foreach (HeroDefinition hero in GameData.Heroes)
+        {
+            if (hero.Rarity == rarity)
+            {
+                matchCount += 1;
+            }
+        }
+
+        if (matchCount == 0)
+        {
+            return GameData.Heroes[random.Next(0, GameData.Heroes.Count)];
+        }
+
+        int selected = random.Next(0, matchCount);
+        foreach (HeroDefinition hero in GameData.Heroes)
+        {
+            if (hero.Rarity != rarity)
+            {
+                continue;
+            }
+
+            if (selected == 0)
+            {
+                return hero;
+            }
+
+            selected -= 1;
+        }
+
+        return GameData.Heroes[0];
     }
 }

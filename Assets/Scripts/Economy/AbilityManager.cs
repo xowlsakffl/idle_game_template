@@ -13,9 +13,13 @@ public sealed class AbilityManager : MonoBehaviour
 
     public IReadOnlyList<AbilityState> States => states;
 
-    public int AttackPowerBonus => GetRawValue(AbilityKind.AttackPower);
-    public float CriticalChance => Mathf.Clamp01(GetRawValue(AbilityKind.CriticalChance) / 1000f);
-    public float CriticalDamageMultiplier => Mathf.Max(1f, GetRawValue(AbilityKind.CriticalDamage) / 100f);
+    public double AttackPowerBonus => GetValue(AbilityKind.AttackPower);
+    public double MaxHpBonus => GetValue(AbilityKind.MaxHp);
+    public float CriticalChance => Mathf.Clamp((float)(GetValue(AbilityKind.CriticalChance) / 100d), 0f, 0.5f);
+    public double CriticalDamageMultiplier => Math.Max(1d, 1d + GetValue(AbilityKind.CriticalDamage) / 100d);
+    public float DoubleCriticalChance => Mathf.Clamp((float)(GetValue(AbilityKind.DoubleCriticalChance) / 100d), 0f, 0.5f);
+    public double DoubleCriticalBonusMultiplier => Math.Max(1d, 1d + GetValue(AbilityKind.DoubleCriticalBonusDamage) / 100d);
+    public double FinalDamageMultiplier => Math.Max(1d, 1d + GetValue(AbilityKind.FinalDamage) / 100d);
 
     public void Initialize(CurrencyWallet currency, SaveManager save)
     {
@@ -37,18 +41,34 @@ public sealed class AbilityManager : MonoBehaviour
 
     public bool TryLevelUp(AbilityKind kind)
     {
+        return TryLevelUp(kind, 1);
+    }
+
+    public bool TryLevelUp(AbilityKind kind, int requestedLevels)
+    {
         if (!statesByKind.TryGetValue(kind, out AbilityState state) || state.IsMaxed)
         {
             return false;
         }
 
-        long cost = state.LevelUpCost;
+        int levels = GetCappedLevelCount(state, requestedLevels);
+        if (levels <= 0)
+        {
+            return false;
+        }
+
+        long cost = GetLevelUpCost(state, levels);
+        if (cost <= 0 || wallet.Gold < cost)
+        {
+            return false;
+        }
+
         if (!wallet.SpendGold(cost))
         {
             return false;
         }
 
-        state.Level += 1;
+        state.Level += levels;
         PlayerPrefs.SetInt(SaveKeys.AbilityLevel(kind), state.Level);
         saveManager.Flush();
         NotifyChanged();
@@ -57,22 +77,95 @@ public sealed class AbilityManager : MonoBehaviour
 
     public string GetDisplayValue(AbilityState state)
     {
-        switch (state.Definition.Kind)
-        {
-            case AbilityKind.AttackPower:
-                return "+" + state.RawValue;
-            case AbilityKind.CriticalChance:
-                return (state.RawValue / 10f).ToString("0.0") + "%";
-            case AbilityKind.CriticalDamage:
-                return state.RawValue + "%";
-            default:
-                return state.RawValue.ToString();
-        }
+        string prefix = state.Definition.DisplayKind == AbilityDisplayKind.Flat ? "+" : string.Empty;
+        return prefix + state.Definition.FormatValue(state.Level);
     }
 
-    private int GetRawValue(AbilityKind kind)
+    public long GetLevelUpCost(AbilityState state, int requestedLevels)
     {
-        return statesByKind.TryGetValue(kind, out AbilityState state) ? state.RawValue : 0;
+        if (state == null || requestedLevels <= 0 || state.IsMaxed)
+        {
+            return 0;
+        }
+
+        int cappedLevels = GetCappedLevelCount(state, requestedLevels);
+        long total = 0;
+        for (int i = 0; i < cappedLevels; i++)
+        {
+            long cost = state.Definition.GetLevelUpCost(state.Level + i);
+            if (cost <= 0)
+            {
+                continue;
+            }
+
+            if (long.MaxValue - total < cost)
+            {
+                return long.MaxValue;
+            }
+
+            total += cost;
+        }
+
+        return total;
+    }
+
+    public int GetCappedLevelCount(AbilityState state, int requestedLevels)
+    {
+        if (state == null || requestedLevels <= 0 || state.IsMaxed)
+        {
+            return 0;
+        }
+
+        if (state.Definition.MaxLevel <= 0)
+        {
+            return requestedLevels;
+        }
+
+        return Mathf.Clamp(requestedLevels, 0, state.Definition.MaxLevel - state.Level);
+    }
+
+    public int GetPurchasableLevelCount(AbilityState state, int requestedLevels, long availableGold)
+    {
+        int cappedLevels = GetCappedLevelCount(state, requestedLevels);
+        long total = 0;
+        int purchasable = 0;
+        for (int i = 0; i < cappedLevels; i++)
+        {
+            long cost = state.Definition.GetLevelUpCost(state.Level + i);
+            if (cost <= 0 || total > availableGold - cost)
+            {
+                break;
+            }
+
+            total += cost;
+            purchasable += 1;
+        }
+
+        return purchasable;
+    }
+
+    public double GetTotalCombatPower(IReadOnlyList<HeroState> heroes)
+    {
+        int heroCount = heroes == null ? 0 : heroes.Count;
+        double attack = AttackPowerBonus * Math.Max(1, heroCount);
+        if (heroes != null)
+        {
+            foreach (HeroState hero in heroes)
+            {
+                attack += hero.AttackPower;
+            }
+        }
+
+        double criticalExpected = 1d + CriticalChance * (CriticalDamageMultiplier - 1d);
+        double doubleCriticalExpected = 1d + DoubleCriticalChance * (DoubleCriticalBonusMultiplier - 1d);
+        double hpScore = MaxHpBonus * 0.02d;
+        double power = attack * criticalExpected * doubleCriticalExpected * FinalDamageMultiplier + hpScore;
+        return Math.Max(1d, power);
+    }
+
+    private double GetValue(AbilityKind kind)
+    {
+        return statesByKind.TryGetValue(kind, out AbilityState state) ? state.Value : 0d;
     }
 
     private void NotifyChanged()

@@ -6,12 +6,16 @@ public static class GameData
     public const string FirstStageId = "1-1";
     public const string ChapterOneBossStageId = "1-20";
     public const string BossFallbackStageId = "1-19";
+    public const int NormalStageRequiredKills = 100;
+    public const int MaxVisibleEnemies = 12;
 
     private static readonly HeroDefinition[] heroes =
     {
-        new HeroDefinition("H001", "기사 아렌", "균형형", 10, 1.2f, 5),
-        new HeroDefinition("H002", "궁수 리나", "빠른 공격", 7, 0.8f, 3),
-        new HeroDefinition("H003", "마법사 노아", "강한 한방", 18, 1.8f, 8)
+        new HeroDefinition("H001", "기사 아렌", "균형형", HeroRarity.Uncommon, 10, 1.2f, 5),
+        new HeroDefinition("H002", "궁수 리나", "빠른 공격", HeroRarity.Rare, 7, 0.8f, 3),
+        new HeroDefinition("H003", "마법사 노아", "강한 한방", HeroRarity.Epic, 18, 1.8f, 8),
+        new HeroDefinition("H004", "성기사 카일", "안정형", HeroRarity.Legendary, 12, 1.4f, 6),
+        new HeroDefinition("H005", "도적 세라", "연속 공격", HeroRarity.Mythic, 6, 0.55f, 2)
     };
 
     private static readonly EnemyDefinition[] enemies =
@@ -25,7 +29,7 @@ public static class GameData
 
     private static readonly BossDefinition[] bosses =
     {
-        new BossDefinition("B001", "타락한 기사", 2200, 30f, 500)
+        new BossDefinition("B001", "타락한 기사", 9000, 30f, 500)
     };
 
     private static readonly StageDefinition[] stages =
@@ -54,9 +58,24 @@ public static class GameData
 
     private static readonly AbilityDefinition[] abilities =
     {
-        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "모든 히어로 기본 데미지 증가", 5, 0, 0, 25, 1.25f),
-        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "치명타 발생 확률 증가", 5, 0, 100, 50, 1.30f),
-        new AbilityDefinition(AbilityKind.CriticalDamage, "치명타 데미지 증가", "치명타 데미지 배율 증가", 5, 150, 0, 75, 1.30f)
+        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "만렙 1,000,000 기준 4.89B", 4890d, 0d, 1000000, 25, 1.25f, AbilityDisplayKind.Flat),
+        new AbilityDefinition(AbilityKind.MaxHp, "체력 증가", "만렙 1,000,000 기준 26.6B", 26600d, 0d, 1000000, 30, 1.25f, AbilityDisplayKind.Flat),
+        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 50, 1.30f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.CriticalDamage, "치명타 데미지 증가", "기본 5.0% + 레벨당 0.1%", 0.1d, 5d, 1000000, 75, 1.22f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.DoubleCriticalChance, "더블 치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 100, 1.32f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.DoubleCriticalBonusDamage, "더블 치명타 추가 데미지 증가", "기본 5.0% + 레벨당 0.1%", 0.1d, 5d, 1000000, 100, 1.22f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.FinalDamage, "최종 데미지 증가", "레벨당 0.5%", 0.5d, 0d, 1000000, 150, 1.28f, AbilityDisplayKind.Percent)
+    };
+
+    private static readonly CombatSkillDefinition[] skills =
+    {
+        new CombatSkillDefinition("S001", "유성 낙하", 8f, 1.8f),
+        new CombatSkillDefinition("S002", "전장의 함성", 14f, 1.2f)
+    };
+
+    private static readonly PetDefinition[] pets =
+    {
+        new PetDefinition("P001", "여우 루루", 8, 1.5f, 0.05f)
     };
 
     private static readonly Dictionary<string, HeroDefinition> heroesById = BuildHeroMap();
@@ -68,6 +87,8 @@ public static class GameData
     public static IReadOnlyList<HeroDefinition> Heroes => heroes;
     public static IReadOnlyList<StageDefinition> Stages => stages;
     public static IReadOnlyList<AbilityDefinition> Abilities => abilities;
+    public static IReadOnlyList<CombatSkillDefinition> Skills => skills;
+    public static IReadOnlyList<PetDefinition> Pets => pets;
 
     public static HeroDefinition GetHero(string id)
     {
@@ -183,7 +204,7 @@ public static class GameData
 
     private static StageDefinition Normal(string id, int number, string enemyId, float hpMultiplier, float goldMultiplier)
     {
-        return new StageDefinition(id, 1, number, StageType.Normal, enemyId, hpMultiplier, goldMultiplier, 10, null);
+        return new StageDefinition(id, 1, number, StageType.Normal, enemyId, hpMultiplier, goldMultiplier, NormalStageRequiredKills, null);
     }
 
     private static Dictionary<string, HeroDefinition> BuildHeroMap()
