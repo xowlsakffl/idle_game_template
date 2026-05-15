@@ -18,6 +18,15 @@ public sealed class GameHud : MonoBehaviour
         Debug
     }
 
+    private enum HeroPageTab
+    {
+        Formation,
+        Trait,
+        Statue,
+        Seal,
+        Relic
+    }
+
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
     private AbilityManager abilityManager;
@@ -57,21 +66,41 @@ public sealed class GameHud : MonoBehaviour
     private GameObject contentRoot;
     private GameObject growthPanel;
     private GameObject heroPanel;
+    private GameObject heroFormationContent;
+    private Text heroFormationSummaryText;
+    private Text heroOwnedEffectText;
+    private Text heroPlaceholderText;
     private GameObject stagePanel;
     private GameObject summonPanel;
     private GameObject shopPanel;
     private GameObject supportPanel;
     private GameObject debugPanel;
+    private GameObject heroFormationSavePrompt;
     private GameObject guideQuestDot;
     private Text gachaText;
     private Text debugText;
     private int selectedGrowthLevelStep = 1;
+    private int selectedHeroPreset = 1;
+    private int pendingHeroPreset = 0;
+    private HudTab pendingTabAfterHeroFormationPrompt = HudTab.Growth;
+    private string selectedHeroForPlacement = string.Empty;
+    private HeroPageTab activeHeroPageTab = HeroPageTab.Formation;
     private string growthNoticeMessage = string.Empty;
     private float growthNoticeUntil;
+    private bool heroFormationDirty;
+    private bool heroFormationSavePromptOpen;
+    private bool pendingContentOpenAfterHeroFormationPrompt = true;
+    private bool pendingHeroPresetSwitch;
 
     private readonly Dictionary<AbilityKind, Text> abilityButtonTexts = new Dictionary<AbilityKind, Text>();
     private readonly Dictionary<AbilityKind, Text> abilityCostBadgeTexts = new Dictionary<AbilityKind, Text>();
     private readonly Dictionary<string, Text> heroButtonTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<HeroPageTab, Button> heroPageTabButtons = new Dictionary<HeroPageTab, Button>();
+    private readonly Dictionary<int, Button> heroPresetButtons = new Dictionary<int, Button>();
+    private readonly Dictionary<int, Button> heroFormationSlotButtons = new Dictionary<int, Button>();
+    private readonly Dictionary<int, Button> heroFormationSlotRemoveButtons = new Dictionary<int, Button>();
+    private readonly Dictionary<string, Button> heroRosterActionButtons = new Dictionary<string, Button>();
+    private readonly List<Text> heroFormationSlotTexts = new List<Text>();
     private readonly Dictionary<AbilityKind, GameObject> abilityNotificationDots = new Dictionary<AbilityKind, GameObject>();
     private readonly Dictionary<string, GameObject> heroNotificationDots = new Dictionary<string, GameObject>();
     private readonly Dictionary<string, Text> skillStatusTexts = new Dictionary<string, Text>();
@@ -85,6 +114,7 @@ public sealed class GameHud : MonoBehaviour
     private readonly Dictionary<HudTab, Button> tabButtons = new Dictionary<HudTab, Button>();
     private readonly Dictionary<HudTab, string> tabButtonLabels = new Dictionary<HudTab, string>();
     private readonly Dictionary<HudTab, List<GameObject>> tabNotificationDots = new Dictionary<HudTab, List<GameObject>>();
+    private readonly List<string> editingFormationHeroIds = new List<string>();
     private readonly List<Image> enemyBattleImages = new List<Image>();
     private readonly List<Text> enemyBattleTexts = new List<Text>();
     private readonly List<RectTransform> enemyBattleRects = new List<RectTransform>();
@@ -225,21 +255,41 @@ public sealed class GameHud : MonoBehaviour
         contentRoot = null;
         growthPanel = null;
         heroPanel = null;
+        heroFormationContent = null;
+        heroFormationSummaryText = null;
+        heroOwnedEffectText = null;
+        heroPlaceholderText = null;
         stagePanel = null;
         summonPanel = null;
         shopPanel = null;
         supportPanel = null;
         debugPanel = null;
+        heroFormationSavePrompt = null;
         guideQuestDot = null;
         gachaText = null;
         debugText = null;
         selectedGrowthLevelStep = 1;
+        selectedHeroPreset = 1;
+        pendingHeroPreset = 0;
+        pendingTabAfterHeroFormationPrompt = HudTab.Growth;
+        selectedHeroForPlacement = string.Empty;
+        activeHeroPageTab = HeroPageTab.Formation;
         growthNoticeMessage = string.Empty;
         growthNoticeUntil = 0f;
+        heroFormationDirty = false;
+        heroFormationSavePromptOpen = false;
+        pendingContentOpenAfterHeroFormationPrompt = true;
+        pendingHeroPresetSwitch = false;
 
         abilityButtonTexts.Clear();
         abilityCostBadgeTexts.Clear();
         heroButtonTexts.Clear();
+        heroPageTabButtons.Clear();
+        heroPresetButtons.Clear();
+        heroFormationSlotButtons.Clear();
+        heroFormationSlotRemoveButtons.Clear();
+        heroRosterActionButtons.Clear();
+        heroFormationSlotTexts.Clear();
         abilityNotificationDots.Clear();
         heroNotificationDots.Clear();
         skillStatusTexts.Clear();
@@ -253,6 +303,7 @@ public sealed class GameHud : MonoBehaviour
         tabButtons.Clear();
         tabButtonLabels.Clear();
         tabNotificationDots.Clear();
+        editingFormationHeroIds.Clear();
         enemyBattleImages.Clear();
         enemyBattleTexts.Clear();
         enemyBattleRects.Clear();
@@ -314,7 +365,7 @@ public sealed class GameHud : MonoBehaviour
         CreateBattlePanel(root.transform);
         CreateContentPanels(root.transform);
         CreateBottomNav(root.transform);
-        CreateFloatingActionRails(root.transform);
+        CreateHeroFormationSavePrompt(root.transform);
     }
 
     private void CreateHeader(Transform parent)
@@ -355,10 +406,23 @@ public sealed class GameHud : MonoBehaviour
         resourceRect.anchorMin = new Vector2(1f, 0.5f);
         resourceRect.anchorMax = new Vector2(1f, 0.5f);
         resourceRect.pivot = new Vector2(1f, 0.5f);
-        resourceRect.sizeDelta = new Vector2(520f, 66f);
-        resourceRect.anchoredPosition = new Vector2(-112f, 18f);
+        bool showDebugGrantButton = IsDebugPanelEnabled();
+        resourceRect.sizeDelta = new Vector2(showDebugGrantButton ? 430f : 520f, 66f);
+        resourceRect.anchoredPosition = new Vector2(showDebugGrantButton ? -194f : -112f, 18f);
         resourceText = CreateText("Resources", resourcePill.transform, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
         StretchToParent(resourceText.gameObject);
+
+        if (showDebugGrantButton)
+        {
+            Button debugGrantButton = CreateButton("DBG", panel.transform, 24, new Color(0.26f, 0.18f, 0.12f, 1f));
+            RectTransform debugRect = debugGrantButton.GetComponent<RectTransform>();
+            debugRect.anchorMin = new Vector2(1f, 0.5f);
+            debugRect.anchorMax = new Vector2(1f, 0.5f);
+            debugRect.pivot = new Vector2(1f, 0.5f);
+            debugRect.sizeDelta = new Vector2(76f, 66f);
+            debugRect.anchoredPosition = new Vector2(-108f, 18f);
+            debugGrantButton.onClick.AddListener(DebugGrantTestCurrency);
+        }
 
         Button menuButton = CreateButton("≡", panel.transform, 36, new Color(0.12f, 0.16f, 0.22f, 1f));
         RectTransform menuRect = menuButton.GetComponent<RectTransform>();
@@ -367,6 +431,62 @@ public sealed class GameHud : MonoBehaviour
         menuRect.pivot = new Vector2(1f, 0.5f);
         menuRect.sizeDelta = new Vector2(76f, 66f);
         menuRect.anchoredPosition = new Vector2(-22f, 18f);
+    }
+
+    private void CreateHeroFormationSavePrompt(Transform parent)
+    {
+        heroFormationSavePrompt = CreatePanel("HeroFormationSavePrompt", parent, new Color(0f, 0f, 0f, 0.62f));
+        LayoutElement overlayLayout = heroFormationSavePrompt.AddComponent<LayoutElement>();
+        overlayLayout.ignoreLayout = true;
+        StretchToParent(heroFormationSavePrompt);
+
+        GameObject dialog = CreatePanel("HeroFormationSaveDialog", heroFormationSavePrompt.transform, new Color(0.12f, 0.16f, 0.24f, 1f));
+        RectTransform dialogRect = dialog.GetComponent<RectTransform>();
+        dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+        dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+        dialogRect.pivot = new Vector2(0.5f, 0.5f);
+        dialogRect.sizeDelta = new Vector2(660f, 320f);
+        dialogRect.anchoredPosition = Vector2.zero;
+
+        Text title = CreateText("HeroFormationSaveTitle", dialog.transform, 34, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform titleRect = title.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.sizeDelta = new Vector2(0f, 70f);
+        titleRect.anchoredPosition = new Vector2(0f, -26f);
+        title.text = "편성 저장";
+
+        Text message = CreateText("HeroFormationSaveMessage", dialog.transform, 25, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform messageRect = message.GetComponent<RectTransform>();
+        messageRect.anchorMin = new Vector2(0f, 0.5f);
+        messageRect.anchorMax = new Vector2(1f, 0.5f);
+        messageRect.pivot = new Vector2(0.5f, 0.5f);
+        messageRect.sizeDelta = new Vector2(0f, 92f);
+        messageRect.anchoredPosition = new Vector2(0f, 12f);
+        message.text = "변경된 히어로 편성을 저장하시겠습니까?\n저장하면 현재 스테이지가 다시 시작됩니다.";
+
+        GameObject buttonRow = new GameObject("HeroFormationSaveButtons", typeof(RectTransform));
+        buttonRow.transform.SetParent(dialog.transform, false);
+        RectTransform rowRect = buttonRow.GetComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0f, 0f);
+        rowRect.anchorMax = new Vector2(1f, 0f);
+        rowRect.pivot = new Vector2(0.5f, 0f);
+        rowRect.sizeDelta = new Vector2(-72f, 76f);
+        rowRect.anchoredPosition = new Vector2(0f, 34f);
+        HorizontalLayoutGroup rowLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
+        rowLayout.spacing = 18;
+        rowLayout.childControlWidth = true;
+        rowLayout.childControlHeight = true;
+        rowLayout.childForceExpandWidth = true;
+        rowLayout.childForceExpandHeight = true;
+
+        Button confirmButton = CreateButton("확인", buttonRow.transform, 28, new Color(0.36f, 0.52f, 0.22f, 1f));
+        Button cancelButton = CreateButton("취소", buttonRow.transform, 28, new Color(0.26f, 0.29f, 0.34f, 1f));
+        confirmButton.onClick.AddListener(ConfirmHeroFormationSavePrompt);
+        cancelButton.onClick.AddListener(CancelHeroFormationSavePrompt);
+
+        heroFormationSavePrompt.SetActive(false);
     }
 
     private void CreateBattlePanel(Transform parent)
@@ -691,32 +811,148 @@ public sealed class GameHud : MonoBehaviour
     {
         VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(24, 24, 22, 22);
-        layout.spacing = 10;
+        layout.spacing = 8;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
 
         Text heroTitle = CreateText("HeroGrowthTitle", parent, 28, FontStyle.Bold, TextAnchor.MiddleLeft);
-        heroTitle.text = "히어로";
-        AddLayoutElement(heroTitle.gameObject, -1, 50);
+        heroTitle.text = "편성";
+        AddLayoutElement(heroTitle.gameObject, -1, 38);
+
+        GameObject heroPageTabs = new GameObject("HeroPageTabs", typeof(RectTransform));
+        heroPageTabs.transform.SetParent(parent, false);
+        HorizontalLayoutGroup tabLayout = heroPageTabs.AddComponent<HorizontalLayoutGroup>();
+        tabLayout.spacing = 8;
+        tabLayout.childControlWidth = true;
+        tabLayout.childControlHeight = true;
+        tabLayout.childForceExpandWidth = true;
+        tabLayout.childForceExpandHeight = true;
+        AddLayoutElement(heroPageTabs, -1, 54);
+
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Formation, "편성");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Trait, "특성");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Statue, "석상");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Seal, "인장");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Relic, "유물");
+
+        heroFormationContent = new GameObject("HeroFormationContent", typeof(RectTransform));
+        heroFormationContent.transform.SetParent(parent, false);
+        VerticalLayoutGroup formationLayout = heroFormationContent.AddComponent<VerticalLayoutGroup>();
+        formationLayout.spacing = 8;
+        formationLayout.childControlWidth = true;
+        formationLayout.childControlHeight = true;
+        formationLayout.childForceExpandWidth = true;
+        formationLayout.childForceExpandHeight = false;
+        AddLayoutElement(heroFormationContent, -1, 594);
+
+        heroFormationSummaryText = CreateText("HeroFormationSummary", heroFormationContent.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
+        AddLayoutElement(heroFormationSummaryText.gameObject, -1, 30);
+
+        GameObject formationArea = CreatePanel("FormationArea", heroFormationContent.transform, new Color(0.33f, 0.42f, 0.58f, 1f));
+        AddLayoutElement(formationArea, -1, 188);
+        HorizontalLayoutGroup formationAreaLayout = formationArea.AddComponent<HorizontalLayoutGroup>();
+        formationAreaLayout.padding = new RectOffset(14, 14, 14, 14);
+        formationAreaLayout.spacing = 14;
+        formationAreaLayout.childControlWidth = true;
+        formationAreaLayout.childControlHeight = true;
+        formationAreaLayout.childForceExpandWidth = true;
+        formationAreaLayout.childForceExpandHeight = true;
+
+        GameObject slotGrid = new GameObject("FormationSlots", typeof(RectTransform));
+        slotGrid.transform.SetParent(formationArea.transform, false);
+        GridLayoutGroup slotGridLayout = slotGrid.AddComponent<GridLayoutGroup>();
+        slotGridLayout.cellSize = new Vector2(148f, 72f);
+        slotGridLayout.spacing = new Vector2(10f, 12f);
+        slotGridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        slotGridLayout.constraintCount = 4;
+        AddLayoutElement(slotGrid, -1, -1);
+
+        for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+        {
+            int slotIndex = i;
+            Button slot = CreateButton(string.Empty, slotGrid.transform, 18, new Color(0.18f, 0.22f, 0.31f, 1f));
+            slot.onClick.AddListener(() => TryPlaceSelectedHeroInSlot(slotIndex));
+            Text slotText = slot.GetComponentInChildren<Text>();
+            slotText.name = "FormationSlotText" + i;
+            slotText.fontSize = 18;
+            slotText.alignment = TextAnchor.MiddleCenter;
+            StretchToParent(slotText.gameObject);
+            heroFormationSlotTexts.Add(slotText);
+            heroFormationSlotButtons[i] = slot;
+
+            Button removeButton = CreateCornerActionButton("-", slot.transform, new Color(0.58f, 0.12f, 0.12f, 1f));
+            removeButton.onClick.AddListener(() =>
+            {
+                RemoveHeroFromEditingFormationSlot(slotIndex);
+            });
+            heroFormationSlotRemoveButtons[i] = removeButton;
+        }
+
+        GameObject presetColumn = new GameObject("PresetColumn", typeof(RectTransform));
+        presetColumn.transform.SetParent(formationArea.transform, false);
+        VerticalLayoutGroup presetLayout = presetColumn.AddComponent<VerticalLayoutGroup>();
+        presetLayout.spacing = 10;
+        presetLayout.childControlWidth = true;
+        presetLayout.childControlHeight = true;
+        presetLayout.childForceExpandWidth = true;
+        presetLayout.childForceExpandHeight = true;
+        AddLayoutElement(presetColumn, 132, -1);
+
+        Text presetTitle = CreateText("PresetTitle", presetColumn.transform, 22, FontStyle.Bold, TextAnchor.MiddleCenter);
+        presetTitle.text = "프리셋";
+        AddLayoutElement(presetTitle.gameObject, -1, 34);
+        for (int preset = 1; preset <= GameData.MaxHeroPresets; preset++)
+        {
+            Button presetButton = CreateButton(preset.ToString(), presetColumn.transform, 24, new Color(0.21f, 0.29f, 0.45f, 1f));
+            int capturedPreset = preset;
+            presetButton.onClick.AddListener(() =>
+            {
+                RequestHeroPresetChange(capturedPreset);
+            });
+            heroPresetButtons[preset] = presetButton;
+        }
+
+        GameObject rosterGrid = new GameObject("HeroRosterGrid", typeof(RectTransform));
+        rosterGrid.transform.SetParent(heroFormationContent.transform, false);
+        GridLayoutGroup rosterLayout = rosterGrid.AddComponent<GridLayoutGroup>();
+        rosterLayout.cellSize = new Vector2(154f, 124f);
+        rosterLayout.spacing = new Vector2(10f, 10f);
+        rosterLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        rosterLayout.constraintCount = 5;
+        AddLayoutElement(rosterGrid, -1, 258);
 
         foreach (HeroDefinition hero in GameData.Heroes)
         {
-            Button button = CreateButton(hero.DisplayName, parent, 24, new Color(0.23f, 0.29f, 0.37f, 1f));
-            AddLayoutElement(button.gameObject, -1, 82);
-
+            Button button = CreateButton(hero.DisplayName, rosterGrid.transform, 15, GetRarityColor(hero.Rarity));
             string heroId = hero.Id;
-            button.onClick.AddListener(() =>
-            {
-                if (!battleManager.TryStarUpHero(heroId))
-                {
-                    battleManager.TryLevelUpHero(heroId);
-                }
-            });
             heroButtonTexts[hero.Id] = button.GetComponentInChildren<Text>();
+            Button actionButton = CreateCornerActionButton("+", button.transform, new Color(0.88f, 0.72f, 0.20f, 1f));
+            actionButton.onClick.AddListener(() => SelectOrRemoveRosterHero(heroId));
+            heroRosterActionButtons[hero.Id] = actionButton;
             heroNotificationDots[hero.Id] = CreateNotificationDot(button.transform, 40f, new Vector2(-16f, -16f));
         }
+
+        heroOwnedEffectText = CreateText("HeroOwnedEffect", heroFormationContent.transform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
+        AddLayoutElement(heroOwnedEffectText.gameObject, -1, 34);
+
+        GameObject actionRow = new GameObject("HeroFormationActions", typeof(RectTransform));
+        actionRow.transform.SetParent(heroFormationContent.transform, false);
+        HorizontalLayoutGroup actionLayout = actionRow.AddComponent<HorizontalLayoutGroup>();
+        actionLayout.spacing = 14;
+        actionLayout.childControlWidth = true;
+        actionLayout.childControlHeight = true;
+        actionLayout.childForceExpandWidth = true;
+        actionLayout.childForceExpandHeight = true;
+        AddLayoutElement(actionRow, -1, 58);
+        CreateButton("자동 배치", actionRow.transform, 24, new Color(0.72f, 0.56f, 0.15f, 1f));
+        CreateButton("일괄 승급", actionRow.transform, 24, new Color(0.34f, 0.35f, 0.37f, 1f));
+
+        heroPlaceholderText = CreateText("HeroPagePlaceholder", parent, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
+        heroPlaceholderText.text = "준비 중";
+        AddLayoutElement(heroPlaceholderText.gameObject, -1, 594);
+        heroPlaceholderText.gameObject.SetActive(false);
     }
 
     private void CreateStagePanel(Transform parent)
@@ -934,6 +1170,15 @@ public sealed class GameHud : MonoBehaviour
         });
     }
 
+    private void DebugGrantTestCurrency()
+    {
+        wallet.AddGold(50000000);
+        wallet.AddRuby(15000);
+        wallet.AddHeroExpItem(100000);
+        wallet.AddHeroSummonTicket(100);
+        UpdateView();
+    }
+
     private void CreateBottomNav(Transform parent)
     {
         GameObject panel = CreatePanel("BottomNav", parent, new Color(0.08f, 0.11f, 0.17f, 1f));
@@ -954,69 +1199,27 @@ public sealed class GameHud : MonoBehaviour
         CreateTabButton(panel.transform, HudTab.Shop, "▤\n상점");
     }
 
-    private void CreateFloatingActionRails(Transform parent)
+    private void CreateHeroPageTabButton(Transform parent, HeroPageTab tab, string label)
     {
-        GameObject rightRail = new GameObject("RightActionRail", typeof(RectTransform));
-        rightRail.transform.SetParent(parent, false);
-        LayoutElement ignoreLayout = rightRail.AddComponent<LayoutElement>();
-        ignoreLayout.ignoreLayout = true;
-
-        RectTransform rightRect = rightRail.GetComponent<RectTransform>();
-        rightRect.anchorMin = new Vector2(1f, 0.5f);
-        rightRect.anchorMax = new Vector2(1f, 0.5f);
-        rightRect.pivot = new Vector2(1f, 0.5f);
-        rightRect.sizeDelta = new Vector2(122f, 470f);
-        rightRect.anchoredPosition = new Vector2(-20f, 120f);
-
-        VerticalLayoutGroup rightLayout = rightRail.AddComponent<VerticalLayoutGroup>();
-        rightLayout.spacing = 16;
-        rightLayout.childAlignment = TextAnchor.UpperCenter;
-        rightLayout.childControlWidth = true;
-        rightLayout.childControlHeight = false;
-        rightLayout.childForceExpandWidth = true;
-        rightLayout.childForceExpandHeight = false;
-
-        CreateFloatingTabButton(rightRail.transform, HudTab.Hero, "영웅", new Color(0.32f, 0.24f, 0.18f, 0.96f));
-        CreateFloatingTabButton(rightRail.transform, HudTab.Shop, "상점", new Color(0.32f, 0.18f, 0.38f, 0.96f));
-        CreateFloatingTabButton(rightRail.transform, HudTab.Stage, "맵", new Color(0.18f, 0.27f, 0.37f, 0.96f));
-        CreateFloatingTabButton(rightRail.transform, HudTab.Support, "지원", new Color(0.18f, 0.32f, 0.27f, 0.96f));
-
-        GameObject leftRail = new GameObject("LeftActionRail", typeof(RectTransform));
-        leftRail.transform.SetParent(parent, false);
-        LayoutElement leftIgnoreLayout = leftRail.AddComponent<LayoutElement>();
-        leftIgnoreLayout.ignoreLayout = true;
-
-        RectTransform leftRect = leftRail.GetComponent<RectTransform>();
-        leftRect.anchorMin = new Vector2(0f, 0.5f);
-        leftRect.anchorMax = new Vector2(0f, 0.5f);
-        leftRect.pivot = new Vector2(0f, 0.5f);
-        leftRect.sizeDelta = new Vector2(156f, 300f);
-        leftRect.anchoredPosition = new Vector2(20f, -240f);
-
-        VerticalLayoutGroup leftLayout = leftRail.AddComponent<VerticalLayoutGroup>();
-        leftLayout.spacing = 16;
-        leftLayout.childAlignment = TextAnchor.LowerCenter;
-        leftLayout.childControlWidth = true;
-        leftLayout.childControlHeight = false;
-        leftLayout.childForceExpandWidth = true;
-        leftLayout.childForceExpandHeight = false;
-
-        CreateFloatingTabButton(leftRail.transform, HudTab.Stage, "탑", new Color(0.20f, 0.22f, 0.36f, 0.96f));
-        CreateFloatingTabButton(leftRail.transform, HudTab.Support, "길드", new Color(0.24f, 0.18f, 0.34f, 0.96f));
-        CreateFloatingTabButton(leftRail.transform, HudTab.Growth, "마을", new Color(0.12f, 0.34f, 0.44f, 0.96f));
-    }
-
-    private void CreateFloatingTabButton(Transform parent, HudTab tab, string label, Color color)
-    {
-        Button button = CreateButton(label, parent, 23, color);
-        AddLayoutElement(button.gameObject, -1, 82);
-        RegisterTabNotificationDot(tab, CreateNotificationDot(button.transform, 36f, new Vector2(-12f, -12f)));
+        Button button = CreateButton(label, parent, 22, new Color(0.18f, 0.24f, 0.38f, 1f));
         button.onClick.AddListener(() =>
         {
-            activeTab = tab;
-            contentPanelOpen = true;
+            activeHeroPageTab = tab;
             UpdateView();
         });
+        heroPageTabButtons[tab] = button;
+    }
+
+    private Button CreateCornerActionButton(string label, Transform parent, Color color)
+    {
+        Button button = CreateButton(label, parent, 20, color);
+        RectTransform rect = button.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.one;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(1f, 1f);
+        rect.sizeDelta = new Vector2(34f, 34f);
+        rect.anchoredPosition = new Vector2(-4f, -4f);
+        return button;
     }
 
     private void CreateTabButton(Transform parent, HudTab tab, string label)
@@ -1025,20 +1228,117 @@ public sealed class GameHud : MonoBehaviour
         RegisterTabNotificationDot(tab, CreateNotificationDot(button.transform, 38f, new Vector2(-14f, -14f)));
         button.onClick.AddListener(() =>
         {
-            if (tab == HudTab.Growth && activeTab == HudTab.Growth && contentPanelOpen)
-            {
-                contentPanelOpen = false;
-            }
-            else
-            {
-                activeTab = tab;
-                contentPanelOpen = true;
-            }
-
-            UpdateView();
+            RequestTabChange(tab);
         });
         tabButtons[tab] = button;
         tabButtonLabels[tab] = label;
+    }
+
+    private void RequestTabChange(HudTab tab)
+    {
+        HudTab targetTab;
+        bool targetContentOpen;
+        if (tab == HudTab.Growth && activeTab == HudTab.Growth && contentPanelOpen)
+        {
+            targetTab = activeTab;
+            targetContentOpen = false;
+        }
+        else
+        {
+            targetTab = tab;
+            targetContentOpen = true;
+        }
+
+        if (ShouldPromptHeroFormationSave(targetTab, targetContentOpen))
+        {
+            ShowHeroFormationSavePromptForTab(targetTab, targetContentOpen);
+            return;
+        }
+
+        ApplyTabState(targetTab, targetContentOpen);
+    }
+
+    private bool ShouldPromptHeroFormationSave(HudTab targetTab, bool targetContentOpen)
+    {
+        return !heroFormationSavePromptOpen
+            && contentPanelOpen
+            && activeTab == HudTab.Hero
+            && HasHeroFormationPendingChanges()
+            && (targetTab != HudTab.Hero || !targetContentOpen);
+    }
+
+    private void ShowHeroFormationSavePromptForTab(HudTab targetTab, bool targetContentOpen)
+    {
+        pendingHeroPresetSwitch = false;
+        pendingHeroPreset = 0;
+        pendingTabAfterHeroFormationPrompt = targetTab;
+        pendingContentOpenAfterHeroFormationPrompt = targetContentOpen;
+        heroFormationSavePromptOpen = true;
+        UpdateView();
+    }
+
+    private void ShowHeroFormationSavePromptForPreset(int preset)
+    {
+        pendingHeroPresetSwitch = true;
+        pendingHeroPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        heroFormationSavePromptOpen = true;
+        UpdateView();
+    }
+
+    private void ApplyTabState(HudTab targetTab, bool targetContentOpen)
+    {
+        bool openingHeroPanel = targetTab == HudTab.Hero && (!contentPanelOpen || activeTab != HudTab.Hero);
+        activeTab = targetTab;
+        contentPanelOpen = targetContentOpen;
+        if (openingHeroPanel)
+        {
+            LoadHeroFormationDraftFromPreset(battleManager.ActiveHeroPreset);
+        }
+
+        UpdateView();
+    }
+
+    private void ConfirmHeroFormationSavePrompt()
+    {
+        if (!battleManager.ApplyHeroFormation(selectedHeroPreset, editingFormationHeroIds))
+        {
+            heroFormationSavePromptOpen = false;
+            UpdateView();
+            return;
+        }
+
+        heroFormationDirty = false;
+        selectedHeroForPlacement = string.Empty;
+        heroFormationSavePromptOpen = false;
+
+        if (pendingHeroPresetSwitch)
+        {
+            int preset = pendingHeroPreset;
+            ClearHeroFormationPromptTarget();
+            LoadHeroFormationDraftFromPreset(preset);
+            UpdateView();
+            return;
+        }
+
+        HudTab targetTab = pendingTabAfterHeroFormationPrompt;
+        bool targetContentOpen = pendingContentOpenAfterHeroFormationPrompt;
+        ClearHeroFormationPromptTarget();
+        ApplyTabState(targetTab, targetContentOpen);
+    }
+
+    private void CancelHeroFormationSavePrompt()
+    {
+        heroFormationSavePromptOpen = false;
+        ClearHeroFormationPromptTarget();
+        UpdateView();
+    }
+
+    private void ClearHeroFormationPromptTarget()
+    {
+        pendingHeroPresetSwitch = false;
+        pendingHeroPreset = 0;
+        pendingTabAfterHeroFormationPrompt = activeTab;
+        pendingContentOpenAfterHeroFormationPrompt = contentPanelOpen;
     }
 
     private void UpdateView()
@@ -1063,7 +1363,7 @@ public sealed class GameHud : MonoBehaviour
         }
 
         targetText.text = battleManager.TargetName;
-        hpText.text = "HP " + battleManager.TargetHp + " / " + battleManager.TargetMaxHp;
+        hpText.text = "HP " + FormatShortNumber(battleManager.TargetHp) + " / " + FormatShortNumber(battleManager.TargetMaxHp);
         float hpRatio = battleManager.TargetMaxHp <= 0 ? 0f : Mathf.Clamp01((float)battleManager.TargetHp / battleManager.TargetMaxHp);
         hpFill.rectTransform.anchorMax = new Vector2(hpRatio, 1f);
 
@@ -1174,6 +1474,8 @@ public sealed class GameHud : MonoBehaviour
             }
         }
 
+        RefreshHeroFormationPanel();
+
         bool hasHeroAttention = false;
         foreach (HeroState hero in battleManager.Heroes)
         {
@@ -1187,14 +1489,40 @@ public sealed class GameHud : MonoBehaviour
                 string starCostText = hero.IsMaxStars
                     ? "S MAX"
                     : "S " + hero.Shards + "/" + hero.StarUpCost;
-                string actionText = hero.CanStarUp ? "STAR!" : canLevel ? "LV!" : "EXP " + FormatShortNumber(hero.LevelUpCost);
+                bool isDeployed = IsHeroInEditingFormation(hero.Definition.Id);
+                bool isSelectedForPlacement = selectedHeroForPlacement == hero.Definition.Id;
+                string actionText = isSelectedForPlacement ? "선택됨" : "대기";
 
-                text.text = GetRarityBadge(hero.Definition.Rarity) + " " + GetShortHeroLabel(hero.Definition)
-                    + "  S" + hero.Stars + "/" + HeroDefinition.MaxStars
-                    + "  Lv." + hero.Level
-                    + "\nATK " + FormatShortNumber(hero.AttackPower)
-                    + "  " + starCostText
-                    + "  " + actionText;
+                text.text = (isDeployed ? "배치중 " : string.Empty)
+                    + GetTraitBadge(hero.Definition.Trait)
+                    + " " + GetRarityBadge(hero.Definition.Rarity)
+                    + " Lv." + hero.Level
+                    + "\n" + GetShortHeroLabel(hero.Definition)
+                    + "  " + hero.Definition.RarityLabel + "  " + FormatStars(hero.Stars)
+                    + "\n공 " + FormatShortNumber(hero.AttackPower) + "  체 " + FormatShortNumber(hero.MaxHp)
+                    + "\n속 " + hero.AttackSpeed.ToString("0.##") + "  이 " + hero.MoveSpeed.ToString("0.#")
+                    + "\n" + hero.Definition.PassiveLabel + "  " + starCostText + (isDeployed ? string.Empty : "  " + actionText);
+
+                Button heroButton = text.GetComponentInParent<Button>();
+                if (heroButton != null)
+                {
+                    SetButtonColor(heroButton, isDeployed
+                        ? new Color(0.13f, 0.15f, 0.18f, 1f)
+                        : isSelectedForPlacement ? new Color(0.55f, 0.49f, 0.20f, 1f) : GetRarityColor(hero.Definition.Rarity));
+                }
+
+                if (heroRosterActionButtons.TryGetValue(hero.Definition.Id, out Button actionButton))
+                {
+                    Text actionTextComponent = actionButton.GetComponentInChildren<Text>(true);
+                    if (actionTextComponent != null)
+                    {
+                        actionTextComponent.text = isDeployed ? "-" : "+";
+                    }
+
+                    SetButtonColor(actionButton, isDeployed
+                        ? new Color(0.58f, 0.12f, 0.12f, 1f)
+                        : new Color(0.88f, 0.72f, 0.20f, 1f));
+                }
             }
         }
 
@@ -1222,7 +1550,7 @@ public sealed class GameHud : MonoBehaviour
             {
                 text.text = pet.Definition.DisplayName
                     + "    Next " + Mathf.CeilToInt(pet.AttackCooldown) + "s"
-                    + "\nATK " + pet.Definition.AttackPower
+                    + "\nATK " + FormatShortNumber(pet.Definition.AttackPower)
                     + "    Interval " + pet.Definition.AttackInterval.ToString("0.0") + "s"
                     + "    Gold +" + battleManager.PetGoldBonusPercent.ToString("0.#") + "%";
             }
@@ -1324,6 +1652,11 @@ public sealed class GameHud : MonoBehaviour
             debugPanel.SetActive(contentPanelOpen && activeTab == HudTab.Debug);
         }
 
+        if (heroFormationSavePrompt != null)
+        {
+            heroFormationSavePrompt.SetActive(heroFormationSavePromptOpen);
+        }
+
         foreach (KeyValuePair<HudTab, Button> pair in tabButtons)
         {
             Text text = pair.Value.GetComponentInChildren<Text>(true);
@@ -1341,6 +1674,156 @@ public sealed class GameHud : MonoBehaviour
     {
         Time.timeScale = Mathf.Max(0.1f, scale);
         UpdateView();
+    }
+
+    private void LoadHeroFormationDraftFromPreset(int preset)
+    {
+        selectedHeroPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        selectedHeroForPlacement = string.Empty;
+        editingFormationHeroIds.Clear();
+
+        IReadOnlyList<string> savedIds = battleManager.GetHeroFormationHeroIds(selectedHeroPreset);
+        for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+        {
+            editingFormationHeroIds.Add(i < savedIds.Count ? savedIds[i] : string.Empty);
+        }
+
+        heroFormationDirty = false;
+    }
+
+    private void EnsureHeroFormationDraft()
+    {
+        if (editingFormationHeroIds.Count == GameData.MaxPartyHeroes)
+        {
+            return;
+        }
+
+        LoadHeroFormationDraftFromPreset(battleManager.ActiveHeroPreset);
+    }
+
+    private bool HasHeroFormationPendingChanges()
+    {
+        EnsureHeroFormationDraft();
+
+        IReadOnlyList<string> savedIds = battleManager.GetHeroFormationHeroIds(selectedHeroPreset);
+        for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+        {
+            string editingHeroId = i < editingFormationHeroIds.Count ? editingFormationHeroIds[i] : string.Empty;
+            string savedHeroId = i < savedIds.Count ? savedIds[i] : string.Empty;
+            if (editingHeroId != savedHeroId)
+            {
+                return true;
+            }
+        }
+
+        if (heroFormationDirty)
+        {
+            return true;
+        }
+
+        return selectedHeroPreset != battleManager.ActiveHeroPreset && GetEditingFormationFilledCount() > 0;
+    }
+
+    private void RequestHeroPresetChange(int preset)
+    {
+        int nextPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        if (nextPreset == selectedHeroPreset)
+        {
+            return;
+        }
+
+        if (heroFormationDirty)
+        {
+            ShowHeroFormationSavePromptForPreset(nextPreset);
+            return;
+        }
+
+        LoadHeroFormationDraftFromPreset(nextPreset);
+        UpdateView();
+    }
+
+    private void RefreshHeroFormationPanel()
+    {
+        EnsureHeroFormationDraft();
+        bool formationOpen = activeHeroPageTab == HeroPageTab.Formation;
+        if (heroFormationContent != null)
+        {
+            heroFormationContent.SetActive(formationOpen);
+        }
+
+        if (heroPlaceholderText != null)
+        {
+            heroPlaceholderText.gameObject.SetActive(!formationOpen);
+            heroPlaceholderText.text = GetHeroPageTabLabel(activeHeroPageTab) + " 준비 중";
+        }
+
+        foreach (KeyValuePair<HeroPageTab, Button> pair in heroPageTabButtons)
+        {
+            SetButtonColor(pair.Value, pair.Key == activeHeroPageTab
+                ? new Color(0.42f, 0.54f, 0.82f, 1f)
+                : new Color(0.18f, 0.24f, 0.38f, 1f));
+        }
+
+        foreach (KeyValuePair<int, Button> pair in heroPresetButtons)
+        {
+            SetButtonColor(pair.Value, pair.Key == selectedHeroPreset
+                ? new Color(0.50f, 0.64f, 0.96f, 1f)
+                : new Color(0.21f, 0.29f, 0.45f, 1f));
+        }
+
+        int deployedCount = Mathf.Min(GameData.MaxPartyHeroes, GetEditingFormationFilledCount());
+        if (heroFormationSummaryText != null)
+        {
+            heroFormationSummaryText.text = "출전 " + deployedCount + "/" + GameData.MaxPartyHeroes
+                + "    프리셋 " + selectedHeroPreset
+                + (HasHeroFormationPendingChanges() ? "    저장 필요" : string.Empty)
+                + (string.IsNullOrEmpty(selectedHeroForPlacement)
+                    ? string.Empty
+                    : "    배치 선택: " + GameData.GetHero(selectedHeroForPlacement).DisplayName);
+        }
+
+        for (int i = 0; i < heroFormationSlotTexts.Count; i++)
+        {
+            Text slotText = heroFormationSlotTexts[i];
+            string heroId = i < editingFormationHeroIds.Count ? editingFormationHeroIds[i] : string.Empty;
+            HeroState hero = FindHeroState(heroId);
+            bool occupied = hero != null;
+            if (heroFormationSlotButtons.TryGetValue(i, out Button slotButton))
+            {
+                SetButtonColor(slotButton, occupied ? GetRarityColor(hero.Definition.Rarity) : new Color(0.18f, 0.22f, 0.31f, 1f));
+            }
+
+            if (heroFormationSlotRemoveButtons.TryGetValue(i, out Button removeButton))
+            {
+                removeButton.gameObject.SetActive(occupied);
+            }
+
+            if (occupied)
+            {
+                slotText.text = GetTraitBadge(hero.Definition.Trait)
+                    + " " + GetRarityBadge(hero.Definition.Rarity)
+                    + " Lv." + hero.Level
+                    + "\n" + GetShortHeroLabel(hero.Definition) + "  " + FormatStars(hero.Stars)
+                    + "\n공 " + FormatShortNumber(hero.AttackPower) + " 체 " + FormatShortNumber(hero.MaxHp);
+                slotText.color = Color.white;
+            }
+            else
+            {
+                slotText.text = "빈 슬롯";
+                slotText.color = new Color(0.64f, 0.70f, 0.78f, 1f);
+            }
+        }
+
+        if (heroOwnedEffectText != null)
+        {
+            int totalStars = 0;
+            foreach (HeroState hero in battleManager.Heroes)
+            {
+                totalStars += hero.Stars;
+            }
+
+            heroOwnedEffectText.text = "보유 효과 : 공격력+" + (battleManager.Heroes.Count * 10 + totalStars * 2) + "%";
+        }
     }
 
     private void TryLevelUpAbilityFromHud(AbilityKind kind)
@@ -1369,6 +1852,138 @@ public sealed class GameHud : MonoBehaviour
         {
             ShowGrowthNotice("골드가 부족합니다.");
         }
+    }
+
+    private bool IsHeroInEditingFormation(string heroId)
+    {
+        EnsureHeroFormationDraft();
+        foreach (string editingHeroId in editingFormationHeroIds)
+        {
+            if (editingHeroId == heroId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int GetEditingFormationHeroIndex(string heroId)
+    {
+        EnsureHeroFormationDraft();
+        for (int i = 0; i < editingFormationHeroIds.Count; i++)
+        {
+            if (editingFormationHeroIds[i] == heroId)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int GetEditingFormationFilledCount()
+    {
+        EnsureHeroFormationDraft();
+        int count = 0;
+        foreach (string heroId in editingFormationHeroIds)
+        {
+            if (!string.IsNullOrEmpty(heroId))
+            {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    private void SelectOrRemoveRosterHero(string heroId)
+    {
+        HeroState hero = FindHeroState(heroId);
+        if (hero == null)
+        {
+            return;
+        }
+
+        int existingIndex = GetEditingFormationHeroIndex(heroId);
+        if (existingIndex >= 0)
+        {
+            if (selectedHeroForPlacement == heroId)
+            {
+                selectedHeroForPlacement = string.Empty;
+            }
+
+            RemoveHeroFromEditingFormationSlot(existingIndex);
+            return;
+        }
+
+        selectedHeroForPlacement = selectedHeroForPlacement == heroId ? string.Empty : heroId;
+        UpdateView();
+    }
+
+    private void RemoveHeroFromEditingFormationSlot(int slotIndex)
+    {
+        EnsureHeroFormationDraft();
+        if (slotIndex < 0 || slotIndex >= editingFormationHeroIds.Count || string.IsNullOrEmpty(editingFormationHeroIds[slotIndex]))
+        {
+            return;
+        }
+
+        if (GetEditingFormationFilledCount() <= 1)
+        {
+            return;
+        }
+
+        editingFormationHeroIds[slotIndex] = string.Empty;
+        selectedHeroForPlacement = string.Empty;
+        heroFormationDirty = true;
+        UpdateView();
+    }
+
+    private void TryPlaceSelectedHeroInSlot(int slotIndex)
+    {
+        if (string.IsNullOrEmpty(selectedHeroForPlacement))
+        {
+            return;
+        }
+
+        EnsureHeroFormationDraft();
+        if (slotIndex < 0 || slotIndex >= editingFormationHeroIds.Count)
+        {
+            return;
+        }
+
+        string heroId = selectedHeroForPlacement;
+        for (int i = 0; i < editingFormationHeroIds.Count; i++)
+        {
+            if (editingFormationHeroIds[i] == heroId)
+            {
+                editingFormationHeroIds[i] = string.Empty;
+            }
+        }
+
+        editingFormationHeroIds[slotIndex] = heroId;
+        selectedHeroForPlacement = string.Empty;
+        heroFormationDirty = true;
+        UpdateView();
+    }
+
+    private HeroState FindHeroState(string heroId)
+    {
+        if (string.IsNullOrEmpty(heroId))
+        {
+            return null;
+        }
+
+        foreach (HeroState hero in battleManager.Heroes)
+        {
+            if (hero.Definition.Id == heroId)
+            {
+                return hero;
+            }
+        }
+
+        return null;
     }
 
     private AbilityState FindAbilityState(AbilityKind kind)
@@ -1448,11 +2063,19 @@ public sealed class GameHud : MonoBehaviour
             new Vector2(-86f, -26f),
             new Vector2(86f, -26f),
             new Vector2(-48f, 56f),
-            new Vector2(48f, 56f)
+            new Vector2(48f, 56f),
+            new Vector2(-134f, 22f),
+            new Vector2(134f, 22f),
+            new Vector2(0f, 104f)
         };
 
+        foreach (RectTransform heroRect in heroBattleRects.Values)
+        {
+            heroRect.localScale = Vector3.zero;
+        }
+
         int heroIndex = 0;
-        foreach (HeroState hero in battleManager.Heroes)
+        foreach (HeroState hero in battleManager.DeployedHeroes)
         {
             if (!heroBattleImages.TryGetValue(hero.Definition.Id, out Image image))
             {
@@ -1460,7 +2083,8 @@ public sealed class GameHud : MonoBehaviour
             }
 
             bool isLastSource = battleManager.LastHitSourceName == hero.Definition.DisplayName && flashActive;
-            float bob = Mathf.Sin(time * 4.5f + heroIndex * 0.7f) * 5f;
+            float movementTempo = 3.2f + hero.MoveSpeed * 0.45f;
+            float bob = Mathf.Sin(time * movementTempo + heroIndex * 0.7f) * (4f + hero.MoveSpeed);
             float attackLift = isLastSource ? 28f * flashRatio : 0f;
             if (heroBattleRects.TryGetValue(hero.Definition.Id, out RectTransform heroRect))
             {
@@ -1557,7 +2181,7 @@ public sealed class GameHud : MonoBehaviour
         }
 
         damagePopupText.text = battleManager.LastHitSourceName
-            + "\n-" + battleManager.LastHitDamage
+            + "\n-" + FormatShortNumber(battleManager.LastHitDamage)
             + (battleManager.LastHitWasCritical ? " CRIT" : string.Empty);
         damagePopupText.color = battleManager.LastHitWasCritical
             ? new Color(1f, 0.91f, 0.24f, 1f)
@@ -1598,6 +2222,25 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private string GetHeroPageTabLabel(HeroPageTab tab)
+    {
+        switch (tab)
+        {
+            case HeroPageTab.Formation:
+                return "편성";
+            case HeroPageTab.Trait:
+                return "특성";
+            case HeroPageTab.Statue:
+                return "석상";
+            case HeroPageTab.Seal:
+                return "인장";
+            case HeroPageTab.Relic:
+                return "유물";
+            default:
+                return tab.ToString();
+        }
+    }
+
     private GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
     {
         Text dot = CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
@@ -1635,6 +2278,41 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private string GetTraitBadge(HeroTrait trait)
+    {
+        switch (trait)
+        {
+            case HeroTrait.Melee:
+                return "근";
+            case HeroTrait.Ranged:
+                return "원";
+            case HeroTrait.Support:
+                return "지";
+            case HeroTrait.Defense:
+                return "방";
+            default:
+                return "?";
+        }
+    }
+
+    private string FormatStars(int stars)
+    {
+        int clampedStars = Mathf.Clamp(stars, 0, HeroDefinition.MaxStars);
+        if (clampedStars <= 0)
+        {
+            return "<color=#6F778A>☆☆☆☆☆</color>";
+        }
+
+        string result = string.Empty;
+        for (int i = 1; i <= clampedStars; i++)
+        {
+            string color = i <= 5 ? "#FFD84D" : i <= 10 ? "#51A7FF" : "#C15CFF";
+            result += "<color=" + color + ">★</color>";
+        }
+
+        return result;
+    }
+
     private Color GetRarityColor(HeroRarity rarity)
     {
         switch (rarity)
@@ -1663,28 +2341,7 @@ public sealed class GameHud : MonoBehaviour
 
     private string FormatShortNumber(double value)
     {
-        double abs = System.Math.Abs(value);
-        if (abs >= 1000000000000d)
-        {
-            return (value / 1000000000000d).ToString("0.##") + "T";
-        }
-
-        if (abs >= 1000000000d)
-        {
-            return (value / 1000000000d).ToString("0.##") + "B";
-        }
-
-        if (abs >= 1000000d)
-        {
-            return (value / 1000000d).ToString("0.##") + "M";
-        }
-
-        if (abs >= 1000d)
-        {
-            return (value / 1000d).ToString("0.##") + "K";
-        }
-
-        return value.ToString(value % 1d == 0d ? "0" : "0.#");
+        return NumberFormatter.Format(value);
     }
 
     private GameObject CreatePanel(string name, Transform parent, Color color)
@@ -1760,6 +2417,7 @@ public sealed class GameHud : MonoBehaviour
         text.fontStyle = fontStyle;
         text.alignment = alignment;
         text.color = Color.white;
+        text.supportRichText = true;
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
         text.verticalOverflow = VerticalWrapMode.Truncate;
 

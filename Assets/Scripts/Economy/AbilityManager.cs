@@ -147,19 +147,24 @@ public sealed class AbilityManager : MonoBehaviour
     public double GetTotalCombatPower(IReadOnlyList<HeroState> heroes)
     {
         int heroCount = heroes == null ? 0 : heroes.Count;
-        double attack = AttackPowerBonus * Math.Max(1, heroCount);
+        double attackScore = heroCount <= 0 ? AttackPowerBonus : 0d;
+        double hpScore = heroCount <= 0 ? MaxHpBonus : 0d;
+        double mobilityScore = 0d;
         if (heroes != null)
         {
             foreach (HeroState hero in heroes)
             {
-                attack += hero.AttackPower;
+                attackScore += (hero.AttackPower + AttackPowerBonus) * hero.AttackSpeed;
+                hpScore += hero.MaxHp + MaxHpBonus;
+                mobilityScore += hero.MoveSpeed * 10d;
             }
         }
 
         double criticalExpected = 1d + CriticalChance * (CriticalDamageMultiplier - 1d);
         double doubleCriticalExpected = 1d + DoubleCriticalChance * (DoubleCriticalBonusMultiplier - 1d);
-        double hpScore = MaxHpBonus * 0.02d;
-        double power = attack * criticalExpected * doubleCriticalExpected * FinalDamageMultiplier + hpScore;
+        double power = attackScore * criticalExpected * doubleCriticalExpected * FinalDamageMultiplier
+            + hpScore * 0.03d
+            + mobilityScore;
         return Math.Max(1d, power);
     }
 

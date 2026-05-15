@@ -12,13 +12,19 @@ public sealed class BattleManager : MonoBehaviour
     private GameSpeedManager speedManager;
     private List<HeroState> heroes;
     private static readonly IReadOnlyList<HeroState> EmptyHeroes = Array.Empty<HeroState>();
+    private readonly List<HeroState> deployedHeroes = new List<HeroState>();
+    private readonly List<string> activeFormationHeroIds = new List<string>();
     private readonly List<CombatSkillState> skills = new List<CombatSkillState>();
     private readonly List<PetState> pets = new List<PetState>();
+    private int activeHeroPreset = 1;
     private bool initialized;
 
     public event Action Changed;
 
     public IReadOnlyList<HeroState> Heroes => heroes != null ? heroes : EmptyHeroes;
+    public IReadOnlyList<HeroState> DeployedHeroes => deployedHeroes;
+    public IReadOnlyList<string> ActiveFormationHeroIds => activeFormationHeroIds;
+    public int ActiveHeroPreset => activeHeroPreset;
     public IReadOnlyList<CombatSkillState> Skills => skills;
     public IReadOnlyList<PetState> Pets => pets;
     public string TargetName { get; private set; } = string.Empty;
@@ -38,7 +44,7 @@ public sealed class BattleManager : MonoBehaviour
     public int HitSequence { get; private set; }
     public string SupportStatusText => BuildSupportStatusText();
     public double PartyAttackPower => GetPartyAttackPower();
-    public double TotalCombatPower => abilityManager != null ? abilityManager.GetTotalCombatPower(Heroes) : 1d;
+    public double TotalCombatPower => abilityManager != null ? abilityManager.GetTotalCombatPower(DeployedHeroes) : 1d;
     public float PetGoldBonusPercent => (GetPetGoldBonusMultiplier() - 1f) * 100f;
 
     public void Initialize(
@@ -59,6 +65,8 @@ public sealed class BattleManager : MonoBehaviour
         abilityManager = abilities;
         speedManager = speed;
         heroes = saveManager.LoadHeroes() ?? new List<HeroState>();
+        activeHeroPreset = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.HeroFormationPreset, 1), 1, GameData.MaxHeroPresets);
+        RefreshDeployedHeroes();
         skills.Clear();
         pets.Clear();
 
@@ -119,6 +127,145 @@ public sealed class BattleManager : MonoBehaviour
         LastBattleLog = hero.Definition.DisplayName + " Lv." + hero.Level + " 달성";
         NotifyChanged();
         return true;
+    }
+
+    public void SetActiveHeroPreset(int preset)
+    {
+        activeHeroPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        PlayerPrefs.SetInt(SaveKeys.HeroFormationPreset, activeHeroPreset);
+        saveManager.Flush();
+        RefreshDeployedHeroes();
+        NotifyChanged();
+    }
+
+    public IReadOnlyList<string> GetHeroFormationHeroIds(int preset)
+    {
+        return LoadFormationHeroIds(Mathf.Clamp(preset, 1, GameData.MaxHeroPresets));
+    }
+
+    public bool ApplyHeroFormation(int preset, IReadOnlyList<string> heroIds)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        List<string> normalizedIds = NormalizeFormationHeroIds(heroIds);
+        if (GetFilledFormationCount(normalizedIds) <= 0)
+        {
+            LastBattleLog = "편성 실패: 최소 1명이 필요";
+            NotifyChanged();
+            return false;
+        }
+
+        activeHeroPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        PlayerPrefs.SetInt(SaveKeys.HeroFormationPreset, activeHeroPreset);
+        SaveFormationHeroIds(activeHeroPreset, normalizedIds);
+        RefreshDeployedHeroes();
+        LastBattleLog = "프리셋 " + activeHeroPreset + " 편성 저장";
+        StartStage();
+        return true;
+    }
+
+    public bool ToggleHeroInActiveFormation(string heroId)
+    {
+        HeroState hero = FindHero(heroId);
+        if (hero == null)
+        {
+            return false;
+        }
+
+        List<string> ids = LoadFormationHeroIds(activeHeroPreset);
+        int existingIndex = ids.IndexOf(heroId);
+        if (existingIndex >= 0)
+        {
+            if (GetFilledFormationCount(ids) <= 1)
+            {
+                LastBattleLog = "편성 실패: 최소 1명은 필요";
+                NotifyChanged();
+                return false;
+            }
+
+            ids[existingIndex] = string.Empty;
+        }
+        else
+        {
+            int emptyIndex = ids.FindIndex(string.IsNullOrEmpty);
+            if (emptyIndex < 0)
+            {
+                LastBattleLog = "편성 실패: 최대 " + GameData.MaxPartyHeroes + "명";
+                NotifyChanged();
+                return false;
+            }
+
+            ids[emptyIndex] = heroId;
+        }
+
+        SaveFormationHeroIds(activeHeroPreset, ids);
+        RefreshDeployedHeroes();
+        LastBattleLog = "프리셋 " + activeHeroPreset + " 편성 갱신";
+        NotifyChanged();
+        return true;
+    }
+
+    public bool SetHeroInActiveFormationSlot(string heroId, int slotIndex)
+    {
+        HeroState hero = FindHero(heroId);
+        if (hero == null || slotIndex < 0 || slotIndex >= GameData.MaxPartyHeroes)
+        {
+            return false;
+        }
+
+        List<string> ids = LoadFormationHeroIds(activeHeroPreset);
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (ids[i] == heroId)
+            {
+                ids[i] = string.Empty;
+            }
+        }
+
+        ids[slotIndex] = heroId;
+        SaveFormationHeroIds(activeHeroPreset, ids);
+        RefreshDeployedHeroes();
+        LastBattleLog = hero.Definition.DisplayName + " 슬롯 " + (slotIndex + 1) + " 배치";
+        NotifyChanged();
+        return true;
+    }
+
+    public bool RemoveHeroFromActiveFormationSlot(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= GameData.MaxPartyHeroes)
+        {
+            return false;
+        }
+
+        List<string> ids = LoadFormationHeroIds(activeHeroPreset);
+        if (string.IsNullOrEmpty(ids[slotIndex]))
+        {
+            return false;
+        }
+
+        if (GetFilledFormationCount(ids) <= 1)
+        {
+            LastBattleLog = "편성 실패: 최소 1명은 필요";
+            NotifyChanged();
+            return false;
+        }
+
+        ids[slotIndex] = string.Empty;
+        SaveFormationHeroIds(activeHeroPreset, ids);
+        RefreshDeployedHeroes();
+        LastBattleLog = "슬롯 " + (slotIndex + 1) + " 편성 해제";
+        NotifyChanged();
+        return true;
+    }
+
+    public bool RemoveHeroFromActiveFormation(string heroId)
+    {
+        List<string> ids = LoadFormationHeroIds(activeHeroPreset);
+        int index = ids.IndexOf(heroId);
+        return index >= 0 && RemoveHeroFromActiveFormationSlot(index);
     }
 
     public void AddHeroShards(string heroId, int amount)
@@ -203,7 +350,7 @@ public sealed class BattleManager : MonoBehaviour
             return;
         }
 
-        foreach (HeroState hero in heroes)
+        foreach (HeroState hero in deployedHeroes)
         {
             hero.AttackCooldown = 0f;
         }
@@ -267,7 +414,7 @@ public sealed class BattleManager : MonoBehaviour
 
     private void TickHeroes(float deltaTime)
     {
-        foreach (HeroState hero in heroes)
+        foreach (HeroState hero in deployedHeroes)
         {
             hero.AttackCooldown -= deltaTime;
             if (hero.AttackCooldown > 0f)
@@ -275,7 +422,7 @@ public sealed class BattleManager : MonoBehaviour
                 continue;
             }
 
-            hero.AttackCooldown += hero.Definition.AttackInterval;
+            hero.AttackCooldown += hero.AttackInterval;
             DealDamage(hero);
 
             if (TargetHp <= 0)
@@ -378,13 +525,13 @@ public sealed class BattleManager : MonoBehaviour
 
     private double GetPartyAttackPower()
     {
-        if (heroes == null || abilityManager == null)
+        if (deployedHeroes.Count <= 0 || abilityManager == null)
         {
             return 0d;
         }
 
         double total = 0d;
-        foreach (HeroState hero in heroes)
+        foreach (HeroState hero in deployedHeroes)
         {
             total += hero.AttackPower + abilityManager.AttackPowerBonus;
         }
@@ -426,7 +573,7 @@ public sealed class BattleManager : MonoBehaviour
         LastHitDamage = appliedDamage;
         LastHitWasCritical = isCritical;
         HitSequence += 1;
-        LastDamageLog = sourceName + " -" + appliedDamage + (isCritical ? " CRIT" : string.Empty);
+        LastDamageLog = sourceName + " -" + NumberFormatter.Format(appliedDamage) + (isCritical ? " CRIT" : string.Empty);
 
         if (TargetHp <= 0)
         {
@@ -445,7 +592,7 @@ public sealed class BattleManager : MonoBehaviour
         if (stage.Type == StageType.Boss)
         {
             BossDefinition boss = GameData.GetBoss(stage.TargetId);
-            LastRewardLog = "+" + boss.ClearGold + " 골드";
+            LastRewardLog = "+" + NumberFormatter.Format(boss.ClearGold) + " 골드";
             wallet.AddGold(boss.ClearGold);
             progressManager.HandleStageCleared();
             LastBattleLog = "보스 처치 성공: 챕터 1 클리어";
@@ -455,7 +602,7 @@ public sealed class BattleManager : MonoBehaviour
 
         int gold = Mathf.FloorToInt(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier());
         int heroExp = GameData.GetEnemyHeroExpItem(stage);
-        LastRewardLog = "+" + gold + " 골드, +" + heroExp + " EXP";
+        LastRewardLog = "+" + NumberFormatter.Format(gold) + " 골드, +" + NumberFormatter.Format(heroExp) + " EXP";
         wallet.AddGold(gold);
         wallet.AddHeroExpItem(heroExp);
         KillsThisStage += 1;
@@ -475,6 +622,125 @@ public sealed class BattleManager : MonoBehaviour
     private string BuildSupportStatusText()
     {
         return "Auto Skill/Pet active    Field " + VisibleEnemyCount;
+    }
+
+    private void RefreshDeployedHeroes()
+    {
+        deployedHeroes.Clear();
+        if (heroes == null)
+        {
+            return;
+        }
+
+        List<string> ids = LoadFormationHeroIds(activeHeroPreset);
+        activeFormationHeroIds.Clear();
+        activeFormationHeroIds.AddRange(ids);
+
+        foreach (string heroId in ids)
+        {
+            if (string.IsNullOrEmpty(heroId))
+            {
+                continue;
+            }
+
+            HeroState hero = FindHero(heroId);
+            if (hero != null && !deployedHeroes.Contains(hero) && deployedHeroes.Count < GameData.MaxPartyHeroes)
+            {
+                deployedHeroes.Add(hero);
+            }
+        }
+
+        if (deployedHeroes.Count <= 0)
+        {
+            foreach (HeroState hero in heroes)
+            {
+                if (deployedHeroes.Count >= GameData.MaxPartyHeroes)
+                {
+                    break;
+                }
+
+                deployedHeroes.Add(hero);
+            }
+
+            activeFormationHeroIds.Clear();
+            foreach (HeroState hero in deployedHeroes)
+            {
+                activeFormationHeroIds.Add(hero.Definition.Id);
+            }
+
+            while (activeFormationHeroIds.Count < GameData.MaxPartyHeroes)
+            {
+                activeFormationHeroIds.Add(string.Empty);
+            }
+        }
+    }
+
+    private List<string> LoadFormationHeroIds(int preset)
+    {
+        var ids = new List<string>(GameData.MaxPartyHeroes);
+        bool hasSavedFormation = false;
+        for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+        {
+            string key = SaveKeys.HeroFormationSlot(preset, i);
+            hasSavedFormation |= PlayerPrefs.HasKey(key);
+            ids.Add(PlayerPrefs.GetString(key, string.Empty));
+        }
+
+        if (!hasSavedFormation && preset == 1 && heroes != null)
+        {
+            ids.Clear();
+            for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+            {
+                ids.Add(i < heroes.Count ? heroes[i].Definition.Id : string.Empty);
+            }
+        }
+
+        return ids;
+    }
+
+    private void SaveFormationHeroIds(int preset, List<string> ids)
+    {
+        for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+        {
+            string heroId = i < ids.Count ? ids[i] : string.Empty;
+            PlayerPrefs.SetString(SaveKeys.HeroFormationSlot(preset, i), heroId ?? string.Empty);
+        }
+
+        saveManager.Flush();
+    }
+
+    private List<string> NormalizeFormationHeroIds(IReadOnlyList<string> sourceIds)
+    {
+        var ids = new List<string>(GameData.MaxPartyHeroes);
+        var usedHeroIds = new HashSet<string>();
+        for (int i = 0; i < GameData.MaxPartyHeroes; i++)
+        {
+            string heroId = sourceIds != null && i < sourceIds.Count ? sourceIds[i] : string.Empty;
+            if (string.IsNullOrEmpty(heroId) || FindHero(heroId) == null || usedHeroIds.Contains(heroId))
+            {
+                ids.Add(string.Empty);
+                continue;
+            }
+
+            usedHeroIds.Add(heroId);
+            ids.Add(heroId);
+        }
+
+        return ids;
+    }
+
+    private static int GetFilledFormationCount(List<string> ids)
+    {
+        int count = 0;
+        foreach (string heroId in ids)
+        {
+            if (!string.IsNullOrEmpty(heroId))
+            {
+                count += 1;
+            }
+        }
+
+        return count;
     }
 
     private HeroState FindHero(string heroId)

@@ -12,6 +12,7 @@ public static class SaveKeys
     public const string LastOnlineUtcTicks = "lastOnlineUtcTicks";
     public const string CombatSpeedMultiplier = "combatSpeedMultiplier";
     public const string HasFourTimesSpeedEntitlement = "hasFourTimesSpeedEntitlement";
+    public const string HeroFormationPreset = "heroFormationPreset";
 
     public static string HeroLevel(string heroId)
     {
@@ -26,6 +27,11 @@ public static class SaveKeys
     public static string HeroStars(string heroId)
     {
         return "hero." + heroId + ".stars";
+    }
+
+    public static string HeroFormationSlot(int preset, int slot)
+    {
+        return "heroFormation." + preset + ".slot." + slot;
     }
 
     public static string AbilityLevel(AbilityKind kind)

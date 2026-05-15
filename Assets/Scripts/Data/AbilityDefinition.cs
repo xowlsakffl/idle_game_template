@@ -91,28 +91,7 @@ public sealed class AbilityDefinition
 
     public static string FormatShortNumber(double value)
     {
-        double abs = Math.Abs(value);
-        if (abs >= 1000000000000d)
-        {
-            return (value / 1000000000000d).ToString("0.##") + "T";
-        }
-
-        if (abs >= 1000000000d)
-        {
-            return (value / 1000000000d).ToString("0.##") + "B";
-        }
-
-        if (abs >= 1000000d)
-        {
-            return (value / 1000000d).ToString("0.##") + "M";
-        }
-
-        if (abs >= 1000d)
-        {
-            return (value / 1000d).ToString("0.##") + "K";
-        }
-
-        return value.ToString(value % 1d == 0d ? "0" : "0.#");
+        return NumberFormatter.Format(value);
     }
 }
 

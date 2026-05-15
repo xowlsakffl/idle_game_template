@@ -8,14 +8,19 @@ public static class GameData
     public const string BossFallbackStageId = "1-19";
     public const int NormalStageRequiredKills = 100;
     public const int MaxVisibleEnemies = 12;
+    public const int MaxPartyHeroes = 8;
+    public const int MaxHeroPresets = 3;
 
     private static readonly HeroDefinition[] heroes =
     {
-        new HeroDefinition("H001", "기사 아렌", "균형형", HeroRarity.Uncommon, 10, 1.2f, 5),
-        new HeroDefinition("H002", "궁수 리나", "빠른 공격", HeroRarity.Rare, 7, 0.8f, 3),
-        new HeroDefinition("H003", "마법사 노아", "강한 한방", HeroRarity.Epic, 18, 1.8f, 8),
-        new HeroDefinition("H004", "성기사 카일", "안정형", HeroRarity.Legendary, 12, 1.4f, 6),
-        new HeroDefinition("H005", "도적 세라", "연속 공격", HeroRarity.Mythic, 6, 0.55f, 2)
+        new HeroDefinition("H001", "기사 아렌", "균형형", HeroRarity.Uncommon, HeroTrait.Melee, 10, 130, 0.85f, 3.4f, 5, 26, HeroPassiveStat.AttackPower, 8f),
+        new HeroDefinition("H002", "궁수 리나", "빠른 공격", HeroRarity.Rare, HeroTrait.Ranged, 7, 92, 1.25f, 3.9f, 3, 18, HeroPassiveStat.AttackSpeed, 10f),
+        new HeroDefinition("H003", "마법사 노아", "강한 한방", HeroRarity.Epic, HeroTrait.Ranged, 18, 80, 0.56f, 3.0f, 8, 16, HeroPassiveStat.AttackPower, 15f),
+        new HeroDefinition("H004", "성기사 카일", "안정형", HeroRarity.Legendary, HeroTrait.Defense, 12, 190, 0.72f, 2.8f, 6, 38, HeroPassiveStat.MaxHp, 18f),
+        new HeroDefinition("H005", "도적 세라", "연속 공격", HeroRarity.Mythic, HeroTrait.Melee, 6, 105, 1.82f, 4.6f, 2, 20, HeroPassiveStat.MoveSpeed, 14f),
+        new HeroDefinition("H006", "사제 미나", "회복 지원", HeroRarity.Rare, HeroTrait.Support, 5, 115, 0.67f, 3.2f, 3, 24, HeroPassiveStat.MaxHp, 10f),
+        new HeroDefinition("H007", "방패 로크", "전열 방어", HeroRarity.Epic, HeroTrait.Defense, 14, 230, 0.63f, 2.5f, 5, 42, HeroPassiveStat.MaxHp, 15f),
+        new HeroDefinition("H008", "정령 루미", "보조 공격", HeroRarity.Legendary, HeroTrait.Support, 9, 120, 1.00f, 3.7f, 4, 22, HeroPassiveStat.AttackSpeed, 12f)
     };
 
     private static readonly EnemyDefinition[] enemies =
@@ -58,11 +63,11 @@ public static class GameData
 
     private static readonly AbilityDefinition[] abilities =
     {
-        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "만렙 1,000,000 기준 4.89B", 4890d, 0d, 1000000, 25, 1.25f, AbilityDisplayKind.Flat),
-        new AbilityDefinition(AbilityKind.MaxHp, "체력 증가", "만렙 1,000,000 기준 26.6B", 26600d, 0d, 1000000, 30, 1.25f, AbilityDisplayKind.Flat),
-        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 50, 1.30f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "만렙 1,000,000 기준 4.89C", 4890d, 0d, 1000000, 25, 1.25f, AbilityDisplayKind.Flat),
+        new AbilityDefinition(AbilityKind.MaxHp, "체력 증가", "만렙 1,000,000 기준 26.6C", 26600d, 0d, 1000000, 30, 1.25f, AbilityDisplayKind.Flat),
+        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 2500, 1.75f, AbilityDisplayKind.Percent),
         new AbilityDefinition(AbilityKind.CriticalDamage, "치명타 데미지 증가", "기본 5.0% + 레벨당 0.1%", 0.1d, 5d, 1000000, 75, 1.22f, AbilityDisplayKind.Percent),
-        new AbilityDefinition(AbilityKind.DoubleCriticalChance, "더블 치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 100, 1.32f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.DoubleCriticalChance, "더블 치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 5000, 1.78f, AbilityDisplayKind.Percent),
         new AbilityDefinition(AbilityKind.DoubleCriticalBonusDamage, "더블 치명타 추가 데미지 증가", "기본 5.0% + 레벨당 0.1%", 0.1d, 5d, 1000000, 100, 1.22f, AbilityDisplayKind.Percent),
         new AbilityDefinition(AbilityKind.FinalDamage, "최종 데미지 증가", "레벨당 0.5%", 0.5d, 0d, 1000000, 150, 1.28f, AbilityDisplayKind.Percent)
     };
