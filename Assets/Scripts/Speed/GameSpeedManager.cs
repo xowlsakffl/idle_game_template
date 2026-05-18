@@ -42,6 +42,28 @@ public sealed class GameSpeedManager : MonoBehaviour
         return true;
     }
 
+    public void CycleSpeed()
+    {
+        CurrentMultiplier = GetNextCycleSpeed();
+        Save();
+        NotifyChanged();
+    }
+
+    public int GetNextCycleSpeed()
+    {
+        if (CurrentMultiplier == NormalSpeed)
+        {
+            return FreeSpeed;
+        }
+
+        if (CurrentMultiplier == FreeSpeed)
+        {
+            return CanUseSpeed(PremiumSpeed) ? PremiumSpeed : NormalSpeed;
+        }
+
+        return NormalSpeed;
+    }
+
     public bool CanUseSpeed(int multiplier)
     {
         if (multiplier == NormalSpeed || multiplier == FreeSpeed)

@@ -20,7 +20,37 @@ public static class GameData
         new HeroDefinition("H005", "도적 세라", "연속 공격", HeroRarity.Mythic, HeroTrait.Melee, 6, 105, 1.82f, 4.6f, 2, 20, HeroPassiveStat.MoveSpeed, 14f),
         new HeroDefinition("H006", "사제 미나", "회복 지원", HeroRarity.Rare, HeroTrait.Support, 5, 115, 0.67f, 3.2f, 3, 24, HeroPassiveStat.MaxHp, 10f),
         new HeroDefinition("H007", "방패 로크", "전열 방어", HeroRarity.Epic, HeroTrait.Defense, 14, 230, 0.63f, 2.5f, 5, 42, HeroPassiveStat.MaxHp, 15f),
-        new HeroDefinition("H008", "정령 루미", "보조 공격", HeroRarity.Legendary, HeroTrait.Support, 9, 120, 1.00f, 3.7f, 4, 22, HeroPassiveStat.AttackSpeed, 12f)
+        new HeroDefinition("H008", "정령 루미", "보조 공격", HeroRarity.Legendary, HeroTrait.Support, 9, 120, 1.00f, 3.7f, 4, 22, HeroPassiveStat.AttackSpeed, 12f),
+        new HeroDefinition("H009", "창병 토르", "돌격형", HeroRarity.Uncommon, HeroTrait.Melee, 11, 145, 0.92f, 3.2f, 5, 28, HeroPassiveStat.AttackPower, 7f),
+        new HeroDefinition("H010", "폭탄 몰리", "광역 견제", HeroRarity.Rare, HeroTrait.Ranged, 13, 86, 0.74f, 3.1f, 6, 17, HeroPassiveStat.AttackPower, 11f),
+        new HeroDefinition("H011", "드루이드 엘린", "자연 지원", HeroRarity.Epic, HeroTrait.Support, 8, 140, 0.88f, 3.5f, 4, 27, HeroPassiveStat.MaxHp, 13f),
+        new HeroDefinition("H012", "철벽 브론", "피해 흡수", HeroRarity.Uncommon, HeroTrait.Defense, 9, 250, 0.52f, 2.3f, 4, 46, HeroPassiveStat.MaxHp, 9f),
+        new HeroDefinition("H013", "검무 유리", "치명 연계", HeroRarity.Legendary, HeroTrait.Melee, 16, 118, 1.38f, 4.1f, 6, 23, HeroPassiveStat.AttackSpeed, 14f),
+        new HeroDefinition("H014", "저격수 베른", "단일 저격", HeroRarity.Epic, HeroTrait.Ranged, 22, 74, 0.48f, 2.9f, 9, 15, HeroPassiveStat.AttackPower, 16f),
+        new HeroDefinition("H015", "연금술사 포포", "물약 지원", HeroRarity.Rare, HeroTrait.Support, 6, 128, 0.78f, 3.3f, 3, 25, HeroPassiveStat.MoveSpeed, 8f),
+        new HeroDefinition("H016", "수호자 제드", "후열 보호", HeroRarity.Rare, HeroTrait.Defense, 10, 210, 0.66f, 2.7f, 5, 39, HeroPassiveStat.MaxHp, 12f),
+        new HeroDefinition("H017", "화염 이프", "폭발 화력", HeroRarity.Mythic, HeroTrait.Ranged, 25, 95, 0.70f, 3.4f, 10, 19, HeroPassiveStat.AttackPower, 20f),
+        new HeroDefinition("H018", "음유시인 라온", "공속 지원", HeroRarity.Uncommon, HeroTrait.Support, 5, 118, 1.05f, 3.8f, 3, 23, HeroPassiveStat.AttackSpeed, 7f),
+        new HeroDefinition("H019", "망치 그룬", "둔중한 일격", HeroRarity.Epic, HeroTrait.Melee, 20, 165, 0.50f, 2.6f, 8, 32, HeroPassiveStat.AttackPower, 13f),
+        new HeroDefinition("H020", "그림자 렌", "기습 암살", HeroRarity.Legendary, HeroTrait.Melee, 12, 102, 1.68f, 4.8f, 4, 20, HeroPassiveStat.MoveSpeed, 18f),
+        new HeroDefinition("H021", "견습 기사 딘", "기본 전열", HeroRarity.Common, HeroTrait.Melee, 7, 118, 0.80f, 3.0f, 3, 22, HeroPassiveStat.AttackPower, 4f),
+        new HeroDefinition("H022", "마을 궁수 봄", "기본 사격", HeroRarity.Common, HeroTrait.Ranged, 6, 82, 1.02f, 3.4f, 2, 16, HeroPassiveStat.AttackSpeed, 4f),
+        new HeroDefinition("H023", "초보 사제 나리", "기본 지원", HeroRarity.Common, HeroTrait.Support, 4, 104, 0.62f, 3.0f, 2, 20, HeroPassiveStat.MaxHp, 5f),
+        new HeroDefinition("H024", "나무방패 폴", "기본 방어", HeroRarity.Common, HeroTrait.Defense, 6, 175, 0.50f, 2.4f, 3, 33, HeroPassiveStat.MaxHp, 6f),
+        new HeroDefinition("H025", "새총 피코", "빠른 견제", HeroRarity.Common, HeroTrait.Ranged, 5, 76, 1.20f, 3.7f, 2, 15, HeroPassiveStat.MoveSpeed, 4f),
+        new HeroDefinition("H026", "수련생 로나", "보조 전투", HeroRarity.Common, HeroTrait.Support, 5, 96, 0.90f, 3.2f, 2, 18, HeroPassiveStat.AttackSpeed, 5f),
+        new HeroDefinition("H027", "쌍검 마루", "근접 연타", HeroRarity.Uncommon, HeroTrait.Melee, 9, 122, 1.18f, 3.9f, 4, 24, HeroPassiveStat.AttackSpeed, 8f),
+        new HeroDefinition("H028", "돌갑옷 바크", "전열 유지", HeroRarity.Uncommon, HeroTrait.Defense, 8, 215, 0.56f, 2.2f, 4, 41, HeroPassiveStat.MaxHp, 8f),
+        new HeroDefinition("H029", "빙결 소녀 아이샤", "감속 사격", HeroRarity.Rare, HeroTrait.Ranged, 12, 90, 0.92f, 3.2f, 5, 18, HeroPassiveStat.AttackPower, 10f),
+        new HeroDefinition("H030", "태엽 의무병 코코", "기계 지원", HeroRarity.Epic, HeroTrait.Support, 10, 150, 0.82f, 3.1f, 5, 29, HeroPassiveStat.MaxHp, 14f),
+        new HeroDefinition("H031", "번개 창 아스", "돌파 공격", HeroRarity.Legendary, HeroTrait.Melee, 18, 132, 1.12f, 4.2f, 7, 26, HeroPassiveStat.AttackPower, 17f),
+        new HeroDefinition("H032", "성녀 이리스", "고급 지원", HeroRarity.Legendary, HeroTrait.Support, 11, 170, 0.76f, 3.4f, 5, 34, HeroPassiveStat.AttackSpeed, 16f),
+        new HeroDefinition("H033", "용기사 라그", "신화 돌격", HeroRarity.Mythic, HeroTrait.Melee, 28, 180, 0.95f, 3.8f, 11, 36, HeroPassiveStat.AttackPower, 22f),
+        new HeroDefinition("H034", "별마녀 셀린", "신화 원거리", HeroRarity.Mythic, HeroTrait.Ranged, 30, 105, 0.86f, 3.5f, 12, 21, HeroPassiveStat.AttackPower, 24f),
+        new HeroDefinition("H035", "불멸 수호자 오르", "신화 방어", HeroRarity.Mythic, HeroTrait.Defense, 18, 320, 0.60f, 2.8f, 8, 58, HeroPassiveStat.MaxHp, 24f),
+        new HeroDefinition("H036", "시간술사 네브", "신화 지원", HeroRarity.Mythic, HeroTrait.Support, 16, 160, 1.05f, 3.9f, 7, 32, HeroPassiveStat.AttackSpeed, 22f),
+        new HeroDefinition("H037", "천공검 아리아", "신화 연격", HeroRarity.Mythic, HeroTrait.Melee, 26, 145, 1.32f, 4.4f, 10, 29, HeroPassiveStat.AttackSpeed, 23f),
+        new HeroDefinition("H038", "공허 현자 벨", "신화 증폭", HeroRarity.Mythic, HeroTrait.Support, 18, 185, 0.88f, 3.6f, 8, 37, HeroPassiveStat.MaxHp, 21f)
     };
 
     private static readonly EnemyDefinition[] enemies =
@@ -83,7 +113,35 @@ public static class GameData
         new PetDefinition("P001", "여우 루루", 8, 1.5f, 0.05f)
     };
 
+    private static readonly EquipmentDefinition[] equipments =
+    {
+        new EquipmentDefinition("EQ019", "연습용 검", EquipmentSlot.Weapon, HeroRarity.Common, 4, 0),
+        new EquipmentDefinition("EQ020", "천 모자", EquipmentSlot.Hat, HeroRarity.Common, 0, 18),
+        new EquipmentDefinition("EQ021", "수습 갑옷", EquipmentSlot.Armor, HeroRarity.Common, 0, 30),
+        new EquipmentDefinition("EQ022", "낡은 부적", EquipmentSlot.Accessory, HeroRarity.Common, 2, 10),
+        new EquipmentDefinition("EQ023", "작은 포션", EquipmentSlot.Potion, HeroRarity.Common, 1, 24),
+        new EquipmentDefinition("EQ001", "낡은 검", EquipmentSlot.Weapon, HeroRarity.Uncommon, 8, 0),
+        new EquipmentDefinition("EQ002", "가죽 모자", EquipmentSlot.Hat, HeroRarity.Uncommon, 0, 35),
+        new EquipmentDefinition("EQ003", "천 갑옷", EquipmentSlot.Armor, HeroRarity.Uncommon, 0, 55),
+        new EquipmentDefinition("EQ004", "작은 반지", EquipmentSlot.Accessory, HeroRarity.Uncommon, 4, 20),
+        new EquipmentDefinition("EQ005", "초급 포션", EquipmentSlot.Potion, HeroRarity.Uncommon, 2, 45),
+        new EquipmentDefinition("EQ006", "기사의 장검", EquipmentSlot.Weapon, HeroRarity.Rare, 18, 0),
+        new EquipmentDefinition("EQ007", "마법 챙모자", EquipmentSlot.Hat, HeroRarity.Rare, 5, 85),
+        new EquipmentDefinition("EQ008", "강철 갑옷", EquipmentSlot.Armor, HeroRarity.Rare, 0, 140),
+        new EquipmentDefinition("EQ009", "수호 목걸이", EquipmentSlot.Accessory, HeroRarity.Rare, 10, 55),
+        new EquipmentDefinition("EQ010", "집중 포션", EquipmentSlot.Potion, HeroRarity.Rare, 8, 80),
+        new EquipmentDefinition("EQ011", "별빛 지팡이", EquipmentSlot.Weapon, HeroRarity.Epic, 42, 0),
+        new EquipmentDefinition("EQ012", "왕실 투구", EquipmentSlot.Hat, HeroRarity.Epic, 12, 190),
+        new EquipmentDefinition("EQ013", "용비늘 갑옷", EquipmentSlot.Armor, HeroRarity.Epic, 0, 320),
+        new EquipmentDefinition("EQ014", "현자의 장신구", EquipmentSlot.Accessory, HeroRarity.Epic, 25, 120),
+        new EquipmentDefinition("EQ015", "대형 포션", EquipmentSlot.Potion, HeroRarity.Epic, 18, 210),
+        new EquipmentDefinition("EQ016", "태양검", EquipmentSlot.Weapon, HeroRarity.Legendary, 95, 0),
+        new EquipmentDefinition("EQ017", "불멸의 왕관", EquipmentSlot.Hat, HeroRarity.Legendary, 35, 520),
+        new EquipmentDefinition("EQ018", "신화의 성배", EquipmentSlot.Accessory, HeroRarity.Mythic, 120, 900)
+    };
+
     private static readonly Dictionary<string, HeroDefinition> heroesById = BuildHeroMap();
+    private static readonly Dictionary<string, EquipmentDefinition> equipmentsById = BuildEquipmentMap();
     private static readonly Dictionary<string, EnemyDefinition> enemiesById = BuildEnemyMap();
     private static readonly Dictionary<string, BossDefinition> bossesById = BuildBossMap();
     private static readonly Dictionary<string, StageDefinition> stagesById = BuildStageMap();
@@ -94,10 +152,16 @@ public static class GameData
     public static IReadOnlyList<AbilityDefinition> Abilities => abilities;
     public static IReadOnlyList<CombatSkillDefinition> Skills => skills;
     public static IReadOnlyList<PetDefinition> Pets => pets;
+    public static IReadOnlyList<EquipmentDefinition> Equipments => equipments;
 
     public static HeroDefinition GetHero(string id)
     {
         return heroesById.TryGetValue(id, out HeroDefinition hero) ? hero : heroes[0];
+    }
+
+    public static EquipmentDefinition GetEquipment(string id)
+    {
+        return !string.IsNullOrEmpty(id) && equipmentsById.TryGetValue(id, out EquipmentDefinition equipment) ? equipment : equipments[0];
     }
 
     public static EnemyDefinition GetEnemy(string id)
@@ -218,6 +282,17 @@ public static class GameData
         foreach (HeroDefinition hero in heroes)
         {
             map[hero.Id] = hero;
+        }
+
+        return map;
+    }
+
+    private static Dictionary<string, EquipmentDefinition> BuildEquipmentMap()
+    {
+        var map = new Dictionary<string, EquipmentDefinition>();
+        foreach (EquipmentDefinition equipment in equipments)
+        {
+            map[equipment.Id] = equipment;
         }
 
         return map;

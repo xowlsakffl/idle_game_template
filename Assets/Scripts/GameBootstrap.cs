@@ -8,6 +8,7 @@ public sealed class GameBootstrap : MonoBehaviour
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
     private AbilityManager abilityManager;
+    private EquipmentInventory equipmentInventory;
     private GameSpeedManager speedManager;
     private BattleManager battleManager;
     private GachaManager gachaManager;
@@ -42,6 +43,7 @@ public sealed class GameBootstrap : MonoBehaviour
         progressManager = GetOrAddComponent<StageProgressManager>();
         wallet = GetOrAddComponent<CurrencyWallet>();
         abilityManager = GetOrAddComponent<AbilityManager>();
+        equipmentInventory = GetOrAddComponent<EquipmentInventory>();
         speedManager = GetOrAddComponent<GameSpeedManager>();
         battleManager = GetOrAddComponent<BattleManager>();
         gachaManager = GetOrAddComponent<GachaManager>();
@@ -49,14 +51,15 @@ public sealed class GameBootstrap : MonoBehaviour
         progressManager.Initialize(saveManager);
         wallet.Initialize(saveManager);
         abilityManager.Initialize(wallet, saveManager);
+        equipmentInventory.Initialize(saveManager);
         speedManager.Initialize(saveManager);
         battleManager.Initialize(progressManager, wallet, saveManager, abilityManager, speedManager);
-        gachaManager.Initialize(battleManager, wallet);
+        gachaManager.Initialize(battleManager, wallet, equipmentInventory);
 
         ApplyOfflineReward();
 
         GameHud hud = GetOrAddComponent<GameHud>();
-        hud.Initialize(progressManager, wallet, abilityManager, speedManager, battleManager, gachaManager, DebugResetSaveAndReload);
+        hud.Initialize(progressManager, wallet, abilityManager, speedManager, battleManager, gachaManager, equipmentInventory, DebugResetSaveAndReload);
     }
 
     private T GetOrAddComponent<T>() where T : Component

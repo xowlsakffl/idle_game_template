@@ -14,8 +14,12 @@ public static class IdleGameQaRunner
             RunWithFreshPrefs(prefs, TestSelectedStageRepeats);
             RunWithFreshPrefs(prefs, TestBossFailureAndGrowthRetry);
             RunWithFreshPrefs(prefs, TestCombatSpeedEntitlement);
+            RunWithFreshPrefs(prefs, TestBattleAutoControls);
+            RunWithFreshPrefs(prefs, TestHeroDamageMeter);
             RunWithFreshPrefs(prefs, TestGachaAndSaveRestore);
             RunWithFreshPrefs(prefs, TestHeroStarUp);
+            RunWithFreshPrefs(prefs, TestHeroBulkStarUp);
+            TestGachaRateTable();
             TestOfflineRewardFormula();
         }
 
@@ -115,6 +119,12 @@ public static class IdleGameQaRunner
 
     private static void TestCombatSpeedEntitlement(RuntimeHarness game)
     {
+        AssertEqual(GameSpeedManager.NormalSpeed, game.Speed.CurrentMultiplier, "combat speed should start at 1x");
+        game.Speed.CycleSpeed();
+        AssertEqual(GameSpeedManager.FreeSpeed, game.Speed.CurrentMultiplier, "first cycle click should select 2x");
+        game.Speed.CycleSpeed();
+        AssertEqual(GameSpeedManager.NormalSpeed, game.Speed.CurrentMultiplier, "cycle should skip locked 4x and return to 1x");
+
         AssertTrue(game.Speed.TrySelectSpeed(GameSpeedManager.FreeSpeed), "2x speed should be free");
         AssertEqual(GameSpeedManager.FreeSpeed, game.Speed.CurrentMultiplier, "2x speed should be selected");
 
@@ -123,19 +133,110 @@ public static class IdleGameQaRunner
         AssertEqual(GameSpeedManager.FreeSpeed, game.Speed.CurrentMultiplier, "locked 4x attempt should keep current speed");
 
         game.Speed.DebugSetFourTimesEntitlement(true);
+        game.Speed.CycleSpeed();
+        AssertEqual(GameSpeedManager.PremiumSpeed, game.Speed.CurrentMultiplier, "cycle should select 4x after entitlement");
+        game.Speed.CycleSpeed();
+        AssertEqual(GameSpeedManager.NormalSpeed, game.Speed.CurrentMultiplier, "cycle should return from 4x to 1x");
         AssertTrue(game.Speed.TrySelectSpeed(GameSpeedManager.PremiumSpeed), "4x speed should work after entitlement");
-        AssertEqual(GameSpeedManager.PremiumSpeed, game.Speed.CurrentMultiplier, "4x speed should be selected after entitlement");
+    }
+
+    private static void TestBattleAutoControls(RuntimeHarness game)
+    {
+        AssertTrue(game.Battle.SkillAutoEnabled, "skill auto should start enabled");
+        AssertTrue(game.Battle.FeverAutoEnabled, "fever auto should start enabled");
+
+        game.Battle.ToggleSkillAuto();
+        game.Battle.ToggleFeverAuto();
+        AssertTrue(!game.Battle.SkillAutoEnabled, "skill auto toggle should turn off");
+        AssertTrue(!game.Battle.FeverAutoEnabled, "fever auto toggle should turn off");
+
+        game.Battle.ToggleSkillAuto();
+        game.Battle.ToggleFeverAuto();
+        AssertTrue(game.Battle.SkillAutoEnabled, "skill auto toggle should turn on");
+        AssertTrue(game.Battle.FeverAutoEnabled, "fever auto toggle should turn on");
+    }
+
+    private static void TestHeroDamageMeter(RuntimeHarness game)
+    {
+        HeroState firstDeployedHero = game.Battle.DeployedHeroes[0];
+        IReadOnlyList<HeroState> deployedHeroes = game.Battle.DeployedHeroes;
+        game.Progress.DebugJumpToStage(GameData.ChapterOneBossStageId, ProgressMode.AutoProgress);
+        game.Battle.DebugSimulateSeconds(0.4f, 0.05f);
+
+        AssertEqual(
+            deployedHeroes.Count,
+            game.Battle.RecentHeroAttackIds.Count,
+            "all deployed heroes should attack in the first ready batch");
+
+        foreach (HeroState hero in deployedHeroes)
+        {
+            AssertTrue(
+                game.Battle.GetHeroDamageDone(hero.Definition.Id) > 0d,
+                "each deployed hero should contribute damage when the party attacks together");
+        }
+
+        game.Battle.DebugSimulateSeconds(3f);
+
+        AssertTrue(game.Battle.GetMaxHeroDamageDone() > 0d, "damage meter should track deployed hero damage");
+        AssertTrue(
+            game.Battle.GetHeroDamageDone(firstDeployedHero.Definition.Id) > 0d,
+            "damage meter should expose damage by deployed hero id");
+
+        game.Progress.DebugJumpToStage(GameData.BossFallbackStageId, ProgressMode.RepeatSelected);
+        AssertTrue(game.Battle.VisibleEnemyCount > 1, "normal stages should spawn multiple visible enemies");
+        game.Battle.DebugSimulateSeconds(0.7f, 0.05f);
+
+        int damagedEnemyCount = 0;
+        for (int i = 0; i < game.Battle.VisibleEnemyCount; i++)
+        {
+            if (game.Battle.GetVisibleEnemyHpRatio(i) < 1f)
+            {
+                damagedEnemyCount += 1;
+            }
+        }
+
+        AssertTrue(damagedEnemyCount > 1, "party attacks should damage multiple visible enemies instead of one target only");
+
+        int firstHeroTarget = game.Battle.GetHeroTargetSpawnSequence(firstDeployedHero.Definition.Id);
+        AssertTrue(firstHeroTarget >= 0, "hero should lock a visible enemy target after attacking");
+        game.Battle.DebugSimulateSeconds(0.1f, 0.05f);
+        AssertEqual(
+            firstHeroTarget,
+            game.Battle.GetHeroTargetSpawnSequence(firstDeployedHero.Definition.Id),
+            "hero should keep attacking the same target until that target dies");
+
+        game.Progress.DebugJumpToStage("1-1", ProgressMode.RepeatSelected);
+        int visibleBeforeRefill = game.Battle.VisibleEnemyCount;
+        int maxSpawnBeforeRefill = GetMaxVisibleEnemySpawnSequence(game.Battle);
+        SimulateUntil(game, () => game.Battle.KillsThisStage > 0, 5f, "normal stages should kill at least one visible enemy");
+        AssertEqual(visibleBeforeRefill, game.Battle.VisibleEnemyCount, "normal stages should refill the killed visible enemy slot");
+        AssertTrue(
+            GetMaxVisibleEnemySpawnSequence(game.Battle) > maxSpawnBeforeRefill,
+            "normal stages should spawn a new enemy after a visible enemy dies");
+
+        game.Progress.DebugJumpToStage("1-2", ProgressMode.RepeatSelected);
+        AssertEqual(0d, game.Battle.GetMaxHeroDamageDone(), "damage meter should reset when a new stage starts");
     }
 
     private static void TestGachaAndSaveRestore(RuntimeHarness game)
     {
         game.Gacha.Roll(10);
         AssertEqual(0L, game.Wallet.HeroSummonTicket, "ten-roll should spend default tickets");
-        AssertTrue(GetTotalShards(game.Battle) > 0, "ten-roll should add hero shards");
+        AssertEqual(10, GetTotalShards(game.Battle), "ten-roll should add one hero shard per pull");
+        game.Gacha.RollEquipment(10);
+        AssertEqual(0L, game.Wallet.EquipmentSummonTicket, "equipment ten-roll should spend default tickets");
+        AssertEqual(10, game.EquipmentInventory.GetTotalOwnedCount(), "equipment ten-roll should add one equipment copy per pull");
 
         game.Wallet.AddGold(1234);
         game.Progress.DebugJumpToStage("1-5", ProgressMode.RepeatSelected);
+        EquipmentState equipmentToEquip = FindFirstOwnedEquipment(game.EquipmentInventory);
+        string savedEquipmentId = equipmentToEquip.Definition.Id;
+        EquipmentSlot savedEquipmentSlot = equipmentToEquip.Definition.Slot;
+        AssertTrue(game.EquipmentInventory.Equip("H001", savedEquipmentId), "owned equipment should equip to hero");
+        AssertEqual(savedEquipmentId, game.EquipmentInventory.GetEquippedEquipmentId("H001", savedEquipmentSlot), "equipped equipment should be stored on hero slot");
+
         long savedGold = game.Wallet.Gold;
+        int savedEquipmentCount = game.EquipmentInventory.GetTotalOwnedCount();
 
         game.Dispose();
 
@@ -145,6 +246,8 @@ public static class IdleGameQaRunner
             AssertEqual(ProgressMode.RepeatSelected, restored.Progress.Mode, "mode should restore from PlayerPrefs");
             AssertEqual(savedGold, restored.Wallet.Gold, "gold should restore from PlayerPrefs");
             AssertTrue(GetTotalShards(restored.Battle) > 0, "hero shards should restore from PlayerPrefs");
+            AssertEqual(savedEquipmentCount, restored.EquipmentInventory.GetTotalOwnedCount(), "equipment inventory should restore from PlayerPrefs");
+            AssertEqual(savedEquipmentId, restored.EquipmentInventory.GetEquippedEquipmentId("H001", savedEquipmentSlot), "equipped equipment should restore from PlayerPrefs");
         }
     }
 
@@ -166,6 +269,34 @@ public static class IdleGameQaRunner
             HeroState restoredHero = FindHeroState(restored.Battle, "H001");
             AssertEqual(1, restoredHero.Stars, "hero star level should restore from PlayerPrefs");
         }
+    }
+
+    private static void TestHeroBulkStarUp(RuntimeHarness game)
+    {
+        HeroState firstHero = FindHeroState(game.Battle, "H001");
+        HeroState secondHero = FindHeroState(game.Battle, "H002");
+        int firstHeroTwoStarCost = firstHero.Definition.GetStarUpCost(0) + firstHero.Definition.GetStarUpCost(1);
+        game.Battle.AddHeroShards(firstHero.Definition.Id, firstHeroTwoStarCost);
+        game.Battle.AddHeroShards(secondHero.Definition.Id, secondHero.StarUpCost);
+
+        int starUps = game.Battle.BulkStarUpHeroes();
+
+        AssertEqual(3, starUps, "bulk star up should process every affordable star level");
+        AssertEqual(2, firstHero.Stars, "bulk star up should repeat for a hero while shards are enough");
+        AssertEqual(1, secondHero.Stars, "bulk star up should process multiple heroes");
+        AssertEqual(0, firstHero.Shards, "bulk star up should spend repeated costs");
+        AssertEqual(0, secondHero.Shards, "bulk star up should spend single costs");
+    }
+
+    private static void TestGachaRateTable()
+    {
+        AssertEqual(10000, GachaManager.GetTotalRateWeight(), "gacha rarity weights should sum to 100%");
+        AssertEqual(4500, GachaManager.GetRarityRateWeight(HeroRarity.Common), "common rate should be 45%");
+        AssertEqual(3000, GachaManager.GetRarityRateWeight(HeroRarity.Uncommon), "uncommon rate should be 30%");
+        AssertEqual(1500, GachaManager.GetRarityRateWeight(HeroRarity.Rare), "rare rate should be 15%");
+        AssertEqual(700, GachaManager.GetRarityRateWeight(HeroRarity.Epic), "epic rate should be 7%");
+        AssertEqual(250, GachaManager.GetRarityRateWeight(HeroRarity.Legendary), "legendary rate should be 2.5%");
+        AssertEqual(50, GachaManager.GetRarityRateWeight(HeroRarity.Mythic), "mythic rate should be 0.5%");
     }
 
     private static void TestOfflineRewardFormula()
@@ -334,6 +465,17 @@ public static class IdleGameQaRunner
         return total;
     }
 
+    private static int GetMaxVisibleEnemySpawnSequence(BattleManager battle)
+    {
+        int maxSequence = -1;
+        for (int i = 0; i < battle.VisibleEnemyCount; i++)
+        {
+            maxSequence = Math.Max(maxSequence, battle.GetVisibleEnemySpawnSequence(i));
+        }
+
+        return maxSequence;
+    }
+
     private static HeroState FindHeroState(BattleManager battle, string heroId)
     {
         foreach (HeroState hero in battle.Heroes)
@@ -345,6 +487,19 @@ public static class IdleGameQaRunner
         }
 
         throw new InvalidOperationException("QA failed: missing hero " + heroId);
+    }
+
+    private static EquipmentState FindFirstOwnedEquipment(EquipmentInventory equipmentInventory)
+    {
+        foreach (EquipmentState state in equipmentInventory.States)
+        {
+            if (state.IsOwned)
+            {
+                return state;
+            }
+        }
+
+        throw new InvalidOperationException("QA failed: missing owned equipment");
     }
 
     private static void AssertTrue(bool condition, string message)
@@ -375,6 +530,7 @@ public static class IdleGameQaRunner
             Progress = root.AddComponent<StageProgressManager>();
             Wallet = root.AddComponent<CurrencyWallet>();
             Abilities = root.AddComponent<AbilityManager>();
+            EquipmentInventory = root.AddComponent<EquipmentInventory>();
             Speed = root.AddComponent<GameSpeedManager>();
             Battle = root.AddComponent<BattleManager>();
             Gacha = root.AddComponent<GachaManager>();
@@ -382,15 +538,17 @@ public static class IdleGameQaRunner
             Progress.Initialize(Save);
             Wallet.Initialize(Save);
             Abilities.Initialize(Wallet, Save);
+            EquipmentInventory.Initialize(Save);
             Speed.Initialize(Save);
             Battle.Initialize(Progress, Wallet, Save, Abilities, Speed);
-            Gacha.Initialize(Battle, Wallet);
+            Gacha.Initialize(Battle, Wallet, EquipmentInventory);
         }
 
         public SaveManager Save { get; }
         public StageProgressManager Progress { get; }
         public CurrencyWallet Wallet { get; }
         public AbilityManager Abilities { get; }
+        public EquipmentInventory EquipmentInventory { get; }
         public GameSpeedManager Speed { get; }
         public BattleManager Battle { get; }
         public GachaManager Gacha { get; }
@@ -444,6 +602,7 @@ public static class IdleGameQaRunner
             yield return PrefDescriptor.String(SaveKeys.Ruby);
             yield return PrefDescriptor.String(SaveKeys.HeroExpItem);
             yield return PrefDescriptor.String(SaveKeys.HeroSummonTicket);
+            yield return PrefDescriptor.String(SaveKeys.EquipmentSummonTicket);
             yield return PrefDescriptor.String(SaveKeys.HighestStageId);
             yield return PrefDescriptor.String(SaveKeys.CurrentStageId);
             yield return PrefDescriptor.String(SaveKeys.SelectedStageId);
@@ -452,12 +611,25 @@ public static class IdleGameQaRunner
             yield return PrefDescriptor.String(SaveKeys.LastOnlineUtcTicks);
             yield return PrefDescriptor.String(SaveKeys.CombatSpeedMultiplier);
             yield return PrefDescriptor.Int(SaveKeys.HasFourTimesSpeedEntitlement);
+            yield return PrefDescriptor.Int(SaveKeys.SkillAutoEnabled);
+            yield return PrefDescriptor.Int(SaveKeys.FeverAutoEnabled);
 
             foreach (HeroDefinition hero in GameData.Heroes)
             {
                 yield return PrefDescriptor.Int(SaveKeys.HeroLevel(hero.Id));
                 yield return PrefDescriptor.Int(SaveKeys.HeroShards(hero.Id));
                 yield return PrefDescriptor.Int(SaveKeys.HeroStars(hero.Id));
+                foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+                {
+                    yield return PrefDescriptor.String(SaveKeys.HeroEquipmentSlot(hero.Id, slot));
+                }
+            }
+
+            foreach (EquipmentDefinition equipment in GameData.Equipments)
+            {
+                yield return PrefDescriptor.Int(SaveKeys.EquipmentLevel(equipment.Id));
+                yield return PrefDescriptor.Int(SaveKeys.EquipmentStars(equipment.Id));
+                yield return PrefDescriptor.Int(SaveKeys.EquipmentCount(equipment.Id));
             }
 
             foreach (AbilityDefinition ability in GameData.Abilities)

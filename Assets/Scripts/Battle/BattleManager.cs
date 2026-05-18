@@ -4,6 +4,8 @@ using UnityEngine;
 
 public sealed class BattleManager : MonoBehaviour
 {
+    private const float InitialEnemySpawnGraceSeconds = 0.25f;
+    private const float RespawnEnemySpawnGraceSeconds = 0.45f;
     private readonly System.Random random = new System.Random();
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
@@ -14,9 +16,21 @@ public sealed class BattleManager : MonoBehaviour
     private static readonly IReadOnlyList<HeroState> EmptyHeroes = Array.Empty<HeroState>();
     private readonly List<HeroState> deployedHeroes = new List<HeroState>();
     private readonly List<string> activeFormationHeroIds = new List<string>();
+    private readonly List<HeroState> readyHeroAttacks = new List<HeroState>();
+    private readonly List<string> recentHeroAttackIds = new List<string>();
+    private readonly List<VisibleEnemyState> visibleEnemies = new List<VisibleEnemyState>();
     private readonly List<CombatSkillState> skills = new List<CombatSkillState>();
     private readonly List<PetState> pets = new List<PetState>();
+    private readonly Dictionary<string, double> heroDamageMeter = new Dictionary<string, double>();
+    private readonly Dictionary<string, int> heroTargetSpawnSequences = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> skillTargetSpawnSequences = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> petTargetSpawnSequences = new Dictionary<string, int>();
     private int activeHeroPreset = 1;
+    private int stageRunSequence;
+    private int nextEnemySpawnSequence;
+    private int recentHitEnemyIndex = -1;
+    private bool skillAutoEnabled = true;
+    private bool feverAutoEnabled = true;
     private bool initialized;
 
     public event Action Changed;
@@ -24,6 +38,7 @@ public sealed class BattleManager : MonoBehaviour
     public IReadOnlyList<HeroState> Heroes => heroes != null ? heroes : EmptyHeroes;
     public IReadOnlyList<HeroState> DeployedHeroes => deployedHeroes;
     public IReadOnlyList<string> ActiveFormationHeroIds => activeFormationHeroIds;
+    public IReadOnlyList<string> RecentHeroAttackIds => recentHeroAttackIds;
     public int ActiveHeroPreset => activeHeroPreset;
     public IReadOnlyList<CombatSkillState> Skills => skills;
     public IReadOnlyList<PetState> Pets => pets;
@@ -42,10 +57,102 @@ public sealed class BattleManager : MonoBehaviour
     public int LastHitDamage { get; private set; }
     public bool LastHitWasCritical { get; private set; }
     public int HitSequence { get; private set; }
+    public int HeroAttackBatchSequence { get; private set; }
+    public int RecentHitEnemyIndex => recentHitEnemyIndex;
     public string SupportStatusText => BuildSupportStatusText();
     public double PartyAttackPower => GetPartyAttackPower();
     public double TotalCombatPower => abilityManager != null ? abilityManager.GetTotalCombatPower(DeployedHeroes) : 1d;
     public float PetGoldBonusPercent => (GetPetGoldBonusMultiplier() - 1f) * 100f;
+    public bool SkillAutoEnabled => skillAutoEnabled;
+    public bool FeverAutoEnabled => feverAutoEnabled;
+
+    public double GetHeroDamageDone(string heroId)
+    {
+        return !string.IsNullOrEmpty(heroId) && heroDamageMeter.TryGetValue(heroId, out double damage)
+            ? damage
+            : 0d;
+    }
+
+    public double GetMaxHeroDamageDone()
+    {
+        double maxDamage = 0d;
+        foreach (HeroState hero in deployedHeroes)
+        {
+            maxDamage = Math.Max(maxDamage, GetHeroDamageDone(hero.Definition.Id));
+        }
+
+        return maxDamage;
+    }
+
+    public float GetVisibleEnemyHpRatio(int visualIndex)
+    {
+        if (IsBossFight)
+        {
+            return visualIndex == 0 && TargetMaxHp > 0 ? Mathf.Clamp01((float)TargetHp / TargetMaxHp) : 0f;
+        }
+
+        if (visualIndex < 0 || visualIndex >= visibleEnemies.Count)
+        {
+            return 0f;
+        }
+
+        VisibleEnemyState enemy = visibleEnemies[visualIndex];
+        return enemy.MaxHp > 0 ? Mathf.Clamp01((float)enemy.Hp / enemy.MaxHp) : 0f;
+    }
+
+    public int GetVisibleEnemyDisplayNumber(int visualIndex)
+    {
+        if (IsBossFight)
+        {
+            return 1;
+        }
+
+        if (visualIndex < 0 || visualIndex >= visibleEnemies.Count)
+        {
+            return KillsThisStage + visualIndex + 1;
+        }
+
+        return visibleEnemies[visualIndex].DisplayNumber;
+    }
+
+    public int GetVisibleEnemySpawnSequence(int visualIndex)
+    {
+        if (IsBossFight)
+        {
+            return -2;
+        }
+
+        if (visualIndex < 0 || visualIndex >= visibleEnemies.Count)
+        {
+            return -1;
+        }
+
+        return visibleEnemies[visualIndex].SpawnSequence;
+    }
+
+    public int GetHeroTargetVisualIndex(string heroId)
+    {
+        if (IsBossFight)
+        {
+            return 0;
+        }
+
+        if (string.IsNullOrEmpty(heroId)
+            || !heroTargetSpawnSequences.TryGetValue(heroId, out int spawnSequence))
+        {
+            return -1;
+        }
+
+        return FindVisibleEnemyIndexBySpawnSequence(spawnSequence);
+    }
+
+    public int GetHeroTargetSpawnSequence(string heroId)
+    {
+        return !string.IsNullOrEmpty(heroId)
+            && heroTargetSpawnSequences.TryGetValue(heroId, out int spawnSequence)
+            ? spawnSequence
+            : -1;
+    }
 
     public void Initialize(
         StageProgressManager progress,
@@ -66,6 +173,8 @@ public sealed class BattleManager : MonoBehaviour
         speedManager = speed;
         heroes = saveManager.LoadHeroes() ?? new List<HeroState>();
         activeHeroPreset = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.HeroFormationPreset, 1), 1, GameData.MaxHeroPresets);
+        skillAutoEnabled = saveManager.LoadBool(SaveKeys.SkillAutoEnabled, true);
+        feverAutoEnabled = saveManager.LoadBool(SaveKeys.FeverAutoEnabled, true);
         RefreshDeployedHeroes();
         skills.Clear();
         pets.Clear();
@@ -83,6 +192,20 @@ public sealed class BattleManager : MonoBehaviour
         progressManager.Changed += StartStage;
         initialized = true;
         StartStage();
+    }
+
+    public void ToggleSkillAuto()
+    {
+        skillAutoEnabled = !skillAutoEnabled;
+        SaveAutoControlState();
+        NotifyChanged();
+    }
+
+    public void ToggleFeverAuto()
+    {
+        feverAutoEnabled = !feverAutoEnabled;
+        SaveAutoControlState();
+        NotifyChanged();
     }
 
     private void Update()
@@ -113,6 +236,13 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         int cost = hero.LevelUpCost;
+        if (hero.Level >= hero.MaxLevel)
+        {
+            LastBattleLog = hero.Definition.DisplayName + " 레벨업 실패: 현재 성급 최대 레벨";
+            NotifyChanged();
+            return false;
+        }
+
         if (!wallet.SpendHeroExpItem(cost))
         {
             LastBattleLog = hero.Definition.DisplayName + " 레벨업 실패: EXP 아이템 부족";
@@ -308,6 +438,53 @@ public sealed class BattleManager : MonoBehaviour
         return true;
     }
 
+    public int BulkStarUpHeroes()
+    {
+        if (!IsReady())
+        {
+            return 0;
+        }
+
+        int totalStarUps = 0;
+        int affectedHeroes = 0;
+        foreach (HeroState hero in heroes)
+        {
+            int heroStarUps = 0;
+            while (hero.CanStarUp)
+            {
+                int cost = hero.StarUpCost;
+                if (cost <= 0)
+                {
+                    break;
+                }
+
+                hero.Shards -= cost;
+                hero.Stars += 1;
+                heroStarUps += 1;
+                totalStarUps += 1;
+            }
+
+            if (heroStarUps > 0)
+            {
+                affectedHeroes += 1;
+                saveManager.SaveHero(hero);
+            }
+        }
+
+        if (totalStarUps > 0)
+        {
+            saveManager.Flush();
+            LastBattleLog = "일괄 승급: " + affectedHeroes + "명, 총 " + totalStarUps + "성 상승";
+        }
+        else
+        {
+            LastBattleLog = "일괄 승급 실패: 승급 가능한 영웅 없음";
+        }
+
+        NotifyChanged();
+        return totalStarUps;
+    }
+
     public void DebugLevelAllHeroes(int levels)
     {
         if (!IsReady() || levels <= 0)
@@ -317,7 +494,7 @@ public sealed class BattleManager : MonoBehaviour
 
         foreach (HeroState hero in heroes)
         {
-            hero.Level += levels;
+            hero.Level = Mathf.Min(hero.MaxLevel, hero.Level + levels);
             saveManager.SaveHero(hero);
         }
 
@@ -352,7 +529,7 @@ public sealed class BattleManager : MonoBehaviour
 
         foreach (HeroState hero in deployedHeroes)
         {
-            hero.AttackCooldown = 0f;
+            hero.AttackCooldown = Mathf.Min(hero.AttackInterval, InitialEnemySpawnGraceSeconds + 0.1f);
         }
 
         foreach (CombatSkillState skill in skills)
@@ -362,10 +539,16 @@ public sealed class BattleManager : MonoBehaviour
 
         foreach (PetState pet in pets)
         {
-            pet.AttackCooldown = 0f;
+            pet.AttackCooldown = Mathf.Min(pet.Definition.AttackInterval, InitialEnemySpawnGraceSeconds + 0.2f);
         }
 
+        stageRunSequence += 1;
+        ResetHeroDamageMeter();
         KillsThisStage = 0;
+        nextEnemySpawnSequence = 0;
+        recentHitEnemyIndex = -1;
+        visibleEnemies.Clear();
+        ClearTargetLocks();
         SpawnTarget();
     }
 
@@ -377,6 +560,7 @@ public sealed class BattleManager : MonoBehaviour
 
         if (IsBossFight)
         {
+            visibleEnemies.Clear();
             BossDefinition boss = GameData.GetBoss(stage.TargetId);
             TargetName = boss.DisplayName;
             TargetMaxHp = GameData.GetBossHp(stage);
@@ -390,13 +574,76 @@ public sealed class BattleManager : MonoBehaviour
             EnemyDefinition enemy = GameData.GetEnemy(stage.TargetId);
             TargetName = enemy.DisplayName + " 무리";
             TargetMaxHp = GameData.GetEnemyHp(stage);
-            TargetHp = TargetMaxHp;
             BossTimeRemaining = 0f;
-            VisibleEnemyCount = Mathf.Clamp(RequiredKills - KillsThisStage, 1, GameData.MaxVisibleEnemies);
+            visibleEnemies.Clear();
+            FillVisibleEnemies();
+            SyncTargetFromVisibleEnemies();
             LastBattleLog = stage.Id + " 전투 중";
         }
 
         NotifyChanged();
+    }
+
+    private void FillVisibleEnemies()
+    {
+        if (IsBossFight)
+        {
+            return;
+        }
+
+        while (visibleEnemies.Count < GameData.MaxVisibleEnemies
+            && nextEnemySpawnSequence < RequiredKills)
+        {
+            visibleEnemies.Add(CreateVisibleEnemy(InitialEnemySpawnGraceSeconds));
+        }
+
+        VisibleEnemyCount = visibleEnemies.Count;
+    }
+
+    private VisibleEnemyState CreateVisibleEnemy(float spawnGraceSeconds)
+    {
+        int spawnSequence = nextEnemySpawnSequence;
+        nextEnemySpawnSequence += 1;
+        return new VisibleEnemyState(spawnSequence, Mathf.Max(1, TargetMaxHp), spawnSequence + 1, spawnGraceSeconds);
+    }
+
+    private void SyncTargetFromVisibleEnemies()
+    {
+        if (IsBossFight)
+        {
+            return;
+        }
+
+        VisibleEnemyCount = visibleEnemies.Count;
+        if (visibleEnemies.Count <= 0)
+        {
+            TargetHp = 0;
+            return;
+        }
+
+        TargetMaxHp = visibleEnemies[0].MaxHp;
+        TargetHp = visibleEnemies[0].Hp;
+    }
+
+    private bool HasAttackableTarget()
+    {
+        return IsBossFight ? TargetHp > 0 : FindFirstAttackableVisibleEnemyIndex() >= 0;
+    }
+
+    private void TickVisibleEnemySpawnGrace(float deltaTime)
+    {
+        if (IsBossFight || visibleEnemies.Count <= 0)
+        {
+            return;
+        }
+
+        foreach (VisibleEnemyState enemy in visibleEnemies)
+        {
+            if (enemy.SpawnGraceRemaining > 0f)
+            {
+                enemy.SpawnGraceRemaining = Mathf.Max(0f, enemy.SpawnGraceRemaining - deltaTime);
+            }
+        }
     }
 
     private void TickBattle(float deltaTime)
@@ -406,14 +653,38 @@ public sealed class BattleManager : MonoBehaviour
             return;
         }
 
+        TickVisibleEnemySpawnGrace(deltaTime);
+        if (!HasAttackableTarget())
+        {
+            return;
+        }
+
+        int currentRunSequence = stageRunSequence;
         TickHeroes(deltaTime);
+        if (stageRunSequence != currentRunSequence || !HasAttackableTarget())
+        {
+            return;
+        }
+
         TickSkills(deltaTime);
+        if (stageRunSequence != currentRunSequence || !HasAttackableTarget())
+        {
+            return;
+        }
+
         TickPets(deltaTime);
+        if (stageRunSequence != currentRunSequence || !HasAttackableTarget())
+        {
+            return;
+        }
+
         TickBossTimer(deltaTime);
     }
 
     private void TickHeroes(float deltaTime)
     {
+        readyHeroAttacks.Clear();
+
         foreach (HeroState hero in deployedHeroes)
         {
             hero.AttackCooldown -= deltaTime;
@@ -423,9 +694,33 @@ public sealed class BattleManager : MonoBehaviour
             }
 
             hero.AttackCooldown += hero.AttackInterval;
+            readyHeroAttacks.Add(hero);
+        }
+
+        if (readyHeroAttacks.Count <= 0)
+        {
+            return;
+        }
+
+        recentHeroAttackIds.Clear();
+        foreach (HeroState hero in readyHeroAttacks)
+        {
+            recentHeroAttackIds.Add(hero.Definition.Id);
+        }
+
+        HeroAttackBatchSequence += 1;
+
+        int currentRunSequence = stageRunSequence;
+        foreach (HeroState hero in readyHeroAttacks)
+        {
+            if (stageRunSequence != currentRunSequence || !HasAttackableTarget())
+            {
+                return;
+            }
+
             DealDamage(hero);
 
-            if (TargetHp <= 0)
+            if (stageRunSequence != currentRunSequence || !HasAttackableTarget())
             {
                 return;
             }
@@ -452,12 +747,18 @@ public sealed class BattleManager : MonoBehaviour
     private void DealDamage(HeroState hero)
     {
         int damage = CalculateDamage(hero, out bool isCritical);
-        ApplyDamage(damage, hero.Definition.DisplayName, isCritical);
+        if (IsBossFight)
+        {
+            ApplyDamage(damage, hero.Definition.DisplayName, isCritical, hero.Definition.Id);
+            return;
+        }
+
+        ApplyDamageToVisibleEnemy(SelectVisibleEnemyIndexForHero(hero), damage, hero.Definition.DisplayName, isCritical, hero.Definition.Id);
     }
 
     private void TickSkills(float deltaTime)
     {
-        if (TargetHp <= 0)
+        if (!HasAttackableTarget() || !skillAutoEnabled)
         {
             return;
         }
@@ -472,9 +773,16 @@ public sealed class BattleManager : MonoBehaviour
 
             skill.CooldownRemaining += skill.Definition.CooldownSeconds;
             int damage = ToDamageInt(GetPartyAttackPower() * skill.Definition.PartyAttackMultiplier * abilityManager.FinalDamageMultiplier);
-            ApplyDamage(damage, skill.Definition.DisplayName, false);
+            if (IsBossFight)
+            {
+                ApplyDamage(damage, skill.Definition.DisplayName, false);
+            }
+            else
+            {
+                ApplyDamageToVisibleEnemy(SelectVisibleEnemyIndexForSkill(skill), damage, skill.Definition.DisplayName, false);
+            }
 
-            if (TargetHp <= 0)
+            if (!HasAttackableTarget())
             {
                 return;
             }
@@ -483,7 +791,7 @@ public sealed class BattleManager : MonoBehaviour
 
     private void TickPets(float deltaTime)
     {
-        if (TargetHp <= 0)
+        if (!HasAttackableTarget())
         {
             return;
         }
@@ -497,9 +805,17 @@ public sealed class BattleManager : MonoBehaviour
             }
 
             pet.AttackCooldown += pet.Definition.AttackInterval;
-            ApplyDamage(ToDamageInt(pet.Definition.AttackPower * abilityManager.FinalDamageMultiplier), pet.Definition.DisplayName, false);
+            int damage = ToDamageInt(pet.Definition.AttackPower * abilityManager.FinalDamageMultiplier);
+            if (IsBossFight)
+            {
+                ApplyDamage(damage, pet.Definition.DisplayName, false);
+            }
+            else
+            {
+                ApplyDamageToVisibleEnemy(SelectVisibleEnemyIndexForPet(pet), damage, pet.Definition.DisplayName, false);
+            }
 
-            if (TargetHp <= 0)
+            if (!HasAttackableTarget())
             {
                 return;
             }
@@ -565,7 +881,160 @@ public sealed class BattleManager : MonoBehaviour
         return bonus;
     }
 
-    private void ApplyDamage(int damage, string sourceName, bool isCritical)
+    private int SelectVisibleEnemyIndexForHero(HeroState hero)
+    {
+        if (visibleEnemies.Count <= 0)
+        {
+            return -1;
+        }
+
+        string heroId = hero.Definition.Id;
+        if (heroTargetSpawnSequences.TryGetValue(heroId, out int spawnSequence))
+        {
+            int lockedIndex = FindVisibleEnemyIndexBySpawnSequence(spawnSequence);
+            if (lockedIndex >= 0 && visibleEnemies[lockedIndex].IsAttackable)
+            {
+                return lockedIndex;
+            }
+        }
+
+        int heroIndex = deployedHeroes.IndexOf(hero);
+        if (heroIndex < 0)
+        {
+            heroIndex = 0;
+        }
+
+        int targetIndex = FindAttackableVisibleEnemyIndex(heroIndex);
+        if (targetIndex < 0)
+        {
+            return -1;
+        }
+
+        heroTargetSpawnSequences[heroId] = visibleEnemies[targetIndex].SpawnSequence;
+        return targetIndex;
+    }
+
+    private int SelectVisibleEnemyIndexForSkill(CombatSkillState skill)
+    {
+        int skillIndex = skills.IndexOf(skill);
+        return SelectVisibleEnemyIndexForLockedSource(
+            skill.Definition.Id,
+            skillTargetSpawnSequences,
+            Mathf.Max(0, skillIndex));
+    }
+
+    private int SelectVisibleEnemyIndexForPet(PetState pet)
+    {
+        int petIndex = pets.IndexOf(pet);
+        return SelectVisibleEnemyIndexForLockedSource(
+            pet.Definition.Id,
+            petTargetSpawnSequences,
+            Mathf.Max(0, petIndex));
+    }
+
+    private int SelectVisibleEnemyIndexForLockedSource(
+        string sourceId,
+        Dictionary<string, int> targetLocks,
+        int preferredOffset)
+    {
+        if (visibleEnemies.Count <= 0)
+        {
+            return -1;
+        }
+
+        if (!string.IsNullOrEmpty(sourceId)
+            && targetLocks.TryGetValue(sourceId, out int spawnSequence))
+        {
+            int lockedIndex = FindVisibleEnemyIndexBySpawnSequence(spawnSequence);
+            if (lockedIndex >= 0 && visibleEnemies[lockedIndex].IsAttackable)
+            {
+                return lockedIndex;
+            }
+        }
+
+        int targetIndex = FindAttackableVisibleEnemyIndex(preferredOffset);
+        if (targetIndex < 0)
+        {
+            return -1;
+        }
+
+        if (!string.IsNullOrEmpty(sourceId))
+        {
+            targetLocks[sourceId] = visibleEnemies[targetIndex].SpawnSequence;
+        }
+
+        return targetIndex;
+    }
+
+    private int FindFirstAttackableVisibleEnemyIndex()
+    {
+        return FindAttackableVisibleEnemyIndex(0);
+    }
+
+    private int FindAttackableVisibleEnemyIndex(int preferredOffset)
+    {
+        if (visibleEnemies.Count <= 0)
+        {
+            return -1;
+        }
+
+        int startIndex = Mathf.Abs(preferredOffset) % visibleEnemies.Count;
+        for (int offset = 0; offset < visibleEnemies.Count; offset++)
+        {
+            int index = (startIndex + offset) % visibleEnemies.Count;
+            if (visibleEnemies[index].IsAttackable)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private int FindVisibleEnemyIndexBySpawnSequence(int spawnSequence)
+    {
+        for (int i = 0; i < visibleEnemies.Count; i++)
+        {
+            if (visibleEnemies[i].SpawnSequence == spawnSequence)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private void ApplyDamageToVisibleEnemy(int enemyIndex, int damage, string sourceName, bool isCritical, string heroId = null)
+    {
+        if (enemyIndex < 0 || enemyIndex >= visibleEnemies.Count)
+        {
+            SyncTargetFromVisibleEnemies();
+            NotifyChanged();
+            return;
+        }
+
+        VisibleEnemyState enemy = visibleEnemies[enemyIndex];
+        int appliedDamage = Mathf.Max(1, damage);
+        enemy.Hp = Mathf.Max(0, enemy.Hp - appliedDamage);
+        recentHitEnemyIndex = enemyIndex;
+        LastHitSourceName = sourceName;
+        LastHitDamage = appliedDamage;
+        LastHitWasCritical = isCritical;
+        HitSequence += 1;
+        LastDamageLog = sourceName + " -" + NumberFormatter.Format(appliedDamage) + (isCritical ? " CRIT" : string.Empty);
+        AddHeroDamage(heroId, appliedDamage);
+
+        if (enemy.Hp <= 0)
+        {
+            HandleVisibleEnemyDefeated(enemyIndex, enemy.SpawnSequence);
+            return;
+        }
+
+        SyncTargetFromVisibleEnemies();
+        NotifyChanged();
+    }
+
+    private void ApplyDamage(int damage, string sourceName, bool isCritical, string heroId = null)
     {
         int appliedDamage = Mathf.Max(1, damage);
         TargetHp = Mathf.Max(0, TargetHp - appliedDamage);
@@ -574,6 +1043,7 @@ public sealed class BattleManager : MonoBehaviour
         LastHitWasCritical = isCritical;
         HitSequence += 1;
         LastDamageLog = sourceName + " -" + NumberFormatter.Format(appliedDamage) + (isCritical ? " CRIT" : string.Empty);
+        AddHeroDamage(heroId, appliedDamage);
 
         if (TargetHp <= 0)
         {
@@ -619,9 +1089,115 @@ public sealed class BattleManager : MonoBehaviour
         SpawnTarget();
     }
 
+    private void HandleVisibleEnemyDefeated(int enemyIndex, int defeatedSpawnSequence)
+    {
+        StageDefinition stage = progressManager.CurrentStage;
+        int gold = Mathf.FloorToInt(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier());
+        int heroExp = GameData.GetEnemyHeroExpItem(stage);
+        LastRewardLog = "+" + NumberFormatter.Format(gold) + " 골드, +" + NumberFormatter.Format(heroExp) + " EXP";
+        wallet.AddGold(gold);
+        wallet.AddHeroExpItem(heroExp);
+        KillsThisStage += 1;
+        RemoveTargetLocksForSpawn(defeatedSpawnSequence);
+
+        if (KillsThisStage >= RequiredKills)
+        {
+            visibleEnemies.Clear();
+            SyncTargetFromVisibleEnemies();
+            progressManager.HandleStageCleared();
+            LastBattleLog = stage.Id + " 완료";
+            NotifyChanged();
+            return;
+        }
+
+        if (enemyIndex >= 0 && enemyIndex < visibleEnemies.Count && nextEnemySpawnSequence < RequiredKills)
+        {
+            visibleEnemies[enemyIndex] = CreateVisibleEnemy(RespawnEnemySpawnGraceSeconds);
+            recentHitEnemyIndex = enemyIndex;
+        }
+        else if (enemyIndex >= 0 && enemyIndex < visibleEnemies.Count)
+        {
+            visibleEnemies.RemoveAt(enemyIndex);
+            recentHitEnemyIndex = visibleEnemies.Count > 0 ? Mathf.Clamp(enemyIndex, 0, visibleEnemies.Count - 1) : -1;
+        }
+
+        SyncTargetFromVisibleEnemies();
+        LastBattleLog = stage.Id + " 처치 " + KillsThisStage + "/" + RequiredKills;
+        NotifyChanged();
+    }
+
     private string BuildSupportStatusText()
     {
-        return "Auto Skill/Pet active    Field " + VisibleEnemyCount;
+        return "Skill Auto " + (skillAutoEnabled ? "ON" : "OFF")
+            + "    Fever Auto " + (feverAutoEnabled ? "ON" : "OFF")
+            + "    Field " + VisibleEnemyCount;
+    }
+
+    private void SaveAutoControlState()
+    {
+        saveManager.SaveBool(SaveKeys.SkillAutoEnabled, skillAutoEnabled);
+        saveManager.SaveBool(SaveKeys.FeverAutoEnabled, feverAutoEnabled);
+        saveManager.Flush();
+    }
+
+    private void ClearTargetLocks()
+    {
+        heroTargetSpawnSequences.Clear();
+        skillTargetSpawnSequences.Clear();
+        petTargetSpawnSequences.Clear();
+    }
+
+    private void RemoveTargetLocksForSpawn(int spawnSequence)
+    {
+        RemoveTargetLocksForSpawn(heroTargetSpawnSequences, spawnSequence);
+        RemoveTargetLocksForSpawn(skillTargetSpawnSequences, spawnSequence);
+        RemoveTargetLocksForSpawn(petTargetSpawnSequences, spawnSequence);
+    }
+
+    private static void RemoveTargetLocksForSpawn(Dictionary<string, int> targetLocks, int spawnSequence)
+    {
+        if (targetLocks.Count <= 0)
+        {
+            return;
+        }
+
+        var removeKeys = new List<string>();
+        foreach (KeyValuePair<string, int> entry in targetLocks)
+        {
+            if (entry.Value == spawnSequence)
+            {
+                removeKeys.Add(entry.Key);
+            }
+        }
+
+        foreach (string key in removeKeys)
+        {
+            targetLocks.Remove(key);
+        }
+    }
+
+    private void ResetHeroDamageMeter()
+    {
+        heroDamageMeter.Clear();
+        foreach (HeroState hero in deployedHeroes)
+        {
+            heroDamageMeter[hero.Definition.Id] = 0d;
+        }
+    }
+
+    private void AddHeroDamage(string heroId, int damage)
+    {
+        if (string.IsNullOrEmpty(heroId) || damage <= 0)
+        {
+            return;
+        }
+
+        if (!heroDamageMeter.ContainsKey(heroId))
+        {
+            heroDamageMeter[heroId] = 0d;
+        }
+
+        heroDamageMeter[heroId] += damage;
     }
 
     private void RefreshDeployedHeroes()
@@ -775,5 +1351,24 @@ public sealed class BattleManager : MonoBehaviour
             && abilityManager != null
             && speedManager != null
             && heroes != null;
+    }
+
+    private sealed class VisibleEnemyState
+    {
+        public VisibleEnemyState(int spawnSequence, int maxHp, int displayNumber, float spawnGraceSeconds)
+        {
+            SpawnSequence = spawnSequence;
+            MaxHp = maxHp;
+            Hp = maxHp;
+            DisplayNumber = displayNumber;
+            SpawnGraceRemaining = Mathf.Max(0f, spawnGraceSeconds);
+        }
+
+        public int SpawnSequence { get; }
+        public int MaxHp { get; }
+        public int DisplayNumber { get; }
+        public int Hp { get; set; }
+        public float SpawnGraceRemaining { get; set; }
+        public bool IsAttackable => SpawnGraceRemaining <= 0f && Hp > 0;
     }
 }

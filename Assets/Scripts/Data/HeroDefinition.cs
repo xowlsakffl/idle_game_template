@@ -4,6 +4,7 @@ using UnityEngine;
 [Serializable]
 public enum HeroRarity
 {
+    Common,
     Uncommon,
     Rare,
     Epic,
@@ -33,6 +34,10 @@ public enum HeroPassiveStat
 public sealed class HeroDefinition
 {
     public const int MaxStars = 15;
+    public const int LevelPerStar = 50;
+    public const int MaxLevelAtMaxStars = (MaxStars + 1) * LevelPerStar;
+    private const float FiveStarPassiveBoostMultiplier = 1.5f;
+    private const float TenStarAllStatMultiplier = 1.1f;
 
     public HeroDefinition(
         string id,
@@ -90,29 +95,41 @@ public sealed class HeroDefinition
     {
         int levelAttack = BaseAttack + Mathf.Max(0, level - 1) * AttackPerLevel;
         float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.2f;
-        return Mathf.Max(1, Mathf.FloorToInt(levelAttack * starMultiplier * GetPassiveMultiplier(HeroPassiveStat.AttackPower)));
+        return Mathf.Max(1, Mathf.FloorToInt(levelAttack
+            * starMultiplier
+            * GetPassiveMultiplier(HeroPassiveStat.AttackPower, stars)
+            * GetTenStarMultiplier(stars)));
     }
 
     public int GetMaxHp(int level, int stars)
     {
         int levelHp = BaseHp + Mathf.Max(0, level - 1) * HpPerLevel;
         float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.15f;
-        return Mathf.Max(1, Mathf.FloorToInt(levelHp * starMultiplier * GetPassiveMultiplier(HeroPassiveStat.MaxHp)));
+        return Mathf.Max(1, Mathf.FloorToInt(levelHp
+            * starMultiplier
+            * GetPassiveMultiplier(HeroPassiveStat.MaxHp, stars)
+            * GetTenStarMultiplier(stars)));
     }
 
-    public float GetAttackSpeed()
+    public float GetAttackSpeed(int stars)
     {
-        return AttackSpeed * GetPassiveMultiplier(HeroPassiveStat.AttackSpeed);
+        return AttackSpeed * GetPassiveMultiplier(HeroPassiveStat.AttackSpeed, stars) * GetTenStarMultiplier(stars);
     }
 
-    public float GetMoveSpeed()
+    public float GetMoveSpeed(int stars)
     {
-        return MoveSpeed * GetPassiveMultiplier(HeroPassiveStat.MoveSpeed);
+        return MoveSpeed * GetPassiveMultiplier(HeroPassiveStat.MoveSpeed, stars) * GetTenStarMultiplier(stars);
     }
 
     public int GetLevelUpCost(int level)
     {
         return Mathf.FloorToInt(20f * Mathf.Pow(Mathf.Max(1, level), 1.25f));
+    }
+
+    public int GetMaxLevel(int stars)
+    {
+        int effectiveStars = Mathf.Clamp(stars, 0, MaxStars) + 1;
+        return effectiveStars * LevelPerStar;
     }
 
     public int GetStarUpCost(int currentStars)
@@ -127,18 +144,36 @@ public sealed class HeroDefinition
 
     public int GetSummonShardReward()
     {
-        return GetBaseShardStep(Rarity);
+        return 1;
     }
 
-    private float GetPassiveMultiplier(HeroPassiveStat stat)
+    private float GetPassiveMultiplier(HeroPassiveStat stat, int stars)
     {
-        return PassiveStat == stat ? 1f + PassiveValuePercent / 100f : 1f;
+        if (PassiveStat != stat)
+        {
+            return 1f;
+        }
+
+        float passivePercent = PassiveValuePercent;
+        if (stars >= 5)
+        {
+            passivePercent *= FiveStarPassiveBoostMultiplier;
+        }
+
+        return 1f + passivePercent / 100f;
+    }
+
+    private static float GetTenStarMultiplier(int stars)
+    {
+        return stars >= 10 ? TenStarAllStatMultiplier : 1f;
     }
 
     private static int GetBaseShardStep(HeroRarity rarity)
     {
         switch (rarity)
         {
+            case HeroRarity.Common:
+                return 5;
             case HeroRarity.Uncommon:
                 return 10;
             case HeroRarity.Rare:
@@ -158,6 +193,8 @@ public sealed class HeroDefinition
     {
         switch (rarity)
         {
+            case HeroRarity.Common:
+                return "커먼";
             case HeroRarity.Uncommon:
                 return "언커먼";
             case HeroRarity.Rare:
@@ -209,10 +246,11 @@ public sealed class HeroState
 
     public int AttackPower => Definition.GetAttackPower(Level, Stars);
     public int MaxHp => Definition.GetMaxHp(Level, Stars);
-    public float AttackSpeed => Definition.GetAttackSpeed();
-    public float MoveSpeed => Definition.GetMoveSpeed();
+    public float AttackSpeed => Definition.GetAttackSpeed(Stars);
+    public float MoveSpeed => Definition.GetMoveSpeed(Stars);
     public float AttackInterval => Mathf.Max(0.1f, 1f / AttackSpeed);
     public int LevelUpCost => Definition.GetLevelUpCost(Level);
+    public int MaxLevel => Definition.GetMaxLevel(Stars);
     public bool IsMaxStars => Stars >= HeroDefinition.MaxStars;
     public int StarUpCost => Definition.GetStarUpCost(Stars);
     public bool CanStarUp => !IsMaxStars && Shards >= StarUpCost;
