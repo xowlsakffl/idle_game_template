@@ -11,31 +11,27 @@ public static class NumberFormatter
 
     public static string Format(double value)
     {
-        if (double.IsNaN(value))
+        return Format(GameNumber.FromDouble(value));
+    }
+
+    public static string Format(GameNumber value)
+    {
+        if (value.IsZero)
         {
             return "0";
         }
 
-        if (double.IsInfinity(value))
+        double mantissa = value.Mantissa;
+        int unitExponent = value.UnitExponent;
+        if (unitExponent <= 0)
         {
-            return value < 0d ? "-999Z" : "999Z";
+            double rawValue = value.ToDoubleClamped();
+            double rawAbs = Math.Abs(rawValue);
+            return rawValue.ToString(rawValue % 1d == 0d ? "0" : rawAbs >= 100d ? "0.#" : "0.##");
         }
 
-        double abs = Math.Abs(value);
-        if (abs < UnitStep)
-        {
-            return value.ToString(value % 1d == 0d ? "0" : abs >= 100d ? "0.#" : "0.##");
-        }
-
-        int unitIndex = -1;
-        while (abs >= UnitStep && unitIndex < Units.Length - 1)
-        {
-            abs /= UnitStep;
-            unitIndex += 1;
-        }
-
-        double signedValue = value < 0d ? -abs : abs;
+        double abs = Math.Abs(mantissa);
         string numberFormat = abs >= 100d ? "0" : abs >= 10d ? "0.#" : "0.##";
-        return signedValue.ToString(numberFormat) + Units[unitIndex];
+        return mantissa.ToString(numberFormat) + GameNumber.BuildUnitLabel(unitExponent);
     }
 }

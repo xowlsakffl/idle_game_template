@@ -202,6 +202,81 @@ public sealed class EquipmentInventory : MonoBehaviour
         return false;
     }
 
+    public int UnequipAll(string heroId)
+    {
+        if (string.IsNullOrEmpty(heroId) || !equippedByHero.TryGetValue(heroId, out Dictionary<EquipmentSlot, string> slots))
+        {
+            return 0;
+        }
+
+        int unequippedCount = 0;
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            if (!slots.TryGetValue(slot, out string equipmentId) || string.IsNullOrEmpty(equipmentId))
+            {
+                continue;
+            }
+
+            slots[slot] = string.Empty;
+            SaveHeroEquipmentSlot(heroId, slot, string.Empty);
+            unequippedCount += 1;
+        }
+
+        if (unequippedCount > 0)
+        {
+            NotifyChanged();
+        }
+
+        return unequippedCount;
+    }
+
+    public int EquipBestAvailable(string heroId)
+    {
+        if (string.IsNullOrEmpty(heroId))
+        {
+            return 0;
+        }
+
+        if (!equippedByHero.TryGetValue(heroId, out Dictionary<EquipmentSlot, string> slots))
+        {
+            slots = new Dictionary<EquipmentSlot, string>();
+            equippedByHero[heroId] = slots;
+        }
+
+        bool changed = false;
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            if (slots.TryGetValue(slot, out string currentEquipmentId) && !string.IsNullOrEmpty(currentEquipmentId))
+            {
+                slots[slot] = string.Empty;
+                SaveHeroEquipmentSlot(heroId, slot, string.Empty);
+                changed = true;
+            }
+        }
+
+        int equippedCount = 0;
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            EquipmentState bestState = FindBestAvailableEquipment(slot);
+            if (bestState == null)
+            {
+                continue;
+            }
+
+            slots[slot] = bestState.Definition.Id;
+            SaveHeroEquipmentSlot(heroId, slot, bestState.Definition.Id);
+            equippedCount += 1;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            NotifyChanged();
+        }
+
+        return equippedCount;
+    }
+
     public EquipmentState AddEquipment(string equipmentId, int amount)
     {
         if (string.IsNullOrEmpty(equipmentId) || amount <= 0)
@@ -256,6 +331,72 @@ public sealed class EquipmentInventory : MonoBehaviour
         return true;
     }
 
+    public bool TryDismantleEquipment(string equipmentId, out int reward)
+    {
+        reward = 0;
+        EquipmentState state = GetState(equipmentId);
+        if (state == null || !state.IsOwned || GetAvailableCount(equipmentId) <= 0)
+        {
+            return false;
+        }
+
+        reward = GetDismantleReward(state, 1);
+        state.Count = Math.Max(0, state.Count - 1);
+        SaveEquipment(state);
+        NotifyChanged();
+        return true;
+    }
+
+    public int DismantleByRarity(
+        HeroRarity maxRarity,
+        IReadOnlyCollection<EquipmentSlot> selectedSlots,
+        out int reward)
+    {
+        reward = 0;
+        int dismantledCount = 0;
+        foreach (EquipmentState state in states)
+        {
+            if (state == null
+                || !state.IsOwned
+                || state.Definition.Rarity > maxRarity
+                || (selectedSlots != null && !ContainsSlot(selectedSlots, state.Definition.Slot)))
+            {
+                continue;
+            }
+
+            int dismantleCount = GetAvailableCount(state.Definition.Id);
+            if (dismantleCount <= 0)
+            {
+                continue;
+            }
+
+            reward += GetDismantleReward(state, dismantleCount);
+            dismantledCount += dismantleCount;
+            state.Count = Math.Max(0, state.Count - dismantleCount);
+            SaveEquipment(state);
+        }
+
+        if (dismantledCount > 0)
+        {
+            NotifyChanged();
+        }
+
+        return dismantledCount;
+    }
+
+    public int GetDismantleReward(EquipmentState state, int count)
+    {
+        if (state == null || count <= 0)
+        {
+            return 0;
+        }
+
+        int rarityValue = GetRarityDismantleValue(state.Definition.Rarity);
+        int levelValue = Math.Max(0, state.Level - 1) / 5;
+        int starValue = state.Stars * 3;
+        return Math.Max(1, (rarityValue + levelValue + starValue) * count);
+    }
+
     public string GetOwnedSummary(int maxLines)
     {
         int lines = 0;
@@ -307,6 +448,79 @@ public sealed class EquipmentInventory : MonoBehaviour
         PlayerPrefs.SetInt(SaveKeys.EquipmentStars(state.Definition.Id), state.Stars);
         PlayerPrefs.SetInt(SaveKeys.EquipmentCount(state.Definition.Id), state.Count);
         saveManager.Flush();
+    }
+
+    private static int GetRarityDismantleValue(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return 5;
+            case HeroRarity.Uncommon:
+                return 12;
+            case HeroRarity.Rare:
+                return 30;
+            case HeroRarity.Epic:
+                return 80;
+            case HeroRarity.Legendary:
+                return 180;
+            case HeroRarity.Mythic:
+                return 420;
+            default:
+                return 5;
+        }
+    }
+
+    private EquipmentState FindBestAvailableEquipment(EquipmentSlot slot)
+    {
+        EquipmentState bestState = null;
+        long bestScore = long.MinValue;
+        foreach (EquipmentState state in states)
+        {
+            if (state == null
+                || !state.IsOwned
+                || state.Definition.Slot != slot
+                || GetAvailableCount(state.Definition.Id) <= 0)
+            {
+                continue;
+            }
+
+            long score = GetAutoEquipScore(state);
+            if (bestState == null || score > bestScore)
+            {
+                bestState = state;
+                bestScore = score;
+            }
+        }
+
+        return bestState;
+    }
+
+    private static long GetAutoEquipScore(EquipmentState state)
+    {
+        if (state == null)
+        {
+            return long.MinValue;
+        }
+
+        return state.AttackBonus * 10L
+            + state.HpBonus
+            + (int)state.Definition.Rarity * 10000L
+            + state.Stars * 1000L
+            + state.Level;
+    }
+
+    private static bool ContainsSlot(IReadOnlyCollection<EquipmentSlot> slots, EquipmentSlot slot)
+    {
+        foreach (EquipmentSlot candidate in slots)
+        {
+            if (candidate == slot)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void SaveHeroEquipmentSlot(string heroId, EquipmentSlot slot, string equipmentId)

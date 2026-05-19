@@ -7,28 +7,30 @@ public sealed class CurrencyWallet : MonoBehaviour
 
     public event Action Changed;
 
-    public long Gold { get; private set; }
+    public GameNumber Gold { get; private set; }
     public long Ruby { get; private set; }
-    public long HeroExpItem { get; private set; }
-    public long EquipmentExpItem { get; private set; }
+    public GameNumber HeroExpItem { get; private set; }
+    public GameNumber EquipmentExpItem { get; private set; }
+    public long HeroTranscendStone { get; private set; }
     public long HeroSummonTicket { get; private set; }
     public long EquipmentSummonTicket { get; private set; }
 
     public void Initialize(SaveManager save)
     {
         saveManager = save;
-        Gold = saveManager.LoadLong(SaveKeys.Gold, 0);
-        Ruby = saveManager.LoadLong(SaveKeys.Ruby, 675);
-        HeroExpItem = saveManager.LoadLong(SaveKeys.HeroExpItem, 120);
-        EquipmentExpItem = saveManager.LoadLong(SaveKeys.EquipmentExpItem, 120);
-        HeroSummonTicket = saveManager.LoadLong(SaveKeys.HeroSummonTicket, 10);
-        EquipmentSummonTicket = saveManager.LoadLong(SaveKeys.EquipmentSummonTicket, 10);
+        Gold = saveManager.LoadGameNumber(SaveKeys.Gold, GameNumber.Zero);
+        Ruby = saveManager.LoadLong(SaveKeys.Ruby, 150);
+        HeroExpItem = saveManager.LoadGameNumber(SaveKeys.HeroExpItem, 80);
+        EquipmentExpItem = saveManager.LoadGameNumber(SaveKeys.EquipmentExpItem, 80);
+        HeroTranscendStone = saveManager.LoadLong(SaveKeys.HeroTranscendStone, 0);
+        HeroSummonTicket = saveManager.LoadLong(SaveKeys.HeroSummonTicket, 3);
+        EquipmentSummonTicket = saveManager.LoadLong(SaveKeys.EquipmentSummonTicket, 3);
         NotifyChanged();
     }
 
-    public void AddGold(long amount)
+    public void AddGold(GameNumber amount)
     {
-        if (amount <= 0)
+        if (amount <= GameNumber.Zero)
         {
             return;
         }
@@ -38,9 +40,9 @@ public sealed class CurrencyWallet : MonoBehaviour
         NotifyChanged();
     }
 
-    public void AddHeroExpItem(long amount)
+    public void AddHeroExpItem(GameNumber amount)
     {
-        if (amount <= 0)
+        if (amount <= GameNumber.Zero)
         {
             return;
         }
@@ -74,14 +76,26 @@ public sealed class CurrencyWallet : MonoBehaviour
         NotifyChanged();
     }
 
-    public void AddEquipmentExpItem(long amount)
+    public void AddEquipmentExpItem(GameNumber amount)
+    {
+        if (amount <= GameNumber.Zero)
+        {
+            return;
+        }
+
+        EquipmentExpItem += amount;
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddHeroTranscendStone(long amount)
     {
         if (amount <= 0)
         {
             return;
         }
 
-        EquipmentExpItem += amount;
+        HeroTranscendStone += amount;
         Save();
         NotifyChanged();
     }
@@ -98,9 +112,9 @@ public sealed class CurrencyWallet : MonoBehaviour
         NotifyChanged();
     }
 
-    public bool SpendGold(long amount)
+    public bool SpendGold(GameNumber amount)
     {
-        if (amount <= 0)
+        if (amount <= GameNumber.Zero)
         {
             return true;
         }
@@ -116,9 +130,9 @@ public sealed class CurrencyWallet : MonoBehaviour
         return true;
     }
 
-    public bool SpendHeroExpItem(long amount)
+    public bool SpendHeroExpItem(GameNumber amount)
     {
-        if (amount <= 0)
+        if (amount <= GameNumber.Zero)
         {
             return true;
         }
@@ -148,9 +162,9 @@ public sealed class CurrencyWallet : MonoBehaviour
         return true;
     }
 
-    public bool SpendEquipmentExpItem(long amount)
+    public bool SpendEquipmentExpItem(GameNumber amount)
     {
-        if (amount <= 0)
+        if (amount <= GameNumber.Zero)
         {
             return true;
         }
@@ -161,6 +175,24 @@ public sealed class CurrencyWallet : MonoBehaviour
         }
 
         EquipmentExpItem -= amount;
+        Save();
+        NotifyChanged();
+        return true;
+    }
+
+    public bool SpendHeroTranscendStone(long amount)
+    {
+        if (amount <= 0)
+        {
+            return true;
+        }
+
+        if (HeroTranscendStone < amount)
+        {
+            return false;
+        }
+
+        HeroTranscendStone -= amount;
         Save();
         NotifyChanged();
         return true;
@@ -203,10 +235,11 @@ public sealed class CurrencyWallet : MonoBehaviour
 
     private void Save()
     {
-        saveManager.SaveLong(SaveKeys.Gold, Gold);
+        saveManager.SaveGameNumber(SaveKeys.Gold, Gold);
         saveManager.SaveLong(SaveKeys.Ruby, Ruby);
-        saveManager.SaveLong(SaveKeys.HeroExpItem, HeroExpItem);
-        saveManager.SaveLong(SaveKeys.EquipmentExpItem, EquipmentExpItem);
+        saveManager.SaveGameNumber(SaveKeys.HeroExpItem, HeroExpItem);
+        saveManager.SaveGameNumber(SaveKeys.EquipmentExpItem, EquipmentExpItem);
+        saveManager.SaveLong(SaveKeys.HeroTranscendStone, HeroTranscendStone);
         saveManager.SaveLong(SaveKeys.HeroSummonTicket, HeroSummonTicket);
         saveManager.SaveLong(SaveKeys.EquipmentSummonTicket, EquipmentSummonTicket);
         saveManager.Flush();
@@ -216,4 +249,5 @@ public sealed class CurrencyWallet : MonoBehaviour
     {
         Changed?.Invoke();
     }
+
 }

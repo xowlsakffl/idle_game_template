@@ -177,7 +177,7 @@ public static class IdleGameQaRunner
 
         game.Battle.DebugSimulateSeconds(3f);
 
-        AssertTrue(game.Battle.GetMaxHeroDamageDone() > 0d, "damage meter should track deployed hero damage");
+        AssertTrue(game.Battle.GetMaxHeroDamageDone() > GameNumber.Zero, "damage meter should track deployed hero damage");
         AssertTrue(
             game.Battle.GetHeroDamageDone(firstDeployedHero.Definition.Id) > 0d,
             "damage meter should expose damage by deployed hero id");
@@ -215,17 +215,17 @@ public static class IdleGameQaRunner
             "normal stages should spawn a new enemy after a visible enemy dies");
 
         game.Progress.DebugJumpToStage("1-2", ProgressMode.RepeatSelected);
-        AssertEqual(0d, game.Battle.GetMaxHeroDamageDone(), "damage meter should reset when a new stage starts");
+        AssertEqual(GameNumber.Zero, game.Battle.GetMaxHeroDamageDone(), "damage meter should reset when a new stage starts");
     }
 
     private static void TestGachaAndSaveRestore(RuntimeHarness game)
     {
-        game.Gacha.Roll(10);
-        AssertEqual(0L, game.Wallet.HeroSummonTicket, "ten-roll should spend default tickets");
-        AssertEqual(10, GetTotalShards(game.Battle), "ten-roll should add one hero shard per pull");
-        game.Gacha.RollEquipment(10);
-        AssertEqual(0L, game.Wallet.EquipmentSummonTicket, "equipment ten-roll should spend default tickets");
-        AssertEqual(10, game.EquipmentInventory.GetTotalOwnedCount(), "equipment ten-roll should add one equipment copy per pull");
+        game.Gacha.Roll(3);
+        AssertEqual(0L, game.Wallet.HeroSummonTicket, "starter hero pulls should spend default tickets");
+        AssertEqual(3, GetTotalShards(game.Battle), "starter hero pulls should add one hero shard per pull");
+        game.Gacha.RollEquipment(3);
+        AssertEqual(0L, game.Wallet.EquipmentSummonTicket, "starter equipment pulls should spend default tickets");
+        AssertEqual(3, game.EquipmentInventory.GetTotalOwnedCount(), "starter equipment pulls should add one equipment copy per pull");
 
         game.Wallet.AddGold(1234);
         game.Progress.DebugJumpToStage("1-5", ProgressMode.RepeatSelected);
@@ -235,7 +235,7 @@ public static class IdleGameQaRunner
         AssertTrue(game.EquipmentInventory.Equip("H001", savedEquipmentId), "owned equipment should equip to hero");
         AssertEqual(savedEquipmentId, game.EquipmentInventory.GetEquippedEquipmentId("H001", savedEquipmentSlot), "equipped equipment should be stored on hero slot");
 
-        long savedGold = game.Wallet.Gold;
+        GameNumber savedGold = game.Wallet.Gold;
         int savedEquipmentCount = game.EquipmentInventory.GetTotalOwnedCount();
 
         game.Dispose();
@@ -302,16 +302,16 @@ public static class IdleGameQaRunner
     private static void TestOfflineRewardFormula()
     {
         DateTime now = new DateTime(2026, 5, 14, 0, 0, 0, DateTimeKind.Utc);
-        long oneHourReward = GameBootstrap.CalculateOfflineGoldReward(now.AddHours(-1), now, "1-19");
-        long expectedOneHour = (long)Math.Floor(3600 * GameData.GetOfflineGoldPerSecond("1-19"));
+        GameNumber oneHourReward = GameBootstrap.CalculateOfflineGoldReward(now.AddHours(-1), now, "1-19");
+        GameNumber expectedOneHour = GameNumber.Floor(GameData.GetOfflineGoldPerSecond("1-19") * 3600d);
         AssertEqual(expectedOneHour, oneHourReward, "offline reward should use selected farming stage rate");
 
-        long cappedReward = GameBootstrap.CalculateOfflineGoldReward(now.AddHours(-10), now, "1-19");
-        long expectedCap = (long)Math.Floor(28800 * GameData.GetOfflineGoldPerSecond("1-19"));
+        GameNumber cappedReward = GameBootstrap.CalculateOfflineGoldReward(now.AddHours(-10), now, "1-19");
+        GameNumber expectedCap = GameNumber.Floor(GameData.GetOfflineGoldPerSecond("1-19") * 28800d);
         AssertEqual(expectedCap, cappedReward, "offline reward should cap at 8 hours");
 
-        long shortReward = GameBootstrap.CalculateOfflineGoldReward(now.AddSeconds(-10), now, "1-19");
-        AssertEqual(0L, shortReward, "short sessions should not receive offline reward");
+        GameNumber shortReward = GameBootstrap.CalculateOfflineGoldReward(now.AddSeconds(-10), now, "1-19");
+        AssertEqual(GameNumber.Zero, shortReward, "short sessions should not receive offline reward");
     }
 
     private static void RunWithFreshPrefs(PlayerPrefsScope prefs, Action<RuntimeHarness> test)

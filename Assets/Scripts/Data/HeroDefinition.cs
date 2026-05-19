@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
@@ -31,13 +32,75 @@ public enum HeroPassiveStat
 }
 
 [Serializable]
+public enum HeroTranscendGrade
+{
+    F,
+    E,
+    D,
+    C,
+    B,
+    A,
+    S,
+    SS
+}
+
+[Serializable]
+public enum HeroTranscendOptionScope
+{
+    Common,
+    Exclusive
+}
+
+[Serializable]
+public sealed class HeroTranscendOptionDefinition
+{
+    public HeroTranscendOptionDefinition(
+        string id,
+        string heroId,
+        HeroTranscendOptionScope scope,
+        HeroTranscendGrade grade,
+        string description,
+        float probabilityWeight)
+    {
+        Id = id;
+        HeroId = heroId ?? string.Empty;
+        Scope = scope;
+        Grade = grade;
+        Description = description ?? string.Empty;
+        ProbabilityWeight = Mathf.Max(0.0001f, probabilityWeight);
+    }
+
+    public string Id { get; }
+    public string HeroId { get; }
+    public HeroTranscendOptionScope Scope { get; }
+    public HeroTranscendGrade Grade { get; }
+    public string Description { get; }
+    public float ProbabilityWeight { get; }
+    public bool IsExclusive => Scope == HeroTranscendOptionScope.Exclusive;
+    public string ScopeLabel => IsExclusive ? "전용" : "공용";
+}
+
+[Serializable]
+public sealed class HeroTranscendOptionState
+{
+    public HeroTranscendOptionState(string optionId)
+    {
+        OptionId = optionId ?? string.Empty;
+    }
+
+    public string OptionId { get; set; }
+}
+
+[Serializable]
 public sealed class HeroDefinition
 {
     public const int MaxStars = 15;
+    public const int MaxTranscendSlots = 5;
     public const int LevelPerStar = 50;
     public const int MaxLevelAtMaxStars = (MaxStars + 1) * LevelPerStar;
     private const float FiveStarPassiveBoostMultiplier = 1.5f;
     private const float TenStarAllStatMultiplier = 1.1f;
+    private static readonly int[] TranscendSlotRequiredStars = { 0, 1, 3, 7, 11 };
 
     public HeroDefinition(
         string id,
@@ -52,7 +115,8 @@ public sealed class HeroDefinition
         int attackPerLevel,
         int hpPerLevel,
         HeroPassiveStat passiveStat,
-        float passiveValuePercent)
+        float passiveValuePercent,
+        bool startUnlocked = false)
     {
         Id = id;
         DisplayName = displayName;
@@ -67,6 +131,7 @@ public sealed class HeroDefinition
         HpPerLevel = hpPerLevel;
         PassiveStat = passiveStat;
         PassiveValuePercent = Mathf.Max(0f, passiveValuePercent);
+        StartUnlocked = startUnlocked;
     }
 
     public string Id { get; }
@@ -83,6 +148,7 @@ public sealed class HeroDefinition
     public int HpPerLevel { get; }
     public HeroPassiveStat PassiveStat { get; }
     public float PassiveValuePercent { get; }
+    public bool StartUnlocked { get; }
     public string RarityLabel => GetRarityLabel(Rarity);
     public string PassiveLabel => GetPassiveLabel(PassiveStat) + " +" + PassiveValuePercent.ToString("0.#") + "%";
 
@@ -97,6 +163,7 @@ public sealed class HeroDefinition
         float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.2f;
         return Mathf.Max(1, Mathf.FloorToInt(levelAttack
             * starMultiplier
+            * GetRarityStatMultiplier(Rarity)
             * GetPassiveMultiplier(HeroPassiveStat.AttackPower, stars)
             * GetTenStarMultiplier(stars)));
     }
@@ -107,23 +174,36 @@ public sealed class HeroDefinition
         float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.15f;
         return Mathf.Max(1, Mathf.FloorToInt(levelHp
             * starMultiplier
+            * GetRarityStatMultiplier(Rarity)
             * GetPassiveMultiplier(HeroPassiveStat.MaxHp, stars)
             * GetTenStarMultiplier(stars)));
     }
 
     public float GetAttackSpeed(int stars)
     {
-        return AttackSpeed * GetPassiveMultiplier(HeroPassiveStat.AttackSpeed, stars) * GetTenStarMultiplier(stars);
+        return AttackSpeed
+            * GetRaritySpeedMultiplier(Rarity)
+            * GetPassiveMultiplier(HeroPassiveStat.AttackSpeed, stars)
+            * GetTenStarMultiplier(stars);
     }
 
     public float GetMoveSpeed(int stars)
     {
-        return MoveSpeed * GetPassiveMultiplier(HeroPassiveStat.MoveSpeed, stars) * GetTenStarMultiplier(stars);
+        return MoveSpeed
+            * GetRarityMoveMultiplier(Rarity)
+            * GetPassiveMultiplier(HeroPassiveStat.MoveSpeed, stars)
+            * GetTenStarMultiplier(stars);
     }
 
     public int GetLevelUpCost(int level)
     {
-        return Mathf.FloorToInt(20f * Mathf.Pow(Mathf.Max(1, level), 1.25f));
+        double cost = 35d * Math.Pow(Mathf.Max(1, level), 1.35d) * GetRarityLevelCostMultiplier(Rarity);
+        if (double.IsNaN(cost) || cost <= 1d)
+        {
+            return 1;
+        }
+
+        return cost >= int.MaxValue ? int.MaxValue : Math.Max(1, (int)Math.Floor(cost));
     }
 
     public int GetMaxLevel(int stars)
@@ -147,6 +227,12 @@ public sealed class HeroDefinition
         return 1;
     }
 
+    public static int GetTranscendRequiredStars(int slotIndex)
+    {
+        int clampedIndex = Mathf.Clamp(slotIndex, 0, TranscendSlotRequiredStars.Length - 1);
+        return TranscendSlotRequiredStars[clampedIndex];
+    }
+
     private float GetPassiveMultiplier(HeroPassiveStat stat, int stars)
     {
         if (PassiveStat != stat)
@@ -168,6 +254,69 @@ public sealed class HeroDefinition
         return stars >= 10 ? TenStarAllStatMultiplier : 1f;
     }
 
+    private static float GetRarityStatMultiplier(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return 1.00f;
+            case HeroRarity.Uncommon:
+                return 1.12f;
+            case HeroRarity.Rare:
+                return 1.28f;
+            case HeroRarity.Epic:
+                return 1.50f;
+            case HeroRarity.Legendary:
+                return 1.82f;
+            case HeroRarity.Mythic:
+                return 2.20f;
+            default:
+                return 1f;
+        }
+    }
+
+    private static float GetRaritySpeedMultiplier(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return 1.00f;
+            case HeroRarity.Uncommon:
+                return 1.025f;
+            case HeroRarity.Rare:
+                return 1.055f;
+            case HeroRarity.Epic:
+                return 1.09f;
+            case HeroRarity.Legendary:
+                return 1.13f;
+            case HeroRarity.Mythic:
+                return 1.18f;
+            default:
+                return 1f;
+        }
+    }
+
+    private static float GetRarityMoveMultiplier(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return 1.00f;
+            case HeroRarity.Uncommon:
+                return 1.015f;
+            case HeroRarity.Rare:
+                return 1.035f;
+            case HeroRarity.Epic:
+                return 1.06f;
+            case HeroRarity.Legendary:
+                return 1.09f;
+            case HeroRarity.Mythic:
+                return 1.12f;
+            default:
+                return 1f;
+        }
+    }
+
     private static int GetBaseShardStep(HeroRarity rarity)
     {
         switch (rarity)
@@ -186,6 +335,27 @@ public sealed class HeroDefinition
                 return 60;
             default:
                 return 10;
+        }
+    }
+
+    private static double GetRarityLevelCostMultiplier(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return 1.00d;
+            case HeroRarity.Uncommon:
+                return 1.20d;
+            case HeroRarity.Rare:
+                return 1.50d;
+            case HeroRarity.Epic:
+                return 2.10d;
+            case HeroRarity.Legendary:
+                return 3.00d;
+            case HeroRarity.Mythic:
+                return 4.20d;
+            default:
+                return 1.00d;
         }
     }
 
@@ -230,12 +400,19 @@ public sealed class HeroDefinition
 
 public sealed class HeroState
 {
+    private readonly List<HeroTranscendOptionState> transcendOptions = new List<HeroTranscendOptionState>(HeroDefinition.MaxTranscendSlots);
+
     public HeroState(HeroDefinition definition, int level, int shards, int stars)
     {
         Definition = definition;
         Level = Mathf.Max(1, level);
         Shards = Mathf.Max(0, shards);
         Stars = Mathf.Clamp(stars, 0, HeroDefinition.MaxStars);
+
+        for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            transcendOptions.Add(new HeroTranscendOptionState(string.Empty));
+        }
     }
 
     public HeroDefinition Definition { get; }
@@ -243,6 +420,7 @@ public sealed class HeroState
     public int Shards { get; set; }
     public int Stars { get; set; }
     public float AttackCooldown { get; set; }
+    public IReadOnlyList<HeroTranscendOptionState> TranscendOptions => transcendOptions;
 
     public int AttackPower => Definition.GetAttackPower(Level, Stars);
     public int MaxHp => Definition.GetMaxHp(Level, Stars);
@@ -254,4 +432,33 @@ public sealed class HeroState
     public bool IsMaxStars => Stars >= HeroDefinition.MaxStars;
     public int StarUpCost => Definition.GetStarUpCost(Stars);
     public bool CanStarUp => !IsMaxStars && Shards >= StarUpCost;
+    public bool IsOwned => Definition.StartUnlocked || Shards > 0 || Stars > 0 || Level > 1;
+
+    public bool IsTranscendSlotUnlocked(int slotIndex)
+    {
+        return IsOwned
+            && slotIndex >= 0
+            && slotIndex < HeroDefinition.MaxTranscendSlots
+            && Stars >= HeroDefinition.GetTranscendRequiredStars(slotIndex);
+    }
+
+    public string GetTranscendOptionId(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= transcendOptions.Count)
+        {
+            return string.Empty;
+        }
+
+        return transcendOptions[slotIndex].OptionId;
+    }
+
+    public void SetTranscendOptionId(int slotIndex, string optionId)
+    {
+        if (slotIndex < 0 || slotIndex >= transcendOptions.Count)
+        {
+            return;
+        }
+
+        transcendOptions[slotIndex].OptionId = optionId ?? string.Empty;
+    }
 }

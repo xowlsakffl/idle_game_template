@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
@@ -9,6 +10,7 @@ using UnityEngine.UI;
 public sealed class GameHud : MonoBehaviour
 {
     private const float EnemyDeathVisualSeconds = 0.28f;
+    private const float HeroTranscendAutoRollIntervalSeconds = 0.14f;
     private static readonly StringComparer KoreanNameComparer = StringComparer.Create(CultureInfo.GetCultureInfo("ko-KR"), false);
     private static readonly EquipmentSlot[] HeroDetailEquipmentFilterSlots =
     {
@@ -48,11 +50,13 @@ public sealed class GameHud : MonoBehaviour
 
     private StageProgressManager progressManager;
     private CurrencyWallet wallet;
+    private AccountProgressManager accountProgressManager;
     private AbilityManager abilityManager;
     private GameSpeedManager speedManager;
     private BattleManager battleManager;
     private GachaManager gachaManager;
     private EquipmentInventory equipmentInventory;
+    private BattlefieldWorldView battlefieldWorldView;
     private Action resetSaveAction;
 
     private HudTab activeTab = HudTab.Growth;
@@ -77,6 +81,7 @@ public sealed class GameHud : MonoBehaviour
     private Text damageMeterText;
     private Text centerSpawnText;
     private Image hpFill;
+    private RawImage battlefieldWorldImage;
     private RectTransform battlefieldRect;
     private LayoutElement battleLayoutElement;
     private LayoutElement contentLayoutElement;
@@ -91,7 +96,10 @@ public sealed class GameHud : MonoBehaviour
     private GameObject growthPanel;
     private GameObject heroPanel;
     private GameObject heroFormationContent;
+    private GameObject heroTraitContent;
     private Text heroFormationSummaryText;
+    private Text heroTraitSummaryText;
+    private Text heroTraitDetailText;
     private Text heroOwnedEffectText;
     private Text heroPlaceholderText;
     private GameObject stagePanel;
@@ -105,6 +113,11 @@ public sealed class GameHud : MonoBehaviour
     private GameObject heroDetailEquipmentContent;
     private GameObject heroDetailTranscendContent;
     private GameObject equipmentDetailPopup;
+    private GameObject equipmentDismantlePopup;
+    private GameObject equipmentBulkDismantlePrompt;
+    private GameObject heroTranscendConfirmPrompt;
+    private Transform heroDetailEquipmentGridTransform;
+    private Transform equipmentDismantleGridTransform;
     private GameObject heroFormationSavePrompt;
     private GameObject guideQuestDot;
     private Text gachaText;
@@ -124,6 +137,8 @@ public sealed class GameHud : MonoBehaviour
     private Text heroDetailEquipmentSummaryText;
     private Text heroDetailEquipmentEmptyText;
     private Text heroDetailTranscendText;
+    private Text heroDetailTranscendNoticeText;
+    private Text heroTranscendConfirmMessageText;
     private Text equipmentDetailIconText;
     private Text equipmentDetailTitleText;
     private Text equipmentDetailMetaText;
@@ -131,6 +146,12 @@ public sealed class GameHud : MonoBehaviour
     private Text equipmentDetailSetText;
     private Text equipmentDetailBookText;
     private Text equipmentDetailNoticeText;
+    private Text equipmentDismantleSummaryText;
+    private Text equipmentDismantleEmptyText;
+    private Text equipmentDismantleNoticeText;
+    private Text equipmentBulkDismantleRarityText;
+    private Text equipmentBulkDismantleInfoText;
+    private Text equipmentBulkDismantleNoticeText;
     private int selectedGrowthLevelStep = 1;
     private int selectedHeroPreset = 1;
     private int pendingHeroPreset = 0;
@@ -140,6 +161,9 @@ public sealed class GameHud : MonoBehaviour
     private string selectedHeroDetailEquipmentId = string.Empty;
     private string selectedEquipmentDetailId = string.Empty;
     private EquipmentSlot selectedHeroDetailEquipmentSlot = EquipmentSlot.Weapon;
+    private HeroRarity selectedBulkDismantleRarity = HeroRarity.Rare;
+    private int selectedHeroTranscendSlotIndex = 0;
+    private string selectedHeroTraitId = "ATK_CORE";
     private HeroPageTab activeHeroPageTab = HeroPageTab.Formation;
     private HeroDetailTab activeHeroDetailTab = HeroDetailTab.BasicInfo;
     private string growthNoticeMessage = string.Empty;
@@ -149,22 +173,36 @@ public sealed class GameHud : MonoBehaviour
     private bool heroDetailPanelOpen;
     private bool heroDetailEquipmentSlotSelectionActive;
     private bool equipmentDetailPopupOpen;
+    private bool equipmentDismantlePopupOpen;
+    private bool equipmentBulkDismantlePromptOpen;
+    private bool heroTranscendStopOnlySs = true;
+    private bool pendingHeroTranscendAutoRoll;
+    private bool heroTranscendAutoRolling;
     private bool pendingContentOpenAfterHeroFormationPrompt = true;
     private bool pendingHeroPresetSwitch;
 
     private readonly Dictionary<AbilityKind, Text> abilityButtonTexts = new Dictionary<AbilityKind, Text>();
     private readonly Dictionary<AbilityKind, Text> abilityCostBadgeTexts = new Dictionary<AbilityKind, Text>();
     private readonly Dictionary<string, Text> heroButtonTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<string, Button> heroTraitButtons = new Dictionary<string, Button>();
+    private readonly Dictionary<string, Text> heroTraitButtonTexts = new Dictionary<string, Text>();
     private readonly Dictionary<HeroPageTab, Button> heroPageTabButtons = new Dictionary<HeroPageTab, Button>();
     private readonly Dictionary<HeroDetailTab, Button> heroDetailTabButtons = new Dictionary<HeroDetailTab, Button>();
     private readonly Dictionary<EquipmentSlot, Button> heroDetailEquipmentSlotButtons = new Dictionary<EquipmentSlot, Button>();
     private readonly Dictionary<EquipmentSlot, Text> heroDetailEquipmentSlotTexts = new Dictionary<EquipmentSlot, Text>();
     private readonly Dictionary<EquipmentSlot, Button> heroDetailEquipmentSlotRemoveButtons = new Dictionary<EquipmentSlot, Button>();
     private readonly Dictionary<EquipmentSlot, Button> heroDetailEquipmentFilterButtons = new Dictionary<EquipmentSlot, Button>();
+    private readonly Dictionary<EquipmentSlot, Button> equipmentDismantleFilterButtons = new Dictionary<EquipmentSlot, Button>();
     private readonly HashSet<EquipmentSlot> heroDetailEquipmentSelectedSlots = new HashSet<EquipmentSlot>();
     private readonly Dictionary<string, Button> heroDetailEquipmentCardButtons = new Dictionary<string, Button>();
     private readonly Dictionary<string, Text> heroDetailEquipmentCardTexts = new Dictionary<string, Text>();
     private readonly Dictionary<string, Button> heroDetailEquipmentActionButtons = new Dictionary<string, Button>();
+    private readonly Dictionary<string, Button> equipmentDismantleCardButtons = new Dictionary<string, Button>();
+    private readonly Dictionary<string, Text> equipmentDismantleCardTexts = new Dictionary<string, Text>();
+    private readonly HashSet<string> selectedDismantleEquipmentIds = new HashSet<string>();
+    private readonly List<Button> heroDetailTranscendSlotButtons = new List<Button>();
+    private readonly List<Text> heroDetailTranscendSlotTexts = new List<Text>();
+    private readonly List<Button> heroDetailTranscendLockButtons = new List<Button>();
     private readonly Dictionary<int, Button> heroPresetButtons = new Dictionary<int, Button>();
     private readonly Dictionary<int, Button> heroFormationSlotButtons = new Dictionary<int, Button>();
     private readonly Dictionary<int, Button> heroFormationSlotRemoveButtons = new Dictionary<int, Button>();
@@ -206,32 +244,43 @@ public sealed class GameHud : MonoBehaviour
     private Button skillAutoButton;
     private Button feverAutoButton;
     private Button speedCycleButton;
+    private Button heroTraitLevelUpButton;
     private Button heroDetailExcludeButton;
     private Button heroDetailLevelUpButton;
     private Button heroDetailStarUpButton;
+    private Button heroDetailTranscendChangeButton;
+    private Button heroDetailTranscendAutoButton;
+    private Button heroDetailTranscendStopButton;
     private Button equipmentDetailEquipButton;
     private Button equipmentDetailLevelUpButton;
     private Button equipmentDetailStarUpButton;
+    private Button equipmentDismantleButton;
+    private Button equipmentBulkDismantleButton;
+    private Coroutine heroTranscendAutoRollCoroutine;
 
     public void Initialize(
         StageProgressManager progress,
         CurrencyWallet currency,
+        AccountProgressManager accountProgress,
         AbilityManager abilities,
         GameSpeedManager speed,
         BattleManager battle,
         GachaManager gacha,
         EquipmentInventory equipment,
-        Action resetSave)
+        Action resetSave,
+        BattlefieldWorldView worldView = null)
     {
         UnsubscribeEvents();
 
         progressManager = progress;
         wallet = currency;
+        accountProgressManager = accountProgress;
         abilityManager = abilities;
         speedManager = speed;
         battleManager = battle;
         gachaManager = gacha;
         equipmentInventory = equipment;
+        battlefieldWorldView = worldView;
         resetSaveAction = resetSave;
 
         ResetRuntimeUiState();
@@ -284,9 +333,24 @@ public sealed class GameHud : MonoBehaviour
                 heroDetailNoticeText.text = string.Empty;
             }
 
+            if (heroDetailTranscendNoticeText != null)
+            {
+                heroDetailTranscendNoticeText.text = string.Empty;
+            }
+
             if (equipmentDetailNoticeText != null)
             {
                 equipmentDetailNoticeText.text = string.Empty;
+            }
+
+            if (equipmentDismantleNoticeText != null)
+            {
+                equipmentDismantleNoticeText.text = string.Empty;
+            }
+
+            if (equipmentBulkDismantleNoticeText != null)
+            {
+                equipmentBulkDismantleNoticeText.text = string.Empty;
             }
         }
 
@@ -295,6 +359,7 @@ public sealed class GameHud : MonoBehaviour
 
     private void OnDestroy()
     {
+        StopHeroTranscendAutoRoll();
         UnsubscribeEvents();
     }
 
@@ -302,6 +367,7 @@ public sealed class GameHud : MonoBehaviour
     {
         progressManager.Changed += UpdateView;
         wallet.Changed += UpdateView;
+        accountProgressManager.Changed += UpdateView;
         abilityManager.Changed += UpdateView;
         speedManager.Changed += UpdateView;
         battleManager.Changed += UpdateView;
@@ -319,6 +385,11 @@ public sealed class GameHud : MonoBehaviour
         if (wallet != null)
         {
             wallet.Changed -= UpdateView;
+        }
+
+        if (accountProgressManager != null)
+        {
+            accountProgressManager.Changed -= UpdateView;
         }
 
         if (abilityManager != null)
@@ -367,6 +438,7 @@ public sealed class GameHud : MonoBehaviour
         damageMeterText = null;
         centerSpawnText = null;
         hpFill = null;
+        battlefieldWorldImage = null;
         battlefieldRect = null;
         battleLayoutElement = null;
         contentLayoutElement = null;
@@ -382,7 +454,10 @@ public sealed class GameHud : MonoBehaviour
         growthPanel = null;
         heroPanel = null;
         heroFormationContent = null;
+        heroTraitContent = null;
         heroFormationSummaryText = null;
+        heroTraitSummaryText = null;
+        heroTraitDetailText = null;
         heroOwnedEffectText = null;
         heroPlaceholderText = null;
         stagePanel = null;
@@ -396,6 +471,11 @@ public sealed class GameHud : MonoBehaviour
         heroDetailEquipmentContent = null;
         heroDetailTranscendContent = null;
         equipmentDetailPopup = null;
+        equipmentDismantlePopup = null;
+        equipmentBulkDismantlePrompt = null;
+        heroTranscendConfirmPrompt = null;
+        heroDetailEquipmentGridTransform = null;
+        equipmentDismantleGridTransform = null;
         heroFormationSavePrompt = null;
         guideQuestDot = null;
         gachaText = null;
@@ -415,6 +495,8 @@ public sealed class GameHud : MonoBehaviour
         heroDetailEquipmentSummaryText = null;
         heroDetailEquipmentEmptyText = null;
         heroDetailTranscendText = null;
+        heroDetailTranscendNoticeText = null;
+        heroTranscendConfirmMessageText = null;
         equipmentDetailIconText = null;
         equipmentDetailTitleText = null;
         equipmentDetailMetaText = null;
@@ -422,6 +504,12 @@ public sealed class GameHud : MonoBehaviour
         equipmentDetailSetText = null;
         equipmentDetailBookText = null;
         equipmentDetailNoticeText = null;
+        equipmentDismantleSummaryText = null;
+        equipmentDismantleEmptyText = null;
+        equipmentDismantleNoticeText = null;
+        equipmentBulkDismantleRarityText = null;
+        equipmentBulkDismantleInfoText = null;
+        equipmentBulkDismantleNoticeText = null;
         selectedGrowthLevelStep = 1;
         selectedHeroPreset = 1;
         pendingHeroPreset = 0;
@@ -430,7 +518,11 @@ public sealed class GameHud : MonoBehaviour
         selectedHeroDetailId = string.Empty;
         selectedHeroDetailEquipmentId = string.Empty;
         selectedEquipmentDetailId = string.Empty;
+        selectedDismantleEquipmentIds.Clear();
         selectedHeroDetailEquipmentSlot = EquipmentSlot.Weapon;
+        selectedBulkDismantleRarity = HeroRarity.Rare;
+        selectedHeroTranscendSlotIndex = 0;
+        selectedHeroTraitId = "ATK_CORE";
         activeHeroPageTab = HeroPageTab.Formation;
         activeHeroDetailTab = HeroDetailTab.BasicInfo;
         ResetHeroDetailEquipmentFilters();
@@ -441,22 +533,36 @@ public sealed class GameHud : MonoBehaviour
         heroDetailPanelOpen = false;
         heroDetailEquipmentSlotSelectionActive = false;
         equipmentDetailPopupOpen = false;
+        equipmentDismantlePopupOpen = false;
+        equipmentBulkDismantlePromptOpen = false;
+        heroTranscendStopOnlySs = PlayerPrefs.GetInt(SaveKeys.HeroTranscendStopOnlySs, 1) == 1;
+        pendingHeroTranscendAutoRoll = false;
+        heroTranscendAutoRolling = false;
+        heroTranscendAutoRollCoroutine = null;
         pendingContentOpenAfterHeroFormationPrompt = true;
         pendingHeroPresetSwitch = false;
 
         abilityButtonTexts.Clear();
         abilityCostBadgeTexts.Clear();
         heroButtonTexts.Clear();
+        heroTraitButtons.Clear();
+        heroTraitButtonTexts.Clear();
         heroPageTabButtons.Clear();
         heroDetailTabButtons.Clear();
         heroDetailEquipmentSlotButtons.Clear();
         heroDetailEquipmentSlotTexts.Clear();
         heroDetailEquipmentSlotRemoveButtons.Clear();
         heroDetailEquipmentFilterButtons.Clear();
+        equipmentDismantleFilterButtons.Clear();
         ResetHeroDetailEquipmentFilters();
         heroDetailEquipmentCardButtons.Clear();
         heroDetailEquipmentCardTexts.Clear();
         heroDetailEquipmentActionButtons.Clear();
+        equipmentDismantleCardButtons.Clear();
+        equipmentDismantleCardTexts.Clear();
+        heroDetailTranscendSlotButtons.Clear();
+        heroDetailTranscendSlotTexts.Clear();
+        heroDetailTranscendLockButtons.Clear();
         heroPresetButtons.Clear();
         heroFormationSlotButtons.Clear();
         heroFormationSlotRemoveButtons.Clear();
@@ -498,12 +604,18 @@ public sealed class GameHud : MonoBehaviour
         skillAutoButton = null;
         feverAutoButton = null;
         speedCycleButton = null;
+        heroTraitLevelUpButton = null;
         heroDetailExcludeButton = null;
         heroDetailLevelUpButton = null;
         heroDetailStarUpButton = null;
+        heroDetailTranscendChangeButton = null;
+        heroDetailTranscendAutoButton = null;
+        heroDetailTranscendStopButton = null;
         equipmentDetailEquipButton = null;
         equipmentDetailLevelUpButton = null;
         equipmentDetailStarUpButton = null;
+        equipmentDismantleButton = null;
+        equipmentBulkDismantleButton = null;
     }
 
     private void DestroyExistingHudCanvas()
@@ -818,9 +930,62 @@ public sealed class GameHud : MonoBehaviour
         CreateHeroDetailEquipmentContent();
         CreateHeroDetailTranscendContent();
         CreateHeroDetailBottomTabs();
+        CreateHeroTranscendConfirmPrompt();
         CreateEquipmentDetailPopup();
+        CreateEquipmentDismantlePopup();
 
         heroDetailPanel.SetActive(false);
+    }
+
+    private void CreateHeroTranscendConfirmPrompt()
+    {
+        heroTranscendConfirmPrompt = CreatePanel("HeroTranscendConfirmPrompt", heroDetailPanel.transform, new Color(0.01f, 0.015f, 0.025f, 0.66f));
+        StretchToParent(heroTranscendConfirmPrompt);
+
+        GameObject dialog = CreatePanel("HeroTranscendConfirmDialog", heroTranscendConfirmPrompt.transform, new Color(0.39f, 0.48f, 0.66f, 1f));
+        RectTransform dialogRect = dialog.GetComponent<RectTransform>();
+        dialogRect.anchorMin = new Vector2(0.08f, 0.36f);
+        dialogRect.anchorMax = new Vector2(0.92f, 0.64f);
+        dialogRect.offsetMin = Vector2.zero;
+        dialogRect.offsetMax = Vector2.zero;
+
+        Text title = CreateText("HeroTranscendConfirmTitle", dialog.transform, 32, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform titleRect = title.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.sizeDelta = new Vector2(0f, 64f);
+        titleRect.anchoredPosition = new Vector2(0f, -22f);
+        title.text = "SS 옵션 변경 확인";
+
+        heroTranscendConfirmMessageText = CreateText("HeroTranscendConfirmMessage", dialog.transform, 26, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform messageRect = heroTranscendConfirmMessageText.GetComponent<RectTransform>();
+        messageRect.anchorMin = new Vector2(0.06f, 0.38f);
+        messageRect.anchorMax = new Vector2(0.94f, 0.76f);
+        messageRect.offsetMin = Vector2.zero;
+        messageRect.offsetMax = Vector2.zero;
+
+        GameObject buttonRow = new GameObject("HeroTranscendConfirmActions", typeof(RectTransform));
+        buttonRow.transform.SetParent(dialog.transform, false);
+        RectTransform rowRect = buttonRow.GetComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0.12f, 0f);
+        rowRect.anchorMax = new Vector2(0.88f, 0f);
+        rowRect.pivot = new Vector2(0.5f, 0f);
+        rowRect.sizeDelta = new Vector2(0f, 74f);
+        rowRect.anchoredPosition = new Vector2(0f, 24f);
+        HorizontalLayoutGroup rowLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
+        rowLayout.spacing = 18;
+        rowLayout.childControlWidth = true;
+        rowLayout.childControlHeight = true;
+        rowLayout.childForceExpandWidth = true;
+        rowLayout.childForceExpandHeight = true;
+
+        Button confirmButton = CreateButton("확인", buttonRow.transform, 28, new Color(0.54f, 0.76f, 0.96f, 1f));
+        Button cancelButton = CreateButton("취소", buttonRow.transform, 28, new Color(0.26f, 0.29f, 0.34f, 1f));
+        confirmButton.onClick.AddListener(ConfirmHeroTranscendRollPrompt);
+        cancelButton.onClick.AddListener(CancelHeroTranscendRollPrompt);
+
+        heroTranscendConfirmPrompt.SetActive(false);
     }
 
     private void CreateEquipmentDetailPopup()
@@ -932,6 +1097,251 @@ public sealed class GameHud : MonoBehaviour
         equipmentDetailPopup.SetActive(false);
     }
 
+    private void CreateEquipmentDismantlePopup()
+    {
+        equipmentDismantlePopup = CreatePanel("EquipmentDismantlePopup", heroDetailPanel.transform, new Color(0.01f, 0.015f, 0.025f, 0.72f));
+        StretchToParent(equipmentDismantlePopup);
+
+        GameObject modal = CreatePanel("EquipmentDismantleModal", equipmentDismantlePopup.transform, new Color(0.39f, 0.48f, 0.66f, 1f));
+        RectTransform modalRect = modal.GetComponent<RectTransform>();
+        modalRect.anchorMin = new Vector2(0.05f, 0.06f);
+        modalRect.anchorMax = new Vector2(0.95f, 0.86f);
+        modalRect.offsetMin = Vector2.zero;
+        modalRect.offsetMax = Vector2.zero;
+
+        GameObject titleBar = CreatePanel("EquipmentDismantleTitleBar", modal.transform, new Color(0.25f, 0.37f, 0.63f, 1f));
+        RectTransform titleBarRect = titleBar.GetComponent<RectTransform>();
+        titleBarRect.anchorMin = new Vector2(0.08f, 1f);
+        titleBarRect.anchorMax = new Vector2(0.92f, 1f);
+        titleBarRect.pivot = new Vector2(0.5f, 1f);
+        titleBarRect.sizeDelta = new Vector2(0f, 72f);
+        titleBarRect.anchoredPosition = new Vector2(0f, 34f);
+        Text titleText = CreateText("EquipmentDismantleTitle", titleBar.transform, 34, FontStyle.Bold, TextAnchor.MiddleCenter);
+        StretchToParent(titleText.gameObject);
+        titleText.text = "장비 분해";
+
+        GameObject filterRow = CreatePanel("EquipmentDismantleFilters", modal.transform, new Color(0.30f, 0.38f, 0.54f, 1f));
+        RectTransform filterRect = filterRow.GetComponent<RectTransform>();
+        filterRect.anchorMin = new Vector2(0.04f, 1f);
+        filterRect.anchorMax = new Vector2(0.96f, 1f);
+        filterRect.pivot = new Vector2(0.5f, 1f);
+        filterRect.sizeDelta = new Vector2(0f, 66f);
+        filterRect.anchoredPosition = new Vector2(0f, -72f);
+        HorizontalLayoutGroup filterLayout = filterRow.AddComponent<HorizontalLayoutGroup>();
+        filterLayout.padding = new RectOffset(12, 12, 6, 6);
+        filterLayout.spacing = 8;
+        filterLayout.childControlWidth = true;
+        filterLayout.childControlHeight = true;
+        filterLayout.childForceExpandWidth = true;
+        filterLayout.childForceExpandHeight = true;
+        foreach (EquipmentSlot slot in HeroDetailEquipmentFilterSlots)
+        {
+            CreateEquipmentDismantleFilterButton(filterRow.transform, slot);
+        }
+
+        equipmentDismantleSummaryText = CreateText("EquipmentDismantleSummary", modal.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform summaryRect = equipmentDismantleSummaryText.GetComponent<RectTransform>();
+        summaryRect.anchorMin = new Vector2(0.04f, 1f);
+        summaryRect.anchorMax = new Vector2(0.96f, 1f);
+        summaryRect.pivot = new Vector2(0.5f, 1f);
+        summaryRect.sizeDelta = new Vector2(0f, 42f);
+        summaryRect.anchoredPosition = new Vector2(0f, -146f);
+
+        GameObject scrollObject = CreatePanel("EquipmentDismantleScroll", modal.transform, new Color(0.12f, 0.16f, 0.24f, 1f));
+        RectTransform scrollRectTransform = scrollObject.GetComponent<RectTransform>();
+        scrollRectTransform.anchorMin = new Vector2(0.04f, 0f);
+        scrollRectTransform.anchorMax = new Vector2(0.96f, 1f);
+        scrollRectTransform.offsetMin = new Vector2(0f, 166f);
+        scrollRectTransform.offsetMax = new Vector2(0f, -194f);
+        ScrollRect scrollRect = scrollObject.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Elastic;
+        scrollRect.scrollSensitivity = 34f;
+
+        GameObject viewport = CreatePanel("EquipmentDismantleViewport", scrollObject.transform, new Color(0f, 0f, 0f, 0f));
+        StretchToParent(viewport);
+        viewport.AddComponent<RectMask2D>();
+        Image viewportImage = viewport.GetComponent<Image>();
+        if (viewportImage != null)
+        {
+            viewportImage.raycastTarget = true;
+        }
+
+        GameObject gridObject = new GameObject("EquipmentDismantleGrid", typeof(RectTransform));
+        gridObject.transform.SetParent(viewport.transform, false);
+        RectTransform gridRect = gridObject.GetComponent<RectTransform>();
+        gridRect.anchorMin = new Vector2(0f, 1f);
+        gridRect.anchorMax = new Vector2(0f, 1f);
+        gridRect.pivot = new Vector2(0f, 1f);
+        gridRect.sizeDelta = new Vector2(810f, 0f);
+        gridRect.anchoredPosition = new Vector2(12f, -12f);
+        scrollRect.viewport = viewport.GetComponent<RectTransform>();
+        scrollRect.content = gridRect;
+        equipmentDismantleGridTransform = gridObject.transform;
+
+        GridLayoutGroup grid = gridObject.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(146f, 126f);
+        grid.spacing = new Vector2(16f, 16f);
+        grid.padding = new RectOffset(0, 0, 0, 16);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 5;
+        ContentSizeFitter gridFitter = gridObject.AddComponent<ContentSizeFitter>();
+        gridFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        equipmentDismantleEmptyText = CreateText("EquipmentDismantleEmpty", modal.transform, 27, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform emptyRect = equipmentDismantleEmptyText.GetComponent<RectTransform>();
+        emptyRect.anchorMin = new Vector2(0.04f, 0.36f);
+        emptyRect.anchorMax = new Vector2(0.96f, 0.50f);
+        emptyRect.offsetMin = Vector2.zero;
+        emptyRect.offsetMax = Vector2.zero;
+        equipmentDismantleEmptyText.text = "분해할 장비가 없습니다.";
+
+        GameObject actionRow = new GameObject("EquipmentDismantleActions", typeof(RectTransform));
+        actionRow.transform.SetParent(modal.transform, false);
+        RectTransform actionRect = actionRow.GetComponent<RectTransform>();
+        actionRect.anchorMin = new Vector2(0.15f, 0f);
+        actionRect.anchorMax = new Vector2(0.85f, 0f);
+        actionRect.pivot = new Vector2(0.5f, 0f);
+        actionRect.sizeDelta = new Vector2(0f, 82f);
+        actionRect.anchoredPosition = new Vector2(0f, 42f);
+        HorizontalLayoutGroup actionLayout = actionRow.AddComponent<HorizontalLayoutGroup>();
+        actionLayout.spacing = 24;
+        actionLayout.childControlWidth = true;
+        actionLayout.childControlHeight = true;
+        actionLayout.childForceExpandWidth = true;
+        actionLayout.childForceExpandHeight = true;
+
+        equipmentDismantleButton = CreateButton("선택 분해", actionRow.transform, 28, new Color(0.54f, 0.76f, 0.96f, 1f));
+        equipmentBulkDismantleButton = CreateButton("일괄 분해", actionRow.transform, 28, new Color(0.54f, 0.76f, 0.96f, 1f));
+        equipmentDismantleButton.onClick.AddListener(DismantleSelectedEquipment);
+        equipmentBulkDismantleButton.onClick.AddListener(OpenEquipmentBulkDismantlePrompt);
+
+        equipmentDismantleNoticeText = CreateText("EquipmentDismantleNotice", modal.transform, 22, FontStyle.Bold, TextAnchor.MiddleCenter);
+        equipmentDismantleNoticeText.color = new Color(1f, 0.62f, 0.34f, 1f);
+        RectTransform noticeRect = equipmentDismantleNoticeText.GetComponent<RectTransform>();
+        noticeRect.anchorMin = new Vector2(0.05f, 0f);
+        noticeRect.anchorMax = new Vector2(0.95f, 0f);
+        noticeRect.pivot = new Vector2(0.5f, 0f);
+        noticeRect.sizeDelta = new Vector2(0f, 34f);
+        noticeRect.anchoredPosition = new Vector2(0f, 126f);
+
+        Button closeButton = CreateButton("X", equipmentDismantlePopup.transform, 40, new Color(0.20f, 0.28f, 0.43f, 1f));
+        RectTransform closeRect = closeButton.GetComponent<RectTransform>();
+        closeRect.anchorMin = new Vector2(0.5f, 0f);
+        closeRect.anchorMax = new Vector2(0.5f, 0f);
+        closeRect.pivot = new Vector2(0.5f, 0f);
+        closeRect.sizeDelta = new Vector2(112f, 86f);
+        closeRect.anchoredPosition = new Vector2(0f, 14f);
+        closeButton.onClick.AddListener(CloseEquipmentDismantlePopup);
+
+        CreateEquipmentBulkDismantlePrompt();
+        equipmentDismantlePopup.SetActive(false);
+    }
+
+    private void CreateEquipmentDismantleFilterButton(Transform parent, EquipmentSlot slot)
+    {
+        Button button = CreateButton(BuildEquipmentFilterButtonLabel(slot), parent, 21, new Color(0.24f, 0.30f, 0.42f, 1f));
+        button.onClick.AddListener(() => ToggleHeroDetailEquipmentFilter(slot));
+        equipmentDismantleFilterButtons[slot] = button;
+    }
+
+    private void CreateEquipmentBulkDismantlePrompt()
+    {
+        equipmentBulkDismantlePrompt = CreatePanel("EquipmentBulkDismantlePrompt", equipmentDismantlePopup.transform, new Color(0.01f, 0.015f, 0.025f, 0.62f));
+        StretchToParent(equipmentBulkDismantlePrompt);
+
+        GameObject modal = CreatePanel("EquipmentBulkDismantleModal", equipmentBulkDismantlePrompt.transform, new Color(0.39f, 0.48f, 0.66f, 1f));
+        RectTransform modalRect = modal.GetComponent<RectTransform>();
+        modalRect.anchorMin = new Vector2(0.05f, 0.28f);
+        modalRect.anchorMax = new Vector2(0.95f, 0.72f);
+        modalRect.offsetMin = Vector2.zero;
+        modalRect.offsetMax = Vector2.zero;
+
+        GameObject titleBar = CreatePanel("EquipmentBulkDismantleTitleBar", modal.transform, new Color(0.25f, 0.37f, 0.63f, 1f));
+        RectTransform titleBarRect = titleBar.GetComponent<RectTransform>();
+        titleBarRect.anchorMin = new Vector2(0.08f, 1f);
+        titleBarRect.anchorMax = new Vector2(0.92f, 1f);
+        titleBarRect.pivot = new Vector2(0.5f, 1f);
+        titleBarRect.sizeDelta = new Vector2(0f, 68f);
+        titleBarRect.anchoredPosition = new Vector2(0f, 30f);
+        Text title = CreateText("EquipmentBulkDismantleTitle", titleBar.transform, 32, FontStyle.Bold, TextAnchor.MiddleCenter);
+        StretchToParent(title.gameObject);
+        title.text = "장비 일괄 분해";
+
+        Text category = CreateText("EquipmentBulkDismantleCategory", modal.transform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform categoryRect = category.GetComponent<RectTransform>();
+        categoryRect.anchorMin = new Vector2(0.30f, 1f);
+        categoryRect.anchorMax = new Vector2(0.70f, 1f);
+        categoryRect.pivot = new Vector2(0.5f, 1f);
+        categoryRect.sizeDelta = new Vector2(0f, 48f);
+        categoryRect.anchoredPosition = new Vector2(0f, -52f);
+        category.text = "품질";
+
+        equipmentBulkDismantleInfoText = CreateText("EquipmentBulkDismantleInfo", modal.transform, 30, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform infoRect = equipmentBulkDismantleInfoText.GetComponent<RectTransform>();
+        infoRect.anchorMin = new Vector2(0.08f, 1f);
+        infoRect.anchorMax = new Vector2(0.92f, 1f);
+        infoRect.pivot = new Vector2(0.5f, 1f);
+        infoRect.sizeDelta = new Vector2(0f, 150f);
+        infoRect.anchoredPosition = new Vector2(0f, -112f);
+
+        Button leftButton = CreateButton("<", modal.transform, 42, new Color(0.20f, 0.28f, 0.43f, 1f));
+        Button rightButton = CreateButton(">", modal.transform, 42, new Color(0.20f, 0.28f, 0.43f, 1f));
+        RectTransform leftRect = leftButton.GetComponent<RectTransform>();
+        RectTransform rightRect = rightButton.GetComponent<RectTransform>();
+        leftRect.anchorMin = leftRect.anchorMax = new Vector2(0.30f, 0.42f);
+        rightRect.anchorMin = rightRect.anchorMax = new Vector2(0.70f, 0.42f);
+        leftRect.sizeDelta = rightRect.sizeDelta = new Vector2(82f, 82f);
+        leftRect.anchoredPosition = Vector2.zero;
+        rightRect.anchoredPosition = Vector2.zero;
+        leftButton.onClick.AddListener(() => ChangeBulkDismantleRarity(-1));
+        rightButton.onClick.AddListener(() => ChangeBulkDismantleRarity(1));
+
+        equipmentBulkDismantleRarityText = CreateText("EquipmentBulkDismantleRarity", modal.transform, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform rarityRect = equipmentBulkDismantleRarityText.GetComponent<RectTransform>();
+        rarityRect.anchorMin = rarityRect.anchorMax = new Vector2(0.5f, 0.42f);
+        rarityRect.pivot = new Vector2(0.5f, 0.5f);
+        rarityRect.sizeDelta = new Vector2(260f, 70f);
+        rarityRect.anchoredPosition = Vector2.zero;
+
+        Text protectText = CreateText("EquipmentBulkDismantleProtect", modal.transform, 25, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform protectRect = protectText.GetComponent<RectTransform>();
+        protectRect.anchorMin = new Vector2(0.18f, 0f);
+        protectRect.anchorMax = new Vector2(0.82f, 0f);
+        protectRect.pivot = new Vector2(0.5f, 0f);
+        protectRect.sizeDelta = new Vector2(0f, 52f);
+        protectRect.anchoredPosition = new Vector2(0f, 140f);
+        protectText.text = "[x] 장착 장비 제외";
+
+        Button confirmButton = CreateButton("일괄 분해", modal.transform, 30, new Color(0.54f, 0.76f, 0.96f, 1f));
+        RectTransform confirmRect = confirmButton.GetComponent<RectTransform>();
+        confirmRect.anchorMin = confirmRect.anchorMax = new Vector2(0.5f, 0f);
+        confirmRect.pivot = new Vector2(0.5f, 0f);
+        confirmRect.sizeDelta = new Vector2(300f, 82f);
+        confirmRect.anchoredPosition = new Vector2(0f, 56f);
+        confirmButton.onClick.AddListener(ConfirmBulkDismantleEquipment);
+
+        equipmentBulkDismantleNoticeText = CreateText("EquipmentBulkDismantleNotice", modal.transform, 22, FontStyle.Bold, TextAnchor.MiddleCenter);
+        equipmentBulkDismantleNoticeText.color = new Color(1f, 0.62f, 0.34f, 1f);
+        RectTransform noticeRect = equipmentBulkDismantleNoticeText.GetComponent<RectTransform>();
+        noticeRect.anchorMin = new Vector2(0.05f, 0f);
+        noticeRect.anchorMax = new Vector2(0.95f, 0f);
+        noticeRect.pivot = new Vector2(0.5f, 0f);
+        noticeRect.sizeDelta = new Vector2(0f, 34f);
+        noticeRect.anchoredPosition = new Vector2(0f, 18f);
+
+        Button closeButton = CreateButton("X", equipmentBulkDismantlePrompt.transform, 40, new Color(0.20f, 0.28f, 0.43f, 1f));
+        RectTransform closeRect = closeButton.GetComponent<RectTransform>();
+        closeRect.anchorMin = closeRect.anchorMax = new Vector2(0.5f, 0.22f);
+        closeRect.pivot = new Vector2(0.5f, 0.5f);
+        closeRect.sizeDelta = new Vector2(112f, 86f);
+        closeRect.anchoredPosition = Vector2.zero;
+        closeButton.onClick.AddListener(CloseEquipmentBulkDismantlePrompt);
+
+        equipmentBulkDismantlePrompt.SetActive(false);
+    }
+
     private void CreateHeroDetailEquipmentSlot(EquipmentSlot equipmentSlot, Vector2 anchoredPosition)
     {
         string label = GetEquipmentSlotLabel(equipmentSlot);
@@ -995,38 +1405,47 @@ public sealed class GameHud : MonoBehaviour
         summaryRect.sizeDelta = new Vector2(-28f, 42f);
         summaryRect.anchoredPosition = new Vector2(0f, -82f);
 
+        GameObject scrollObject = CreatePanel("HeroDetailEquipmentScroll", heroDetailEquipmentContent.transform, new Color(0.13f, 0.17f, 0.25f, 1f));
+        RectTransform scrollRectTransform = scrollObject.GetComponent<RectTransform>();
+        scrollRectTransform.anchorMin = new Vector2(0f, 1f);
+        scrollRectTransform.anchorMax = new Vector2(1f, 1f);
+        scrollRectTransform.pivot = new Vector2(0.5f, 1f);
+        scrollRectTransform.sizeDelta = new Vector2(-18f, 438f);
+        scrollRectTransform.anchoredPosition = new Vector2(0f, -130f);
+        ScrollRect scrollRect = scrollObject.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Elastic;
+        scrollRect.scrollSensitivity = 34f;
+
+        GameObject viewport = CreatePanel("HeroDetailEquipmentViewport", scrollObject.transform, new Color(0f, 0f, 0f, 0f));
+        StretchToParent(viewport);
+        viewport.AddComponent<RectMask2D>();
+        Image viewportImage = viewport.GetComponent<Image>();
+        if (viewportImage != null)
+        {
+            viewportImage.raycastTarget = true;
+        }
+
         GameObject gridObject = new GameObject("HeroDetailEquipmentGrid", typeof(RectTransform));
-        gridObject.transform.SetParent(heroDetailEquipmentContent.transform, false);
+        gridObject.transform.SetParent(viewport.transform, false);
         RectTransform gridRect = gridObject.GetComponent<RectTransform>();
         gridRect.anchorMin = new Vector2(0f, 1f);
-        gridRect.anchorMax = new Vector2(1f, 1f);
-        gridRect.pivot = new Vector2(0.5f, 1f);
-        gridRect.sizeDelta = new Vector2(-18f, 438f);
-        gridRect.anchoredPosition = new Vector2(0f, -130f);
+        gridRect.anchorMax = new Vector2(0f, 1f);
+        gridRect.pivot = new Vector2(0f, 1f);
+        gridRect.sizeDelta = new Vector2(950f, 0f);
+        gridRect.anchoredPosition = new Vector2(10f, -10f);
+        scrollRect.viewport = viewport.GetComponent<RectTransform>();
+        scrollRect.content = gridRect;
+        heroDetailEquipmentGridTransform = gridObject.transform;
         GridLayoutGroup grid = gridObject.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(192f, 132f);
+        grid.cellSize = new Vector2(176f, 128f);
         grid.spacing = new Vector2(10f, 10f);
+        grid.padding = new RectOffset(0, 0, 0, 10);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 5;
-
-        foreach (EquipmentDefinition equipment in GameData.Equipments)
-        {
-            Button card = CreateButton(equipment.DisplayName, gridObject.transform, 18, GetRarityColor(equipment.Rarity));
-            string equipmentId = equipment.Id;
-            card.onClick.AddListener(() => OpenEquipmentDetailPopup(equipmentId));
-            Text text = card.GetComponentInChildren<Text>();
-            if (text != null)
-            {
-                text.alignment = TextAnchor.MiddleCenter;
-                text.fontSize = 18;
-                heroDetailEquipmentCardTexts[equipment.Id] = text;
-            }
-
-            heroDetailEquipmentCardButtons[equipment.Id] = card;
-            Button actionButton = CreateCornerActionButton("+", card.transform, new Color(0.88f, 0.72f, 0.20f, 1f));
-            actionButton.onClick.AddListener(() => SelectOrRemoveHeroDetailEquipment(equipmentId));
-            heroDetailEquipmentActionButtons[equipment.Id] = actionButton;
-        }
+        ContentSizeFitter gridFitter = gridObject.AddComponent<ContentSizeFitter>();
+        gridFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         heroDetailEquipmentEmptyText = CreateText("HeroDetailEquipmentEmpty", heroDetailEquipmentContent.transform, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
         RectTransform emptyRect = heroDetailEquipmentEmptyText.GetComponent<RectTransform>();
@@ -1050,9 +1469,12 @@ public sealed class GameHud : MonoBehaviour
         actionLayout.childControlHeight = true;
         actionLayout.childForceExpandWidth = true;
         actionLayout.childForceExpandHeight = true;
-        CreateButton("장비 분해", actionRow.transform, 24, new Color(0.20f, 0.26f, 0.38f, 1f));
-        CreateButton("일괄 해제", actionRow.transform, 24, new Color(0.44f, 0.58f, 0.76f, 1f));
-        CreateButton("일괄 장착", actionRow.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
+        Button dismantleButton = CreateButton("장비 분해", actionRow.transform, 24, new Color(0.20f, 0.26f, 0.38f, 1f));
+        Button bulkUnequipButton = CreateButton("일괄 해제", actionRow.transform, 24, new Color(0.44f, 0.58f, 0.76f, 1f));
+        Button bulkEquipButton = CreateButton("일괄 장착", actionRow.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
+        dismantleButton.onClick.AddListener(OpenEquipmentDismantlePopup);
+        bulkUnequipButton.onClick.AddListener(UnequipAllHeroDetailEquipment);
+        bulkEquipButton.onClick.AddListener(AutoEquipHeroDetailEquipment);
 
         heroDetailEquipmentContent.SetActive(false);
     }
@@ -1101,9 +1523,85 @@ public sealed class GameHud : MonoBehaviour
         contentRect.sizeDelta = new Vector2(0f, 720f);
         contentRect.anchoredPosition = new Vector2(0f, -805f);
 
-        heroDetailTranscendText = CreateText("HeroDetailTranscendText", heroDetailTranscendContent.transform, 30, FontStyle.Bold, TextAnchor.MiddleCenter);
-        StretchToParent(heroDetailTranscendText.gameObject);
+        heroDetailTranscendText = CreateText("HeroDetailTranscendText", heroDetailTranscendContent.transform, 25, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform summaryRect = heroDetailTranscendText.GetComponent<RectTransform>();
+        summaryRect.anchorMin = new Vector2(0.04f, 1f);
+        summaryRect.anchorMax = new Vector2(0.96f, 1f);
+        summaryRect.pivot = new Vector2(0.5f, 1f);
+        summaryRect.sizeDelta = new Vector2(0f, 58f);
+        summaryRect.anchoredPosition = new Vector2(0f, -18f);
         heroDetailTranscendText.text = "초월은 다음 단계에서 구현";
+        for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            int slotIndex = i;
+            Button slotButton = CreateButton(string.Empty, heroDetailTranscendContent.transform, 24, new Color(0.22f, 0.29f, 0.43f, 1f));
+            RectTransform slotRect = slotButton.GetComponent<RectTransform>();
+            slotRect.anchorMin = new Vector2(0.04f, 1f);
+            slotRect.anchorMax = new Vector2(0.96f, 1f);
+            slotRect.pivot = new Vector2(0.5f, 1f);
+            slotRect.sizeDelta = new Vector2(0f, 78f);
+            slotRect.anchoredPosition = new Vector2(0f, -82f - i * 84f);
+            slotButton.onClick.AddListener(() =>
+            {
+                selectedHeroTranscendSlotIndex = slotIndex;
+                UpdateView();
+            });
+
+            Text slotText = slotButton.GetComponentInChildren<Text>(true);
+            if (slotText != null)
+            {
+                slotText.alignment = TextAnchor.MiddleLeft;
+                RectTransform slotTextRect = slotText.GetComponent<RectTransform>();
+                slotTextRect.offsetMin = new Vector2(22f, 6f);
+                slotTextRect.offsetMax = new Vector2(-22f, -6f);
+                heroDetailTranscendSlotTexts.Add(slotText);
+            }
+
+            heroDetailTranscendSlotButtons.Add(slotButton);
+
+            Button lockButton = CreateCornerActionButton("잠", slotButton.transform, new Color(0.20f, 0.25f, 0.36f, 1f));
+            lockButton.onClick.AddListener(() => ToggleHeroTranscendSlotLock(slotIndex));
+            heroDetailTranscendLockButtons.Add(lockButton);
+        }
+
+        heroDetailTranscendStopButton = CreateButton("[x] 자동 변경시 SS만 정지", heroDetailTranscendContent.transform, 25, new Color(0.26f, 0.32f, 0.43f, 1f));
+        RectTransform stopRect = heroDetailTranscendStopButton.GetComponent<RectTransform>();
+        stopRect.anchorMin = new Vector2(0.18f, 0f);
+        stopRect.anchorMax = new Vector2(0.82f, 0f);
+        stopRect.pivot = new Vector2(0.5f, 0f);
+        stopRect.sizeDelta = new Vector2(0f, 56f);
+        stopRect.anchoredPosition = new Vector2(0f, 122f);
+        heroDetailTranscendStopButton.onClick.AddListener(ToggleHeroTranscendStopMode);
+
+        GameObject actionRow = new GameObject("HeroDetailTranscendActions", typeof(RectTransform));
+        actionRow.transform.SetParent(heroDetailTranscendContent.transform, false);
+        RectTransform actionRect = actionRow.GetComponent<RectTransform>();
+        actionRect.anchorMin = new Vector2(0.04f, 0f);
+        actionRect.anchorMax = new Vector2(0.96f, 0f);
+        actionRect.pivot = new Vector2(0.5f, 0f);
+        actionRect.sizeDelta = new Vector2(0f, 82f);
+        actionRect.anchoredPosition = new Vector2(0f, 28f);
+        HorizontalLayoutGroup actionLayout = actionRow.AddComponent<HorizontalLayoutGroup>();
+        actionLayout.spacing = 18;
+        actionLayout.childControlWidth = true;
+        actionLayout.childControlHeight = true;
+        actionLayout.childForceExpandWidth = true;
+        actionLayout.childForceExpandHeight = true;
+
+        heroDetailTranscendChangeButton = CreateButton("변경\n10", actionRow.transform, 25, new Color(0.28f, 0.72f, 0.92f, 1f));
+        heroDetailTranscendAutoButton = CreateButton("자동 변경", actionRow.transform, 25, new Color(0.70f, 0.24f, 0.82f, 1f));
+        heroDetailTranscendChangeButton.onClick.AddListener(RollSelectedHeroTranscendManual);
+        heroDetailTranscendAutoButton.onClick.AddListener(AutoRollSelectedHeroTranscend);
+
+        heroDetailTranscendNoticeText = CreateText("HeroDetailTranscendNotice", heroDetailTranscendContent.transform, 22, FontStyle.Bold, TextAnchor.MiddleCenter);
+        heroDetailTranscendNoticeText.color = new Color(1f, 0.64f, 0.34f, 1f);
+        RectTransform noticeRect = heroDetailTranscendNoticeText.GetComponent<RectTransform>();
+        noticeRect.anchorMin = new Vector2(0.04f, 0f);
+        noticeRect.anchorMax = new Vector2(0.96f, 0f);
+        noticeRect.pivot = new Vector2(0.5f, 0f);
+        noticeRect.sizeDelta = new Vector2(0f, 34f);
+        noticeRect.anchoredPosition = new Vector2(0f, 92f);
+
         heroDetailTranscendContent.SetActive(false);
     }
 
@@ -1221,6 +1719,17 @@ public sealed class GameHud : MonoBehaviour
         StretchToParent(field);
         battlefieldRect = field.GetComponent<RectTransform>();
 
+        if (battlefieldWorldView != null && battlefieldWorldView.OutputTexture != null)
+        {
+            GameObject worldRender = new GameObject("BattlefieldWorldRender", typeof(RectTransform), typeof(RawImage));
+            worldRender.transform.SetParent(field.transform, false);
+            StretchToParent(worldRender);
+            battlefieldWorldImage = worldRender.GetComponent<RawImage>();
+            battlefieldWorldImage.texture = battlefieldWorldView.OutputTexture;
+            battlefieldWorldImage.color = Color.white;
+            battlefieldWorldImage.raycastTarget = false;
+        }
+
         centerSpawnText = CreateText("SpawnPortal", field.transform, 82, FontStyle.Bold, TextAnchor.MiddleCenter);
         RectTransform portalRect = centerSpawnText.GetComponent<RectTransform>();
         portalRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -1242,7 +1751,7 @@ public sealed class GameHud : MonoBehaviour
         fieldStagePillText.color = new Color(0.04f, 0.05f, 0.07f, 1f);
         StretchToParent(fieldStagePillText.gameObject);
 
-        damagePopupText = CreateText("DamagePopup", field.transform, 32, FontStyle.Bold, TextAnchor.MiddleCenter);
+        damagePopupText = CreateText("DamagePopup", field.transform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
         RectTransform damageRect = damagePopupText.GetComponent<RectTransform>();
         damageRect.anchorMin = new Vector2(0.5f, 0.5f);
         damageRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -1563,22 +2072,6 @@ public sealed class GameHud : MonoBehaviour
         heroTitle.text = "편성";
         AddLayoutElement(heroTitle.gameObject, -1, 38);
 
-        GameObject heroPageTabs = new GameObject("HeroPageTabs", typeof(RectTransform));
-        heroPageTabs.transform.SetParent(parent, false);
-        HorizontalLayoutGroup tabLayout = heroPageTabs.AddComponent<HorizontalLayoutGroup>();
-        tabLayout.spacing = 8;
-        tabLayout.childControlWidth = true;
-        tabLayout.childControlHeight = true;
-        tabLayout.childForceExpandWidth = true;
-        tabLayout.childForceExpandHeight = true;
-        AddLayoutElement(heroPageTabs, -1, 54);
-
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Formation, "편성");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Trait, "특성");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Statue, "석상");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Seal, "인장");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Relic, "유물");
-
         heroFormationContent = new GameObject("HeroFormationContent", typeof(RectTransform));
         heroFormationContent.transform.SetParent(parent, false);
         VerticalLayoutGroup formationLayout = heroFormationContent.AddComponent<VerticalLayoutGroup>();
@@ -1748,10 +2241,106 @@ public sealed class GameHud : MonoBehaviour
         Button bulkStarUpButton = CreateButton("일괄 승급", actionRow.transform, 24, new Color(0.34f, 0.35f, 0.37f, 1f));
         bulkStarUpButton.onClick.AddListener(BulkStarUpHeroesFromHud);
 
+        CreateHeroTraitContent(parent);
+
         heroPlaceholderText = CreateText("HeroPagePlaceholder", parent, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
         heroPlaceholderText.text = "준비 중";
         AddLayoutElement(heroPlaceholderText.gameObject, -1, 594);
         heroPlaceholderText.gameObject.SetActive(false);
+
+        GameObject heroPageTabSpacer = new GameObject("HeroPageTabSpacer", typeof(RectTransform));
+        heroPageTabSpacer.transform.SetParent(parent, false);
+        LayoutElement heroPageTabSpacerLayout = AddLayoutElement(heroPageTabSpacer, -1, 1);
+        heroPageTabSpacerLayout.flexibleHeight = 1f;
+
+        GameObject heroPageTabs = new GameObject("HeroPageTabs", typeof(RectTransform));
+        heroPageTabs.transform.SetParent(parent, false);
+        HorizontalLayoutGroup tabLayout = heroPageTabs.AddComponent<HorizontalLayoutGroup>();
+        tabLayout.spacing = 8;
+        tabLayout.childControlWidth = true;
+        tabLayout.childControlHeight = true;
+        tabLayout.childForceExpandWidth = true;
+        tabLayout.childForceExpandHeight = true;
+        AddLayoutElement(heroPageTabs, -1, 54);
+
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Formation, "편성");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Trait, "특성");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Statue, "석상");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Seal, "인장");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Relic, "유물");
+    }
+
+    private void CreateHeroTraitContent(Transform parent)
+    {
+        heroTraitContent = CreatePanel("HeroTraitContent", parent, new Color(0.25f, 0.33f, 0.48f, 1f));
+        VerticalLayoutGroup layout = heroTraitContent.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(16, 16, 12, 12);
+        layout.spacing = 10;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        AddLayoutElement(heroTraitContent, -1, 594);
+
+        heroTraitSummaryText = CreateText("HeroTraitSummary", heroTraitContent.transform, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
+        AddLayoutElement(heroTraitSummaryText.gameObject, -1, 42);
+
+        GameObject treePanel = CreatePanel("HeroTraitTree", heroTraitContent.transform, new Color(0.30f, 0.39f, 0.56f, 1f));
+        AddLayoutElement(treePanel, -1, 338);
+        VerticalLayoutGroup treeLayout = treePanel.AddComponent<VerticalLayoutGroup>();
+        treeLayout.padding = new RectOffset(12, 12, 12, 12);
+        treeLayout.spacing = 8;
+        treeLayout.childControlWidth = true;
+        treeLayout.childControlHeight = true;
+        treeLayout.childForceExpandWidth = true;
+        treeLayout.childForceExpandHeight = true;
+
+        for (int branch = 0; branch < 3; branch++)
+        {
+            GameObject row = new GameObject("HeroTraitBranch" + branch, typeof(RectTransform));
+            row.transform.SetParent(treePanel.transform, false);
+            HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.spacing = 10;
+            rowLayout.childControlWidth = true;
+            rowLayout.childControlHeight = true;
+            rowLayout.childForceExpandWidth = true;
+            rowLayout.childForceExpandHeight = true;
+
+            foreach (TalentDefinition talent in TalentData.Talents)
+            {
+                if (talent.BranchIndex != branch)
+                {
+                    continue;
+                }
+
+                Button node = CreateButton(string.Empty, row.transform, 19, new Color(0.22f, 0.28f, 0.38f, 1f));
+                string talentId = talent.Id;
+                node.onClick.AddListener(() =>
+                {
+                    selectedHeroTraitId = talentId;
+                    UpdateView();
+                });
+                heroTraitButtons[talent.Id] = node;
+                heroTraitButtonTexts[talent.Id] = node.GetComponentInChildren<Text>();
+            }
+        }
+
+        GameObject detailPanel = CreatePanel("HeroTraitDetail", heroTraitContent.transform, new Color(0.20f, 0.27f, 0.40f, 1f));
+        AddLayoutElement(detailPanel, -1, 132);
+        HorizontalLayoutGroup detailLayout = detailPanel.AddComponent<HorizontalLayoutGroup>();
+        detailLayout.padding = new RectOffset(14, 14, 12, 12);
+        detailLayout.spacing = 12;
+        detailLayout.childControlWidth = true;
+        detailLayout.childControlHeight = true;
+        detailLayout.childForceExpandWidth = true;
+        detailLayout.childForceExpandHeight = true;
+
+        heroTraitDetailText = CreateText("HeroTraitDetailText", detailPanel.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
+        heroTraitLevelUpButton = CreateButton("레벨업", detailPanel.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
+        AddLayoutElement(heroTraitLevelUpButton.gameObject, 220, -1);
+        heroTraitLevelUpButton.onClick.AddListener(LevelUpSelectedHeroTrait);
+
+        heroTraitContent.SetActive(false);
     }
 
     private List<HeroDefinition> GetSortedHeroRosterDefinitions()
@@ -1983,12 +2572,13 @@ public sealed class GameHud : MonoBehaviour
         grid.spacing = new Vector2(16, 16);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 3;
-        AddLayoutElement(gridObject, -1, 420);
+        AddLayoutElement(gridObject, -1, 520);
 
         CreateDebugButton("Gold +5000", gridObject.transform, () => wallet.AddGold(5000));
         CreateDebugButton("EXP +5000", gridObject.transform, () => wallet.AddHeroExpItem(5000));
         CreateDebugButton("Equip EXP +5000", gridObject.transform, () => wallet.AddEquipmentExpItem(5000));
         CreateDebugButton("Ruby +1500", gridObject.transform, () => wallet.AddRuby(1500));
+        CreateDebugButton("Transcend +100", gridObject.transform, () => wallet.AddHeroTranscendStone(100));
         CreateDebugButton("Hero Ticket +10", gridObject.transform, () => wallet.AddHeroSummonTicket(10));
         CreateDebugButton("Equip Ticket +10", gridObject.transform, () => wallet.AddEquipmentSummonTicket(10));
         CreateDebugButton("Hero Lv +5", gridObject.transform, () => battleManager.DebugLevelAllHeroes(5));
@@ -2038,6 +2628,7 @@ public sealed class GameHud : MonoBehaviour
         wallet.AddRuby(15000);
         wallet.AddHeroExpItem(100000);
         wallet.AddEquipmentExpItem(100000);
+        wallet.AddHeroTranscendStone(1000);
         wallet.AddHeroSummonTicket(100);
         wallet.AddEquipmentSummonTicket(100);
         UpdateView();
@@ -2228,6 +2819,8 @@ public sealed class GameHud : MonoBehaviour
             + "    R " + FormatCountNumber(wallet.Ruby)
             + "    HT " + FormatCountNumber(wallet.HeroSummonTicket)
             + "    ET " + FormatCountNumber(wallet.EquipmentSummonTicket)
+            + "    TS " + FormatCountNumber(wallet.HeroTranscendStone)
+            + (accountProgressManager != null ? "    Lv " + accountProgressManager.Level : string.Empty)
             + "    x" + speedManager.CurrentMultiplier;
         stageText.text = "Guardian";
         modeText.text = "전투력 " + FormatShortNumber(battleManager.TotalCombatPower)
@@ -2244,7 +2837,7 @@ public sealed class GameHud : MonoBehaviour
         }
 
         float progressRatio = battleManager.IsBossFight
-            ? (battleManager.TargetMaxHp <= 0 ? 0f : Mathf.Clamp01(1f - (float)battleManager.TargetHp / battleManager.TargetMaxHp))
+            ? (battleManager.TargetMaxHp <= GameNumber.Zero ? 0f : Mathf.Clamp01(1f - (float)battleManager.TargetHp.RatioTo(battleManager.TargetMaxHp)))
             : (battleManager.RequiredKills <= 0 ? 0f : Mathf.Clamp01((float)battleManager.KillsThisStage / battleManager.RequiredKills));
         hpFill.rectTransform.anchorMax = new Vector2(progressRatio, 1f);
         hpFill.color = battleManager.IsBossFight
@@ -2362,7 +2955,8 @@ public sealed class GameHud : MonoBehaviour
             if (heroButtonTexts.TryGetValue(hero.Definition.Id, out Text text))
             {
                 bool canLevel = hero.LevelUpCost <= wallet.HeroExpItem;
-                bool needsAttention = hero.CanStarUp || canLevel;
+                bool isOwned = hero.IsOwned;
+                bool needsAttention = isOwned && (hero.CanStarUp || canLevel);
                 hasHeroAttention |= needsAttention;
                 SetNotificationDot(heroNotificationDots, hero.Definition.Id, needsAttention);
 
@@ -2375,17 +2969,19 @@ public sealed class GameHud : MonoBehaviour
 
                 text.text = GetTraitBadge(hero.Definition.Trait)
                     + " " + GetRarityBadge(hero.Definition.Rarity)
-                    + " Lv." + hero.Level
+                    + (isOwned ? " Lv." + hero.Level : " 미보유")
                     + "\n" + GetShortHeroLabel(hero.Definition)
                     + "  " + hero.Definition.RarityLabel + "  " + FormatStars(hero.Stars)
                     + "\n공 " + FormatShortNumber(hero.AttackPower) + "  체 " + FormatShortNumber(hero.MaxHp)
                     + "\n속 " + hero.AttackSpeed.ToString("0.##") + "  이 " + hero.MoveSpeed.ToString("0.#")
-                    + "\n" + hero.Definition.PassiveLabel + "  " + starCostText + (isDeployed ? string.Empty : "  " + actionText);
+                    + "\n" + hero.Definition.PassiveLabel + "  " + starCostText + (isDeployed || !isOwned ? string.Empty : "  " + actionText);
 
                 Button heroButton = text.GetComponentInParent<Button>();
                 if (heroButton != null)
                 {
-                    SetButtonColor(heroButton, isDeployed
+                    SetButtonColor(heroButton, !isOwned
+                        ? new Color(0.10f, 0.11f, 0.14f, 1f)
+                        : isDeployed
                         ? new Color(0.13f, 0.15f, 0.18f, 1f)
                         : isSelectedForPlacement ? new Color(0.55f, 0.49f, 0.20f, 1f) : GetRarityColor(hero.Definition.Rarity));
                 }
@@ -2397,13 +2993,16 @@ public sealed class GameHud : MonoBehaviour
 
                 if (heroRosterActionButtons.TryGetValue(hero.Definition.Id, out Button actionButton))
                 {
+                    actionButton.interactable = isOwned;
                     Text actionTextComponent = actionButton.GetComponentInChildren<Text>(true);
                     if (actionTextComponent != null)
                     {
-                        actionTextComponent.text = isDeployed ? "-" : "+";
+                        actionTextComponent.text = !isOwned ? "잠" : isDeployed ? "-" : "+";
                     }
 
-                    SetButtonColor(actionButton, isDeployed
+                    SetButtonColor(actionButton, !isOwned
+                        ? new Color(0.24f, 0.25f, 0.28f, 1f)
+                        : isDeployed
                         ? new Color(0.58f, 0.12f, 0.12f, 1f)
                         : new Color(0.88f, 0.72f, 0.20f, 1f));
                 }
@@ -2618,8 +3217,11 @@ public sealed class GameHud : MonoBehaviour
         activeHeroDetailTab = HeroDetailTab.BasicInfo;
         selectedHeroDetailEquipmentId = string.Empty;
         selectedEquipmentDetailId = string.Empty;
+        selectedDismantleEquipmentIds.Clear();
         heroDetailEquipmentSlotSelectionActive = false;
         equipmentDetailPopupOpen = false;
+        equipmentDismantlePopupOpen = false;
+        equipmentBulkDismantlePromptOpen = false;
         ResetHeroDetailEquipmentFilters();
         heroDetailPanelOpen = true;
         UpdateView();
@@ -2627,12 +3229,17 @@ public sealed class GameHud : MonoBehaviour
 
     private void CloseHeroDetailPanel()
     {
+        StopHeroTranscendAutoRoll();
+        CloseHeroTranscendConfirmPrompt();
         heroDetailPanelOpen = false;
         selectedHeroDetailId = string.Empty;
         selectedHeroDetailEquipmentId = string.Empty;
         selectedEquipmentDetailId = string.Empty;
+        selectedDismantleEquipmentIds.Clear();
         heroDetailEquipmentSlotSelectionActive = false;
         equipmentDetailPopupOpen = false;
+        equipmentDismantlePopupOpen = false;
+        equipmentBulkDismantlePromptOpen = false;
         UpdateView();
     }
 
@@ -2644,6 +3251,8 @@ public sealed class GameHud : MonoBehaviour
             selectedHeroDetailEquipmentId = string.Empty;
             heroDetailEquipmentSlotSelectionActive = false;
             equipmentDetailPopupOpen = false;
+            equipmentDismantlePopupOpen = false;
+            equipmentBulkDismantlePromptOpen = false;
         }
 
         UpdateView();
@@ -2667,6 +3276,103 @@ public sealed class GameHud : MonoBehaviour
     {
         equipmentDetailPopupOpen = false;
         selectedEquipmentDetailId = string.Empty;
+        UpdateView();
+    }
+
+    private void OpenEquipmentDismantlePopup()
+    {
+        equipmentDetailPopupOpen = false;
+        equipmentDismantlePopupOpen = true;
+        equipmentBulkDismantlePromptOpen = false;
+        selectedDismantleEquipmentIds.Clear();
+        activeHeroDetailTab = HeroDetailTab.Equipment;
+        UpdateView();
+    }
+
+    private void CloseEquipmentDismantlePopup()
+    {
+        equipmentDismantlePopupOpen = false;
+        equipmentBulkDismantlePromptOpen = false;
+        selectedDismantleEquipmentIds.Clear();
+        UpdateView();
+    }
+
+    private void OpenEquipmentBulkDismantlePrompt()
+    {
+        equipmentBulkDismantlePromptOpen = true;
+        UpdateView();
+    }
+
+    private void CloseEquipmentBulkDismantlePrompt()
+    {
+        equipmentBulkDismantlePromptOpen = false;
+        UpdateView();
+    }
+
+    private static string BuildEquipmentCopyKey(string equipmentId, int copyIndex)
+    {
+        return equipmentId + "#" + copyIndex;
+    }
+
+    private static string GetEquipmentIdFromCopyKey(string equipmentCopyKey)
+    {
+        if (string.IsNullOrEmpty(equipmentCopyKey))
+        {
+            return string.Empty;
+        }
+
+        int separatorIndex = equipmentCopyKey.LastIndexOf('#');
+        return separatorIndex >= 0 ? equipmentCopyKey.Substring(0, separatorIndex) : equipmentCopyKey;
+    }
+
+    private static int GetCopyIndexFromCopyKey(string equipmentCopyKey)
+    {
+        if (string.IsNullOrEmpty(equipmentCopyKey))
+        {
+            return -1;
+        }
+
+        int separatorIndex = equipmentCopyKey.LastIndexOf('#');
+        if (separatorIndex < 0 || separatorIndex >= equipmentCopyKey.Length - 1)
+        {
+            return -1;
+        }
+
+        return int.TryParse(equipmentCopyKey.Substring(separatorIndex + 1), out int copyIndex) ? copyIndex : -1;
+    }
+
+    private void SelectDismantleEquipment(string equipmentCopyKey)
+    {
+        string equipmentId = GetEquipmentIdFromCopyKey(equipmentCopyKey);
+        EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(equipmentId) : null;
+        if (state == null || !state.IsOwned)
+        {
+            return;
+        }
+
+        if (equipmentInventory.GetAvailableCount(equipmentId) <= 0)
+        {
+            selectedDismantleEquipmentIds.Remove(equipmentCopyKey);
+            ShowGrowthNotice("장착 중인 장비는 분해할 수 없습니다.");
+            UpdateView();
+            return;
+        }
+
+        if (selectedDismantleEquipmentIds.Contains(equipmentCopyKey))
+        {
+            selectedDismantleEquipmentIds.Remove(equipmentCopyKey);
+        }
+        else
+        {
+            selectedDismantleEquipmentIds.Add(equipmentCopyKey);
+        }
+        UpdateView();
+    }
+
+    private void ChangeBulkDismantleRarity(int direction)
+    {
+        int rarity = Mathf.Clamp((int)selectedBulkDismantleRarity + direction, (int)HeroRarity.Common, (int)HeroRarity.Mythic);
+        selectedBulkDismantleRarity = (HeroRarity)rarity;
         UpdateView();
     }
 
@@ -2726,7 +3432,7 @@ public sealed class GameHud : MonoBehaviour
     {
         HeroState hero = FindHeroState(selectedHeroDetailId);
         EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(equipmentId) : null;
-        if (hero == null || state == null || !state.IsOwned)
+        if (hero == null || !hero.IsOwned || state == null || !state.IsOwned)
         {
             return;
         }
@@ -2759,7 +3465,7 @@ public sealed class GameHud : MonoBehaviour
     private void SelectOrRemoveHeroDetailEquipment(string equipmentId)
     {
         HeroState hero = FindHeroState(selectedHeroDetailId);
-        if (hero == null || equipmentInventory == null)
+        if (hero == null || !hero.IsOwned || equipmentInventory == null)
         {
             return;
         }
@@ -2812,7 +3518,7 @@ public sealed class GameHud : MonoBehaviour
     private void TryPlaceSelectedHeroDetailEquipment(EquipmentSlot slot)
     {
         HeroState hero = FindHeroState(selectedHeroDetailId);
-        if (hero == null || equipmentInventory == null)
+        if (hero == null || !hero.IsOwned || equipmentInventory == null)
         {
             return;
         }
@@ -2853,7 +3559,7 @@ public sealed class GameHud : MonoBehaviour
     private void RemoveHeroDetailEquipment(EquipmentSlot slot)
     {
         HeroState hero = FindHeroState(selectedHeroDetailId);
-        if (hero == null || equipmentInventory == null)
+        if (hero == null || !hero.IsOwned || equipmentInventory == null)
         {
             return;
         }
@@ -2864,11 +3570,49 @@ public sealed class GameHud : MonoBehaviour
         UpdateView();
     }
 
+    private void UnequipAllHeroDetailEquipment()
+    {
+        HeroState hero = FindHeroState(selectedHeroDetailId);
+        if (hero == null || !hero.IsOwned || equipmentInventory == null)
+        {
+            return;
+        }
+
+        int unequippedCount = equipmentInventory.UnequipAll(hero.Definition.Id);
+        selectedHeroDetailEquipmentId = string.Empty;
+        selectedEquipmentDetailId = string.Empty;
+        equipmentDetailPopupOpen = false;
+        heroDetailEquipmentSlotSelectionActive = false;
+        ShowGrowthNotice(unequippedCount > 0
+            ? "장비 " + unequippedCount + "개를 해제했습니다."
+            : "해제할 장비가 없습니다.");
+        UpdateView();
+    }
+
+    private void AutoEquipHeroDetailEquipment()
+    {
+        HeroState hero = FindHeroState(selectedHeroDetailId);
+        if (hero == null || !hero.IsOwned || equipmentInventory == null)
+        {
+            return;
+        }
+
+        int equippedCount = equipmentInventory.EquipBestAvailable(hero.Definition.Id);
+        selectedHeroDetailEquipmentId = string.Empty;
+        selectedEquipmentDetailId = string.Empty;
+        equipmentDetailPopupOpen = false;
+        heroDetailEquipmentSlotSelectionActive = false;
+        ShowGrowthNotice(equippedCount > 0
+            ? "강한 장비 " + equippedCount + "개를 자동 장착했습니다."
+            : "장착할 장비가 없습니다.");
+        UpdateView();
+    }
+
     private void ToggleSelectedEquipmentDetailEquip()
     {
         HeroState hero = FindHeroState(selectedHeroDetailId);
         EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(selectedEquipmentDetailId) : null;
-        if (hero == null || state == null || !state.IsOwned)
+        if (hero == null || !hero.IsOwned || state == null || !state.IsOwned)
         {
             return;
         }
@@ -2966,6 +3710,72 @@ public sealed class GameHud : MonoBehaviour
         UpdateView();
     }
 
+    private void DismantleSelectedEquipment()
+    {
+        if (selectedDismantleEquipmentIds.Count <= 0 || equipmentInventory == null || wallet == null)
+        {
+            ShowGrowthNotice("분해할 장비를 선택하세요.");
+            return;
+        }
+
+        PruneInvalidDismantleSelections();
+        if (selectedDismantleEquipmentIds.Count <= 0)
+        {
+            ShowGrowthNotice("분해할 수 있는 선택 장비가 없습니다.");
+            UpdateView();
+            return;
+        }
+
+        int dismantledCount = 0;
+        int totalReward = 0;
+        var selectedKeys = new List<string>(selectedDismantleEquipmentIds);
+        foreach (string equipmentCopyKey in selectedKeys)
+        {
+            string equipmentId = GetEquipmentIdFromCopyKey(equipmentCopyKey);
+            if (!equipmentInventory.TryDismantleEquipment(equipmentId, out int reward))
+            {
+                selectedDismantleEquipmentIds.Remove(equipmentCopyKey);
+                continue;
+            }
+
+            dismantledCount += 1;
+            totalReward += reward;
+            selectedDismantleEquipmentIds.Remove(equipmentCopyKey);
+        }
+
+        if (dismantledCount <= 0)
+        {
+            ShowGrowthNotice("장비 분해에 실패했습니다.");
+            UpdateView();
+            return;
+        }
+
+        wallet.AddEquipmentExpItem(totalReward);
+        ShowGrowthNotice("장비 " + dismantledCount + "개 분해: 장비책 +" + FormatShortNumber(totalReward));
+        UpdateView();
+    }
+
+    private void ConfirmBulkDismantleEquipment()
+    {
+        if (equipmentInventory == null || wallet == null)
+        {
+            return;
+        }
+
+        int dismantledCount = equipmentInventory.DismantleByRarity(selectedBulkDismantleRarity, null, out int reward);
+        if (dismantledCount <= 0)
+        {
+            ShowGrowthNotice("분해할 장비가 없습니다.");
+            return;
+        }
+
+        wallet.AddEquipmentExpItem(reward);
+        selectedDismantleEquipmentIds.Clear();
+        equipmentBulkDismantlePromptOpen = false;
+        ShowGrowthNotice("장비 " + dismantledCount + "개 분해: 장비책 +" + FormatShortNumber(reward));
+        UpdateView();
+    }
+
     private void RefreshDamageMeter()
     {
         if (damageMeterText != null)
@@ -2973,7 +3783,7 @@ public sealed class GameHud : MonoBehaviour
             damageMeterText.text = "데미지 미터기";
         }
 
-        double maxDamage = Math.Max(1d, battleManager.GetMaxHeroDamageDone());
+        GameNumber maxDamage = GameNumber.Max(GameNumber.One, battleManager.GetMaxHeroDamageDone());
         var meterHeroes = new List<HeroState>(battleManager.DeployedHeroes);
         meterHeroes.Sort(CompareHeroesForDamageMeter);
         int deployedCount = meterHeroes.Count;
@@ -2987,8 +3797,8 @@ public sealed class GameHud : MonoBehaviour
             }
 
             HeroState hero = meterHeroes[i];
-            double damage = battleManager.GetHeroDamageDone(hero.Definition.Id);
-            float ratio = Mathf.Clamp01((float)(damage / maxDamage));
+            GameNumber damage = battleManager.GetHeroDamageDone(hero.Definition.Id);
+            float ratio = Mathf.Clamp01((float)damage.RatioTo(maxDamage));
 
             if (i < damageMeterFills.Count)
             {
@@ -3007,8 +3817,8 @@ public sealed class GameHud : MonoBehaviour
 
     private int CompareHeroesForDamageMeter(HeroState left, HeroState right)
     {
-        double rightDamage = battleManager.GetHeroDamageDone(right.Definition.Id);
-        double leftDamage = battleManager.GetHeroDamageDone(left.Definition.Id);
+        GameNumber rightDamage = battleManager.GetHeroDamageDone(right.Definition.Id);
+        GameNumber leftDamage = battleManager.GetHeroDamageDone(left.Definition.Id);
         int damageCompare = rightDamage.CompareTo(leftDamage);
         if (damageCompare != 0)
         {
@@ -3031,7 +3841,10 @@ public sealed class GameHud : MonoBehaviour
             heroDetailPanelOpen = false;
             selectedHeroDetailId = string.Empty;
             selectedEquipmentDetailId = string.Empty;
+            selectedDismantleEquipmentIds.Clear();
             equipmentDetailPopupOpen = false;
+            equipmentDismantlePopupOpen = false;
+            equipmentBulkDismantlePromptOpen = false;
             return;
         }
 
@@ -3077,6 +3890,11 @@ public sealed class GameHud : MonoBehaviour
                 : "경험치책  " + FormatShortNumber(wallet.HeroExpItem);
         }
 
+        if (activeHeroDetailTab == HeroDetailTab.Transcend && heroDetailExpBookText != null)
+        {
+            heroDetailExpBookText.text = "초월석  " + FormatCountNumber(wallet.HeroTranscendStone);
+        }
+
         if (heroDetailSkillText != null)
         {
             heroDetailSkillText.text = GetHeroSkillName(hero)
@@ -3099,7 +3917,9 @@ public sealed class GameHud : MonoBehaviour
 
         if (heroDetailOwnedEffectText != null)
         {
-            heroDetailOwnedEffectText.text = "[보유 효과]  공격력 +" + (10 + hero.Stars * 2) + "%";
+            heroDetailOwnedEffectText.text = hero.IsOwned
+                ? "[보유 효과]  공격력 +" + (10 + hero.Stars * 2) + "%"
+                : "[미보유]  뽑기로 조각을 획득하면 배치 가능";
         }
 
         if (heroDetailNoticeText != null)
@@ -3111,44 +3931,54 @@ public sealed class GameHud : MonoBehaviour
         RefreshHeroDetailEquipmentSlots(hero);
         RefreshHeroDetailTabState();
         RefreshHeroDetailEquipmentContent();
+        RefreshHeroDetailTranscendContent(hero);
         RefreshEquipmentDetailPopup();
+        RefreshEquipmentDismantlePopup();
+        RefreshEquipmentBulkDismantlePrompt();
     }
 
     private void RefreshHeroDetailActionButtons(HeroState hero)
     {
         bool inFormation = IsHeroInEditingFormation(hero.Definition.Id);
+        bool isOwned = hero.IsOwned;
         bool maxLevel = hero.Level >= hero.MaxLevel;
-        bool canPayLevelUp = wallet != null && wallet.HeroExpItem >= hero.LevelUpCost;
+        bool canPayLevelUp = isOwned && wallet != null && wallet.HeroExpItem >= hero.LevelUpCost;
         bool maxStars = hero.IsMaxStars;
-        bool canStarUp = hero.CanStarUp;
+        bool canStarUp = isOwned && hero.CanStarUp;
 
         if (heroDetailExcludeButton != null)
         {
-            heroDetailExcludeButton.interactable = true;
-            SetButtonText(heroDetailExcludeButton, inFormation ? "제외" : "배치");
-            SetButtonColor(heroDetailExcludeButton, inFormation
+            heroDetailExcludeButton.interactable = isOwned;
+            SetButtonText(heroDetailExcludeButton, !isOwned ? "미보유" : inFormation ? "제외" : "배치");
+            SetButtonColor(heroDetailExcludeButton, !isOwned
+                ? new Color(0.35f, 0.36f, 0.38f, 1f)
+                : inFormation
                 ? new Color(0.54f, 0.76f, 0.96f, 1f)
                 : new Color(0.54f, 0.78f, 0.22f, 1f));
         }
 
         if (heroDetailLevelUpButton != null)
         {
-            heroDetailLevelUpButton.interactable = true;
-            SetButtonText(heroDetailLevelUpButton, maxLevel
+            heroDetailLevelUpButton.interactable = isOwned;
+            SetButtonText(heroDetailLevelUpButton, !isOwned
+                ? "레벨업\n미보유"
+                : maxLevel
                 ? "레벨업\nMAX"
                 : "레벨업\n" + FormatShortNumber(hero.LevelUpCost));
-            SetButtonColor(heroDetailLevelUpButton, maxLevel
+            SetButtonColor(heroDetailLevelUpButton, !isOwned || maxLevel
                 ? new Color(0.26f, 0.27f, 0.29f, 1f)
                 : canPayLevelUp ? new Color(0.54f, 0.78f, 0.22f, 1f) : new Color(0.35f, 0.36f, 0.34f, 1f));
         }
 
         if (heroDetailStarUpButton != null)
         {
-            heroDetailStarUpButton.interactable = true;
-            SetButtonText(heroDetailStarUpButton, maxStars
+            heroDetailStarUpButton.interactable = isOwned;
+            SetButtonText(heroDetailStarUpButton, !isOwned
+                ? "승급\n미보유"
+                : maxStars
                 ? "승급\nMAX"
                 : "승급\n" + FormatCountNumber(hero.Shards) + "/" + FormatCountNumber(hero.StarUpCost));
-            SetButtonColor(heroDetailStarUpButton, maxStars
+            SetButtonColor(heroDetailStarUpButton, !isOwned || maxStars
                 ? new Color(0.26f, 0.27f, 0.29f, 1f)
                 : canStarUp ? new Color(0.54f, 0.72f, 0.96f, 1f) : new Color(0.35f, 0.36f, 0.34f, 1f));
         }
@@ -3226,7 +4056,7 @@ public sealed class GameHud : MonoBehaviour
 
         if (heroDetailNoticeText != null)
         {
-            heroDetailNoticeText.gameObject.SetActive(basicInfoActive);
+            heroDetailNoticeText.gameObject.SetActive(basicInfoActive || transcendActive);
         }
 
         if (heroDetailActionRow != null)
@@ -3251,9 +4081,591 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private void RefreshHeroDetailTranscendContent(HeroState hero)
+    {
+        if (heroDetailTranscendContent == null || hero == null)
+        {
+            return;
+        }
+
+        selectedHeroTranscendSlotIndex = Mathf.Clamp(selectedHeroTranscendSlotIndex, 0, HeroDefinition.MaxTranscendSlots - 1);
+        int selectedRequiredStars = HeroDefinition.GetTranscendRequiredStars(selectedHeroTranscendSlotIndex);
+        bool selectedUnlocked = hero.IsTranscendSlotUnlocked(selectedHeroTranscendSlotIndex);
+        int unlockedSlotCount = CountUnlockedHeroTranscendSlots(hero);
+        int lockedSlotCount = CountLockedHeroTranscendSlots(hero);
+        int changeableSlotCount = CountChangeableHeroTranscendSlots(hero);
+
+        if (heroDetailTranscendText != null)
+        {
+            heroDetailTranscendText.text = "초월 슬롯 " + (selectedHeroTranscendSlotIndex + 1)
+                + " / " + HeroDefinition.MaxTranscendSlots
+                + "    " + (selectedUnlocked ? "변경 가능" : selectedRequiredStars + "성 필요")
+                + "\n전용 옵션과 공용 옵션 중 하나가 등장합니다.";
+        }
+
+        if (heroDetailTranscendText != null)
+        {
+            heroDetailTranscendText.text = "초월 슬롯 " + (selectedHeroTranscendSlotIndex + 1)
+                + " / " + HeroDefinition.MaxTranscendSlots
+                + "    " + (selectedUnlocked ? "선택됨" : selectedRequiredStars + "성 필요")
+                + "\n열림 " + unlockedSlotCount + "칸 / 잠금 " + lockedSlotCount + "칸 / 변경 " + changeableSlotCount + "칸";
+        }
+
+        for (int i = 0; i < heroDetailTranscendSlotTexts.Count && i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            bool unlocked = hero.IsTranscendSlotUnlocked(i);
+            bool selected = selectedHeroTranscendSlotIndex == i;
+            bool locked = unlocked && IsHeroTranscendSlotLocked(hero.Definition.Id, i);
+            int requiredStars = HeroDefinition.GetTranscendRequiredStars(i);
+            string optionId = hero.GetTranscendOptionId(i);
+            HeroTranscendOptionDefinition option = string.IsNullOrEmpty(optionId)
+                ? null
+                : GameData.GetHeroTranscendOption(optionId);
+            Text slotText = heroDetailTranscendSlotTexts[i];
+
+            if (unlocked && option != null)
+            {
+                slotText.text = "<size=34><color=" + GetTranscendGradeHex(option.Grade) + ">" + option.Grade + "</color></size>"
+                    + "  [" + option.ScopeLabel + "] " + option.Description
+                    + "\n<size=22>슬롯 " + (i + 1) + "  해금 " + requiredStars + "성  가중치 " + option.ProbabilityWeight.ToString("0.####") + "</size>";
+            }
+            else if (unlocked)
+            {
+                slotText.text = "<size=34>옵션 없음</size>\n<size=22>변경을 눌러 옵션을 부여하세요.</size>";
+            }
+            else
+            {
+                slotText.text = "<size=30>잠김</size>  " + FormatStars(requiredStars)
+                    + "\n<size=22>" + requiredStars + "성부터 추가 초월 가능</size>";
+            }
+
+            if (unlocked && locked)
+            {
+                slotText.text = "[잠금] " + slotText.text;
+            }
+
+            if (heroDetailTranscendSlotButtons.Count > i)
+            {
+                Color color = unlocked
+                    ? selected
+                        ? Color.Lerp(GetTranscendGradeColor(option != null ? option.Grade : HeroTranscendGrade.F), new Color(1f, 0.92f, 0.42f, 1f), 0.34f)
+                        : GetTranscendGradeColor(option != null ? option.Grade : HeroTranscendGrade.F)
+                    : new Color(0.19f, 0.22f, 0.30f, 1f);
+                SetButtonColor(heroDetailTranscendSlotButtons[i], color);
+                if (locked)
+                {
+                    SetButtonColor(heroDetailTranscendSlotButtons[i], new Color(0.18f, 0.20f, 0.24f, 1f));
+                }
+            }
+
+            if (heroDetailTranscendLockButtons.Count > i)
+            {
+                Button lockButton = heroDetailTranscendLockButtons[i];
+                lockButton.gameObject.SetActive(unlocked);
+                SetButtonText(lockButton, locked ? "해" : "잠");
+                SetButtonColor(lockButton, locked
+                    ? new Color(0.72f, 0.46f, 0.16f, 1f)
+                    : new Color(0.20f, 0.25f, 0.36f, 1f));
+            }
+        }
+
+        if (heroDetailTranscendStopButton != null)
+        {
+            SetButtonText(heroDetailTranscendStopButton, (heroTranscendStopOnlySs ? "[x] " : "[ ] ") + "자동 변경시 SS만 정지");
+            SetButtonColor(heroDetailTranscendStopButton, heroTranscendStopOnlySs
+                ? new Color(0.46f, 0.62f, 0.30f, 1f)
+                : new Color(0.26f, 0.32f, 0.43f, 1f));
+        }
+
+        int rollCost = GetHeroTranscendRollCost(hero);
+        bool canRoll = changeableSlotCount > 0 && wallet != null && wallet.HeroTranscendStone >= rollCost;
+        if (heroDetailTranscendChangeButton != null)
+        {
+            SetButtonText(heroDetailTranscendChangeButton, "변경\n" + rollCost);
+            SetButtonColor(heroDetailTranscendChangeButton, canRoll ? new Color(0.28f, 0.72f, 0.92f, 1f) : new Color(0.35f, 0.36f, 0.38f, 1f));
+        }
+
+        if (heroDetailTranscendAutoButton != null)
+        {
+            SetButtonText(heroDetailTranscendAutoButton, heroTranscendAutoRolling
+                ? "자동 변경\n중지"
+                : heroTranscendStopOnlySs ? "자동 변경\nSS 정지" : "자동 변경\nS 이상 정지");
+            SetButtonColor(heroDetailTranscendAutoButton, heroTranscendAutoRolling
+                ? new Color(0.86f, 0.52f, 0.16f, 1f)
+                : canRoll ? new Color(0.70f, 0.24f, 0.82f, 1f) : new Color(0.35f, 0.36f, 0.38f, 1f));
+        }
+    }
+
+    private void ToggleHeroTranscendStopMode()
+    {
+        heroTranscendStopOnlySs = !heroTranscendStopOnlySs;
+        PlayerPrefs.SetInt(SaveKeys.HeroTranscendStopOnlySs, heroTranscendStopOnlySs ? 1 : 0);
+        PlayerPrefs.Save();
+        UpdateView();
+    }
+
+    private void RollSelectedHeroTranscendManual()
+    {
+        RequestHeroTranscendRoll(false);
+    }
+
+    private void AutoRollSelectedHeroTranscend()
+    {
+        RequestHeroTranscendRoll(true);
+    }
+
+    private void RequestHeroTranscendRoll(bool autoRoll)
+    {
+        if (autoRoll && heroTranscendAutoRolling)
+        {
+            StopHeroTranscendAutoRoll();
+            ShowGrowthNotice("자동 변경을 중지했습니다.");
+            UpdateView();
+            return;
+        }
+
+        HeroState hero = FindHeroState(selectedHeroDetailId);
+        if (hero == null)
+        {
+            return;
+        }
+
+        if (!hero.IsOwned)
+        {
+            ShowGrowthNotice("아직 획득하지 않은 영웅입니다.");
+            return;
+        }
+
+        if (HasSsInChangeableHeroTranscendSlots(hero))
+        {
+            OpenHeroTranscendConfirmPrompt(autoRoll);
+            return;
+        }
+
+        ExecuteHeroTranscendRoll(autoRoll);
+    }
+
+    private void ExecuteHeroTranscendRoll(bool autoRoll)
+    {
+        if (autoRoll)
+        {
+            StartHeroTranscendAutoRoll();
+            return;
+        }
+
+        TryRollHeroTranscendBatch(true, out _, out _);
+        UpdateView();
+    }
+
+    private void OpenHeroTranscendConfirmPrompt(bool autoRoll)
+    {
+        pendingHeroTranscendAutoRoll = autoRoll;
+        if (heroTranscendConfirmMessageText != null)
+        {
+            heroTranscendConfirmMessageText.text = "변경 대상에 SS 옵션이 있습니다.\n계속 변경하시겠습니까?";
+        }
+
+        if (heroTranscendConfirmPrompt != null)
+        {
+            heroTranscendConfirmPrompt.SetActive(true);
+        }
+    }
+
+    private void ConfirmHeroTranscendRollPrompt()
+    {
+        bool autoRoll = pendingHeroTranscendAutoRoll;
+        CloseHeroTranscendConfirmPrompt();
+        ExecuteHeroTranscendRoll(autoRoll);
+    }
+
+    private void CancelHeroTranscendRollPrompt()
+    {
+        CloseHeroTranscendConfirmPrompt();
+    }
+
+    private void CloseHeroTranscendConfirmPrompt()
+    {
+        pendingHeroTranscendAutoRoll = false;
+        if (heroTranscendConfirmPrompt != null)
+        {
+            heroTranscendConfirmPrompt.SetActive(false);
+        }
+    }
+
+    private bool HasSsInChangeableHeroTranscendSlots(HeroState hero)
+    {
+        if (hero == null)
+        {
+            return false;
+        }
+
+        List<int> targetSlots = GetChangeableHeroTranscendSlots(hero);
+        foreach (int slotIndex in targetSlots)
+        {
+            HeroTranscendOptionDefinition option = GameData.GetHeroTranscendOption(hero.GetTranscendOptionId(slotIndex));
+            if (option != null && option.Grade >= HeroTranscendGrade.SS)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void StartHeroTranscendAutoRoll()
+    {
+        if (heroTranscendAutoRollCoroutine != null)
+        {
+            return;
+        }
+
+        heroTranscendAutoRollCoroutine = StartCoroutine(RunHeroTranscendAutoRoll());
+        UpdateView();
+    }
+
+    private void StopHeroTranscendAutoRoll()
+    {
+        if (heroTranscendAutoRollCoroutine != null)
+        {
+            StopCoroutine(heroTranscendAutoRollCoroutine);
+            heroTranscendAutoRollCoroutine = null;
+        }
+
+        heroTranscendAutoRolling = false;
+    }
+
+    private IEnumerator RunHeroTranscendAutoRoll()
+    {
+        heroTranscendAutoRolling = true;
+        int rolls = 0;
+        HeroTranscendOptionDefinition lastOption = null;
+        while (true)
+        {
+            if (!TryRollHeroTranscendBatch(false, out lastOption, out _))
+            {
+                break;
+            }
+
+            rolls += 1;
+            if (ShouldStopHeroTranscendAuto(lastOption))
+            {
+                break;
+            }
+
+            UpdateView();
+            yield return new WaitForSecondsRealtime(HeroTranscendAutoRollIntervalSeconds);
+        }
+
+        heroTranscendAutoRolling = false;
+        heroTranscendAutoRollCoroutine = null;
+
+        if (rolls > 0 && lastOption != null)
+        {
+            ShowGrowthNotice("자동 변경 " + rolls + "회: " + lastOption.Grade + " " + lastOption.Description);
+        }
+        else
+        {
+            ShowGrowthNotice("자동 변경할 수 없습니다.");
+        }
+
+        UpdateView();
+    }
+
+    private bool TryRollHeroTranscendBatch(bool showNotice, out HeroTranscendOptionDefinition bestOption, out int changedSlots)
+    {
+        bestOption = null;
+        changedSlots = 0;
+        HeroState hero = FindHeroState(selectedHeroDetailId);
+        if (hero == null || !hero.IsOwned)
+        {
+            return false;
+        }
+
+        List<int> targetSlots = GetChangeableHeroTranscendSlots(hero);
+        if (targetSlots.Count <= 0)
+        {
+            if (showNotice)
+            {
+                ShowGrowthNotice("변경할 초월칸이 없습니다.");
+            }
+
+            return false;
+        }
+
+        int cost = GetHeroTranscendRollCost(hero);
+        if (wallet == null || !wallet.SpendHeroTranscendStone(cost))
+        {
+            if (showNotice)
+            {
+                ShowGrowthNotice("초월석이 부족합니다.");
+            }
+
+            return false;
+        }
+
+        foreach (int slotIndex in targetSlots)
+        {
+            if (!battleManager.TryRollHeroTranscendOption(hero.Definition.Id, slotIndex, false, out HeroTranscendOptionDefinition option))
+            {
+                continue;
+            }
+
+            changedSlots += 1;
+            if (IsBetterTranscendOption(option, bestOption))
+            {
+                bestOption = option;
+            }
+        }
+
+        if (changedSlots <= 0)
+        {
+            if (wallet != null)
+            {
+                wallet.AddHeroTranscendStone(cost);
+            }
+
+            if (showNotice)
+            {
+                ShowGrowthNotice("초월 변경에 실패했습니다.");
+            }
+
+            return false;
+        }
+
+        if (showNotice)
+        {
+            ShowGrowthNotice("초월 변경 " + changedSlots + "칸: "
+                + (bestOption != null ? bestOption.Grade + " " + bestOption.Description : "완료"));
+        }
+
+        return true;
+    }
+
+    private int GetHeroTranscendRollCost(HeroState hero)
+    {
+        return 10 + CountLockedHeroTranscendSlots(hero) * 10;
+    }
+
+    private List<int> GetChangeableHeroTranscendSlots(HeroState hero)
+    {
+        var slots = new List<int>();
+        if (hero == null)
+        {
+            return slots;
+        }
+
+        for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            if (hero.IsTranscendSlotUnlocked(i) && !IsHeroTranscendSlotLocked(hero.Definition.Id, i))
+            {
+                slots.Add(i);
+            }
+        }
+
+        return slots;
+    }
+
+    private int CountUnlockedHeroTranscendSlots(HeroState hero)
+    {
+        if (hero == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            if (hero.IsTranscendSlotUnlocked(i))
+            {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    private int CountLockedHeroTranscendSlots(HeroState hero)
+    {
+        if (hero == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            if (hero.IsTranscendSlotUnlocked(i) && IsHeroTranscendSlotLocked(hero.Definition.Id, i))
+            {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    private int CountChangeableHeroTranscendSlots(HeroState hero)
+    {
+        if (hero == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
+        {
+            if (hero.IsTranscendSlotUnlocked(i) && !IsHeroTranscendSlotLocked(hero.Definition.Id, i))
+            {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    private bool IsHeroTranscendSlotLocked(string heroId, int slotIndex)
+    {
+        return !string.IsNullOrEmpty(heroId)
+            && slotIndex >= 0
+            && slotIndex < HeroDefinition.MaxTranscendSlots
+            && PlayerPrefs.GetInt(SaveKeys.HeroTranscendLocked(heroId, slotIndex), 0) == 1;
+    }
+
+    private void ToggleHeroTranscendSlotLock(int slotIndex)
+    {
+        HeroState hero = FindHeroState(selectedHeroDetailId);
+        if (hero == null)
+        {
+            return;
+        }
+
+        if (!hero.IsTranscendSlotUnlocked(slotIndex))
+        {
+            ShowGrowthNotice(HeroDefinition.GetTranscendRequiredStars(slotIndex) + "성부터 잠금할 수 있습니다.");
+            return;
+        }
+
+        bool locked = IsHeroTranscendSlotLocked(hero.Definition.Id, slotIndex);
+        PlayerPrefs.SetInt(SaveKeys.HeroTranscendLocked(hero.Definition.Id, slotIndex), locked ? 0 : 1);
+        PlayerPrefs.Save();
+        selectedHeroTranscendSlotIndex = slotIndex;
+        UpdateView();
+    }
+
+    private bool IsBetterTranscendOption(HeroTranscendOptionDefinition candidate, HeroTranscendOptionDefinition current)
+    {
+        if (candidate == null)
+        {
+            return false;
+        }
+
+        return current == null || candidate.Grade > current.Grade;
+    }
+
+    private bool ShouldStopHeroTranscendAuto(HeroTranscendOptionDefinition option)
+    {
+        if (option == null)
+        {
+            return false;
+        }
+
+        return heroTranscendStopOnlySs
+            ? option.Grade >= HeroTranscendGrade.SS
+            : option.Grade >= HeroTranscendGrade.S;
+    }
+
+    private void HideEquipmentCards(Dictionary<string, Button> cardButtons)
+    {
+        foreach (KeyValuePair<string, Button> pair in cardButtons)
+        {
+            if (pair.Value != null)
+            {
+                pair.Value.gameObject.SetActive(false);
+            }
+        }
+    }
+
+    private void RefreshHeroDetailEquipmentCard(
+        EquipmentDefinition equipment,
+        EquipmentState state,
+        string cardKey,
+        bool equippedToHero,
+        int copyNumber)
+    {
+        Button cardButton = GetOrCreateHeroDetailEquipmentCard(equipment, cardKey);
+        if (cardButton == null)
+        {
+            return;
+        }
+
+        cardButton.gameObject.SetActive(true);
+        cardButton.transform.SetAsLastSibling();
+        bool selected = selectedHeroDetailEquipmentId == equipment.Id && !equippedToHero;
+        Color color = equippedToHero
+            ? new Color(0.13f, 0.15f, 0.18f, 1f)
+            : selected ? new Color(0.54f, 0.45f, 0.16f, 1f) : GetRarityColor(equipment.Rarity);
+        SetButtonColor(cardButton, color);
+
+        if (heroDetailEquipmentCardTexts.TryGetValue(cardKey, out Text cardText))
+        {
+            cardText.text = BuildEquipmentCardText(equipment, state, equippedToHero, copyNumber);
+        }
+
+        if (heroDetailEquipmentActionButtons.TryGetValue(cardKey, out Button actionButton))
+        {
+            actionButton.gameObject.SetActive(true);
+            actionButton.interactable = true;
+            Text actionText = actionButton.GetComponentInChildren<Text>(true);
+            if (actionText != null)
+            {
+                actionText.text = equippedToHero ? "-" : "+";
+            }
+
+            SetButtonColor(actionButton, equippedToHero
+                ? new Color(0.58f, 0.12f, 0.12f, 1f)
+                : new Color(0.88f, 0.72f, 0.20f, 1f));
+        }
+    }
+
+    private Button GetOrCreateHeroDetailEquipmentCard(EquipmentDefinition equipment, string cardKey)
+    {
+        if (heroDetailEquipmentCardButtons.TryGetValue(cardKey, out Button existingButton))
+        {
+            return existingButton;
+        }
+
+        if (heroDetailEquipmentGridTransform == null)
+        {
+            return null;
+        }
+
+        Button card = CreateButton(equipment.DisplayName, heroDetailEquipmentGridTransform, 18, GetRarityColor(equipment.Rarity));
+        string equipmentId = equipment.Id;
+        card.onClick.AddListener(() => OpenEquipmentDetailPopup(equipmentId));
+        Text text = card.GetComponentInChildren<Text>();
+        if (text != null)
+        {
+            text.alignment = TextAnchor.MiddleCenter;
+            text.fontSize = 18;
+            heroDetailEquipmentCardTexts[cardKey] = text;
+        }
+
+        heroDetailEquipmentCardButtons[cardKey] = card;
+        Button actionButton = CreateCornerActionButton("+", card.transform, new Color(0.88f, 0.72f, 0.20f, 1f));
+        actionButton.onClick.AddListener(() => SelectOrRemoveHeroDetailEquipment(equipmentId));
+        heroDetailEquipmentActionButtons[cardKey] = actionButton;
+        return card;
+    }
+
     private void RefreshHeroDetailEquipmentContent()
     {
         foreach (KeyValuePair<EquipmentSlot, Button> pair in heroDetailEquipmentFilterButtons)
+        {
+            bool selected = heroDetailEquipmentSelectedSlots.Contains(pair.Key);
+            SetButtonText(pair.Value, BuildEquipmentFilterButtonLabel(pair.Key));
+            SetButtonColor(pair.Value, selected ? new Color(0.46f, 0.62f, 0.30f, 1f) : new Color(0.24f, 0.30f, 0.42f, 1f));
+        }
+
+        foreach (KeyValuePair<EquipmentSlot, Button> pair in equipmentDismantleFilterButtons)
         {
             bool selected = heroDetailEquipmentSelectedSlots.Contains(pair.Key);
             SetButtonText(pair.Value, BuildEquipmentFilterButtonLabel(pair.Key));
@@ -3266,7 +4678,25 @@ public sealed class GameHud : MonoBehaviour
         }
 
         HeroState hero = FindHeroState(selectedHeroDetailId);
+        if (hero == null || !hero.IsOwned)
+        {
+            HideEquipmentCards(heroDetailEquipmentCardButtons);
+            if (heroDetailEquipmentSummaryText != null)
+            {
+                heroDetailEquipmentSummaryText.text = "미보유 영웅은 장비를 장착할 수 없습니다.";
+            }
+
+            if (heroDetailEquipmentEmptyText != null)
+            {
+                heroDetailEquipmentEmptyText.text = "뽑기로 조각을 획득하면 장비 장착이 열립니다.";
+                heroDetailEquipmentEmptyText.gameObject.SetActive(true);
+            }
+
+            return;
+        }
+
         EquipmentState selectedState = equipmentInventory.GetState(selectedHeroDetailEquipmentId);
+        HideEquipmentCards(heroDetailEquipmentCardButtons);
         int visibleCount = 0;
         int ownedCount = 0;
         foreach (EquipmentDefinition equipment in GameData.Equipments)
@@ -3274,18 +4704,8 @@ public sealed class GameHud : MonoBehaviour
             EquipmentState state = equipmentInventory.GetState(equipment.Id);
             bool owned = state != null && state.IsOwned;
             bool visible = owned && heroDetailEquipmentSelectedSlots.Contains(equipment.Slot);
-            if (heroDetailEquipmentCardButtons.TryGetValue(equipment.Id, out Button cardButton))
-            {
-                cardButton.gameObject.SetActive(visible);
-            }
-
             if (!owned)
             {
-                if (heroDetailEquipmentActionButtons.TryGetValue(equipment.Id, out Button hiddenActionButton))
-                {
-                    hiddenActionButton.gameObject.SetActive(false);
-                }
-
                 continue;
             }
 
@@ -3293,39 +4713,19 @@ public sealed class GameHud : MonoBehaviour
             bool equippedToHero = hero != null && equipmentInventory.IsEquipmentEquippedToHero(hero.Definition.Id, equipment.Id);
             int availableCount = equipmentInventory.GetAvailableCount(equipment.Id);
 
-            if (heroDetailEquipmentCardTexts.TryGetValue(equipment.Id, out Text cardText))
-            {
-                cardText.text = BuildEquipmentCardText(equipment, state, equippedToHero, availableCount);
-            }
-
-            if (cardButton != null)
-            {
-                bool selected = selectedHeroDetailEquipmentId == equipment.Id;
-                Color color = equippedToHero
-                    ? new Color(0.13f, 0.15f, 0.18f, 1f)
-                    : selected ? new Color(0.54f, 0.45f, 0.16f, 1f) : GetRarityColor(equipment.Rarity);
-                SetButtonColor(cardButton, color);
-            }
-
-            if (heroDetailEquipmentActionButtons.TryGetValue(equipment.Id, out Button actionButton))
-            {
-                actionButton.gameObject.SetActive(visible);
-                bool canSelect = equippedToHero || availableCount > 0;
-                actionButton.interactable = canSelect;
-                Text actionText = actionButton.GetComponentInChildren<Text>(true);
-                if (actionText != null)
-                {
-                    actionText.text = equippedToHero ? "-" : "+";
-                }
-
-                SetButtonColor(actionButton, equippedToHero
-                    ? new Color(0.58f, 0.12f, 0.12f, 1f)
-                    : canSelect ? new Color(0.88f, 0.72f, 0.20f, 1f) : new Color(0.32f, 0.34f, 0.38f, 1f));
-            }
-
             if (visible)
             {
-                visibleCount += 1;
+                if (equippedToHero)
+                {
+                    RefreshHeroDetailEquipmentCard(equipment, state, BuildEquipmentCopyKey(equipment.Id, -1), true, 0);
+                    visibleCount += 1;
+                }
+
+                for (int i = 0; i < availableCount; i++)
+                {
+                    RefreshHeroDetailEquipmentCard(equipment, state, BuildEquipmentCopyKey(equipment.Id, i), false, i + 1);
+                    visibleCount += 1;
+                }
             }
         }
 
@@ -3464,21 +4864,279 @@ public sealed class GameHud : MonoBehaviour
         equipmentDetailPopup.SetActive(true);
     }
 
-    private string BuildEquipmentCardText(EquipmentDefinition equipment, EquipmentState state, bool equippedToHero, int availableCount)
+    private void PruneInvalidDismantleSelections()
+    {
+        if (selectedDismantleEquipmentIds.Count <= 0)
+        {
+            return;
+        }
+
+        var selectedKeys = new List<string>(selectedDismantleEquipmentIds);
+        foreach (string equipmentCopyKey in selectedKeys)
+        {
+            string equipmentId = GetEquipmentIdFromCopyKey(equipmentCopyKey);
+            int copyIndex = GetCopyIndexFromCopyKey(equipmentCopyKey);
+            EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(equipmentId) : null;
+            int availableCount = equipmentInventory != null ? equipmentInventory.GetAvailableCount(equipmentId) : 0;
+            if (state == null
+                || !state.IsOwned
+                || availableCount <= 0
+                || copyIndex < 0
+                || copyIndex >= availableCount
+                || !heroDetailEquipmentSelectedSlots.Contains(state.Definition.Slot))
+            {
+                selectedDismantleEquipmentIds.Remove(equipmentCopyKey);
+            }
+        }
+    }
+
+    private void RefreshEquipmentDismantleCard(EquipmentDefinition equipment, EquipmentState state, string cardKey, int copyNumber)
+    {
+        Button cardButton = GetOrCreateEquipmentDismantleCard(equipment, cardKey);
+        if (cardButton == null)
+        {
+            return;
+        }
+
+        bool selected = selectedDismantleEquipmentIds.Contains(cardKey);
+        cardButton.gameObject.SetActive(true);
+        cardButton.transform.SetAsLastSibling();
+        SetButtonColor(cardButton, selected ? new Color(0.54f, 0.45f, 0.16f, 1f) : GetRarityColor(equipment.Rarity));
+
+        if (equipmentDismantleCardTexts.TryGetValue(cardKey, out Text cardText))
+        {
+            cardText.text = BuildEquipmentDismantleCardText(state, copyNumber);
+        }
+    }
+
+    private Button GetOrCreateEquipmentDismantleCard(EquipmentDefinition equipment, string cardKey)
+    {
+        if (equipmentDismantleCardButtons.TryGetValue(cardKey, out Button existingButton))
+        {
+            return existingButton;
+        }
+
+        if (equipmentDismantleGridTransform == null)
+        {
+            return null;
+        }
+
+        Button card = CreateButton(equipment.DisplayName, equipmentDismantleGridTransform, 16, GetRarityColor(equipment.Rarity));
+        string equipmentCopyKey = cardKey;
+        card.onClick.AddListener(() => SelectDismantleEquipment(equipmentCopyKey));
+        Text cardText = card.GetComponentInChildren<Text>(true);
+        if (cardText != null)
+        {
+            cardText.alignment = TextAnchor.MiddleCenter;
+            cardText.fontSize = 16;
+            equipmentDismantleCardTexts[cardKey] = cardText;
+        }
+
+        equipmentDismantleCardButtons[cardKey] = card;
+        return card;
+    }
+
+    private void RefreshEquipmentDismantlePopup()
+    {
+        if (equipmentDismantlePopup == null)
+        {
+            return;
+        }
+
+        if (!equipmentDismantlePopupOpen)
+        {
+            equipmentDismantlePopup.SetActive(false);
+            return;
+        }
+
+        PruneInvalidDismantleSelections();
+
+        HideEquipmentCards(equipmentDismantleCardButtons);
+        int visibleCount = 0;
+        int selectedReward = 0;
+        int selectedCount = 0;
+        var sortedEquipment = new List<EquipmentDefinition>(GameData.Equipments);
+        sortedEquipment.Sort(CompareEquipmentForDismantleList);
+        foreach (EquipmentDefinition equipment in sortedEquipment)
+        {
+            EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(equipment.Id) : null;
+            bool owned = state != null && state.IsOwned;
+            int availableCount = equipmentInventory != null ? equipmentInventory.GetAvailableCount(equipment.Id) : 0;
+            bool visible = owned && availableCount > 0 && heroDetailEquipmentSelectedSlots.Contains(equipment.Slot);
+            if (!visible)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < availableCount; i++)
+            {
+                string cardKey = BuildEquipmentCopyKey(equipment.Id, i);
+                RefreshEquipmentDismantleCard(equipment, state, cardKey, i + 1);
+                visibleCount += 1;
+
+                if (selectedDismantleEquipmentIds.Contains(cardKey))
+                {
+                    selectedCount += 1;
+                    selectedReward += equipmentInventory.GetDismantleReward(state, 1);
+                }
+            }
+        }
+
+        if (equipmentDismantleSummaryText != null)
+        {
+            string selectedLabel = selectedCount <= 0
+                ? string.Empty
+                : "    선택 " + selectedCount + "개 / 보상 +" + FormatShortNumber(selectedReward);
+            equipmentDismantleSummaryText.text = "필터 " + BuildEquipmentFilterSummaryLabel()
+                + "    표시 " + visibleCount
+                + selectedLabel;
+        }
+
+        if (equipmentDismantleButton != null)
+        {
+            bool hasSelection = selectedCount > 0;
+            SetButtonText(equipmentDismantleButton, hasSelection
+                ? "선택 분해\n" + selectedCount + "개 +" + FormatShortNumber(selectedReward)
+                : "선택 분해");
+            SetButtonColor(equipmentDismantleButton, hasSelection ? new Color(0.54f, 0.76f, 0.96f, 1f) : new Color(0.35f, 0.38f, 0.44f, 1f));
+        }
+
+        if (equipmentDismantleEmptyText != null)
+        {
+            equipmentDismantleEmptyText.gameObject.SetActive(visibleCount <= 0);
+        }
+
+        if (equipmentDismantleNoticeText != null)
+        {
+            equipmentDismantleNoticeText.text = Time.unscaledTime < growthNoticeUntil ? growthNoticeMessage : string.Empty;
+        }
+
+        equipmentDismantlePopup.SetActive(true);
+    }
+
+    private void RefreshEquipmentBulkDismantlePrompt()
+    {
+        if (equipmentBulkDismantlePrompt == null)
+        {
+            return;
+        }
+
+        if (!equipmentBulkDismantlePromptOpen || !equipmentDismantlePopupOpen)
+        {
+            equipmentBulkDismantlePrompt.SetActive(false);
+            return;
+        }
+
+        int count = CountBulkDismantleCandidates(selectedBulkDismantleRarity, out int reward);
+        if (equipmentBulkDismantleInfoText != null)
+        {
+            equipmentBulkDismantleInfoText.text = "해당 등급 이하의 전체 장비를 일괄 분해합니다."
+                + "\n장착 중인 장비는 분해되지 않습니다."
+                + "\n대상 " + count + "개 / 장비책 +" + FormatShortNumber(reward);
+        }
+
+        if (equipmentBulkDismantleRarityText != null)
+        {
+            equipmentBulkDismantleRarityText.text = GetRarityLabel(selectedBulkDismantleRarity);
+            equipmentBulkDismantleRarityText.color = Color.Lerp(GetRarityColor(selectedBulkDismantleRarity), Color.white, 0.16f);
+        }
+
+        if (equipmentBulkDismantleNoticeText != null)
+        {
+            equipmentBulkDismantleNoticeText.text = Time.unscaledTime < growthNoticeUntil ? growthNoticeMessage : string.Empty;
+        }
+
+        equipmentBulkDismantlePrompt.SetActive(true);
+    }
+
+    private string BuildEquipmentCardText(EquipmentDefinition equipment, EquipmentState state, bool equippedToHero, int copyNumber)
     {
         int level = state != null ? state.Level : 1;
         int maxLevel = state != null ? state.MaxLevel : equipment.GetMaxLevel(0);
         int stars = state != null ? state.Stars : 0;
-        int count = state != null ? state.Count : 0;
         int attack = state != null ? state.AttackBonus : equipment.GetAttackBonus(1, 0);
         int hp = state != null ? state.HpBonus : equipment.GetHpBonus(1, 0);
         string status = equippedToHero ? "<color=#FFD84D>장착중</color>" : equipment.SlotLabel;
+        string copyLabel = equippedToHero ? "장착본" : "개별 #" + copyNumber;
 
         return status
             + "\n" + equipment.RarityLabel + " " + equipment.DisplayName
             + "\nLv." + level + "/" + maxLevel + "  " + stars + "성"
             + "\nATK+" + attack + " HP+" + hp
-            + "\nx" + count + "  남음 " + availableCount;
+            + "\n" + copyLabel;
+    }
+
+    private string BuildEquipmentDismantleCardText(EquipmentState state, int copyNumber)
+    {
+        int reward = equipmentInventory != null ? equipmentInventory.GetDismantleReward(state, 1) : 0;
+        return "Lv." + state.Level
+            + "\n" + state.Definition.RarityLabel + " " + state.Definition.SlotLabel
+            + "\n" + state.Definition.DisplayName
+            + "\n분해 #" + copyNumber
+            + "\n+" + FormatShortNumber(reward);
+    }
+
+    private int CountBulkDismantleCandidates(HeroRarity maxRarity, out int reward)
+    {
+        reward = 0;
+        if (equipmentInventory == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        foreach (EquipmentState state in equipmentInventory.States)
+        {
+            if (state == null
+                || !state.IsOwned
+                || state.Definition.Rarity > maxRarity)
+            {
+                continue;
+            }
+
+            int availableCount = equipmentInventory.GetAvailableCount(state.Definition.Id);
+            if (availableCount <= 0)
+            {
+                continue;
+            }
+
+            count += availableCount;
+            reward += equipmentInventory.GetDismantleReward(state, availableCount);
+        }
+
+        return count;
+    }
+
+    private int CompareEquipmentForDismantleList(EquipmentDefinition left, EquipmentDefinition right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return 0;
+        }
+
+        if (left == null)
+        {
+            return 1;
+        }
+
+        if (right == null)
+        {
+            return -1;
+        }
+
+        int rarityCompare = ((int)right.Rarity).CompareTo((int)left.Rarity);
+        if (rarityCompare != 0)
+        {
+            return rarityCompare;
+        }
+
+        int slotCompare = ((int)left.Slot).CompareTo((int)right.Slot);
+        if (slotCompare != 0)
+        {
+            return slotCompare;
+        }
+
+        return KoreanNameComparer.Compare(left.DisplayName, right.DisplayName);
     }
 
     private string BuildEquipmentDetailEffectText(EquipmentState state)
@@ -3633,15 +5291,25 @@ public sealed class GameHud : MonoBehaviour
     {
         EnsureHeroFormationDraft();
         bool formationOpen = activeHeroPageTab == HeroPageTab.Formation;
+        bool traitOpen = activeHeroPageTab == HeroPageTab.Trait;
         if (heroFormationContent != null)
         {
             heroFormationContent.SetActive(formationOpen);
         }
 
+        if (heroTraitContent != null)
+        {
+            heroTraitContent.SetActive(traitOpen);
+        }
+
         if (heroPlaceholderText != null)
         {
-            heroPlaceholderText.gameObject.SetActive(!formationOpen);
-            heroPlaceholderText.text = GetHeroPageTabLabel(activeHeroPageTab) + " 준비 중";
+            bool placeholderOpen = !formationOpen && !traitOpen;
+            heroPlaceholderText.gameObject.SetActive(placeholderOpen);
+            if (placeholderOpen)
+            {
+                heroPlaceholderText.text = GetHeroPageTabLabel(activeHeroPageTab) + " 준비 중";
+            }
         }
 
         foreach (KeyValuePair<HeroPageTab, Button> pair in heroPageTabButtons)
@@ -3704,13 +5372,148 @@ public sealed class GameHud : MonoBehaviour
         if (heroOwnedEffectText != null)
         {
             int totalStars = 0;
+            int ownedCount = 0;
             foreach (HeroState hero in battleManager.Heroes)
             {
+                if (!hero.IsOwned)
+                {
+                    continue;
+                }
+
+                ownedCount += 1;
                 totalStars += hero.Stars;
             }
 
-            heroOwnedEffectText.text = "보유 효과 : 공격력+" + (battleManager.Heroes.Count * 10 + totalStars * 2) + "%";
+            heroOwnedEffectText.text = "보유 효과 : 공격력+" + (ownedCount * 10 + totalStars * 2) + "%";
         }
+
+        if (traitOpen)
+        {
+            RefreshHeroTraitPanel();
+        }
+    }
+
+    private void RefreshHeroTraitPanel()
+    {
+        if (accountProgressManager == null)
+        {
+            if (heroTraitSummaryText != null)
+            {
+                heroTraitSummaryText.text = "계정 성장 데이터를 불러오는 중";
+            }
+
+            return;
+        }
+
+        if (heroTraitSummaryText != null)
+        {
+            heroTraitSummaryText.text = "계정 Lv." + accountProgressManager.Level
+                + "  EXP " + FormatShortNumber(accountProgressManager.Experience)
+                + "/" + FormatShortNumber(accountProgressManager.NextLevelExperience)
+                + "  특성 포인트 " + accountProgressManager.AvailableTalentPoints
+                + "/" + accountProgressManager.TotalTalentPointsEarned;
+        }
+
+        foreach (TalentDefinition talent in TalentData.Talents)
+        {
+            int level = accountProgressManager.GetTalentLevel(talent.Id);
+            bool unlocked = accountProgressManager.IsTalentUnlocked(talent);
+            bool maxed = level >= talent.MaxLevel;
+            bool selected = talent.Id == selectedHeroTraitId;
+
+            if (heroTraitButtonTexts.TryGetValue(talent.Id, out Text text) && text != null)
+            {
+                text.text = talent.Icon
+                    + "\n" + talent.DisplayName
+                    + "\n" + (maxed ? "MAX" : level + "/" + talent.MaxLevel)
+                    + (unlocked ? string.Empty : "\n잠김");
+            }
+
+            if (heroTraitButtons.TryGetValue(talent.Id, out Button button) && button != null)
+            {
+                SetButtonColor(button, GetHeroTraitNodeColor(unlocked, maxed, selected));
+            }
+        }
+
+        TalentDefinition selectedTalent = TalentData.GetTalent(selectedHeroTraitId);
+        int selectedLevel = accountProgressManager.GetTalentLevel(selectedTalent.Id);
+        bool selectedUnlocked = accountProgressManager.IsTalentUnlocked(selectedTalent);
+        bool selectedMaxed = selectedLevel >= selectedTalent.MaxLevel;
+        TalentDefinition previousTalent = TalentData.GetPreviousTalent(selectedTalent);
+
+        if (heroTraitDetailText != null)
+        {
+            heroTraitDetailText.text = selectedTalent.Icon + " " + selectedTalent.DisplayName
+                + " [" + selectedTalent.BranchName + "]"
+                + "\n현재: " + selectedTalent.FormatValue(selectedLevel)
+                + (selectedMaxed ? "\n다음: MAX" : "\n다음: " + selectedTalent.FormatValue(selectedLevel + 1))
+                + "\nLv." + selectedLevel + "/" + selectedTalent.MaxLevel
+                + (!selectedUnlocked && previousTalent != null ? "\n해금 조건: " + previousTalent.DisplayName + " MAX" : string.Empty);
+        }
+
+        if (heroTraitLevelUpButton != null)
+        {
+            bool canLevel = selectedUnlocked
+                && !selectedMaxed
+                && accountProgressManager.AvailableTalentPoints >= selectedTalent.CostPerLevel;
+            SetButtonText(heroTraitLevelUpButton, selectedMaxed ? "MAX" : "레벨업\n" + selectedTalent.CostPerLevel + "P");
+            SetButtonColor(heroTraitLevelUpButton, canLevel
+                ? new Color(0.54f, 0.78f, 0.22f, 1f)
+                : new Color(0.34f, 0.36f, 0.40f, 1f));
+        }
+    }
+
+    private Color GetHeroTraitNodeColor(bool unlocked, bool maxed, bool selected)
+    {
+        if (selected)
+        {
+            return new Color(0.34f, 0.85f, 0.86f, 1f);
+        }
+
+        if (!unlocked)
+        {
+            return new Color(0.24f, 0.27f, 0.32f, 1f);
+        }
+
+        return maxed
+            ? new Color(0.88f, 0.63f, 0.16f, 1f)
+            : new Color(0.22f, 0.48f, 0.58f, 1f);
+    }
+
+    private void LevelUpSelectedHeroTrait()
+    {
+        if (accountProgressManager == null)
+        {
+            return;
+        }
+
+        TalentDefinition talent = TalentData.GetTalent(selectedHeroTraitId);
+        if (!accountProgressManager.IsTalentUnlocked(talent))
+        {
+            ShowGrowthNotice("이전 특성을 MAX 찍어야 합니다.");
+            return;
+        }
+
+        if (accountProgressManager.GetTalentLevel(talent.Id) >= talent.MaxLevel)
+        {
+            ShowGrowthNotice("이미 최대 레벨입니다.");
+            return;
+        }
+
+        if (accountProgressManager.AvailableTalentPoints < talent.CostPerLevel)
+        {
+            ShowGrowthNotice("특성 포인트가 부족합니다.");
+            return;
+        }
+
+        if (!accountProgressManager.TryLevelUpTalent(talent.Id))
+        {
+            ShowGrowthNotice("특성 레벨업에 실패했습니다.");
+            return;
+        }
+
+        ShowGrowthNotice(talent.DisplayName + " Lv." + accountProgressManager.GetTalentLevel(talent.Id));
+        UpdateView();
     }
 
     private void TryLevelUpAbilityFromHud(AbilityKind kind)
@@ -3869,6 +5672,12 @@ public sealed class GameHud : MonoBehaviour
             return;
         }
 
+        if (!hero.IsOwned)
+        {
+            ShowGrowthNotice("아직 획득하지 않은 영웅입니다.");
+            return;
+        }
+
         EnsureHeroFormationDraft();
         if (IsHeroInEditingFormation(hero.Definition.Id))
         {
@@ -3921,6 +5730,12 @@ public sealed class GameHud : MonoBehaviour
             return;
         }
 
+        if (!hero.IsOwned)
+        {
+            ShowGrowthNotice("아직 획득하지 않은 영웅입니다.");
+            return;
+        }
+
         if (hero.Level >= hero.MaxLevel)
         {
             ShowGrowthNotice("이미 최대 레벨입니다.");
@@ -3950,6 +5765,12 @@ public sealed class GameHud : MonoBehaviour
             return;
         }
 
+        if (!hero.IsOwned)
+        {
+            ShowGrowthNotice("아직 획득하지 않은 영웅입니다.");
+            return;
+        }
+
         if (hero.IsMaxStars)
         {
             ShowGrowthNotice("이미 최대 성급입니다.");
@@ -3976,6 +5797,12 @@ public sealed class GameHud : MonoBehaviour
         HeroState hero = FindHeroState(heroId);
         if (hero == null)
         {
+            return;
+        }
+
+        if (!hero.IsOwned)
+        {
+            ShowGrowthNotice("뽑기로 조각을 획득해야 배치할 수 있습니다.");
             return;
         }
 
@@ -4029,6 +5856,15 @@ public sealed class GameHud : MonoBehaviour
         }
 
         string heroId = selectedHeroForPlacement;
+        HeroState hero = FindHeroState(heroId);
+        if (hero == null || !hero.IsOwned)
+        {
+            selectedHeroForPlacement = string.Empty;
+            ShowGrowthNotice("배치할 수 없는 영웅입니다.");
+            UpdateView();
+            return;
+        }
+
         for (int i = 0; i < editingFormationHeroIds.Count; i++)
         {
             if (editingFormationHeroIds[i] == heroId)
@@ -4088,9 +5924,24 @@ public sealed class GameHud : MonoBehaviour
             heroDetailNoticeText.text = message;
         }
 
+        if (heroDetailTranscendNoticeText != null)
+        {
+            heroDetailTranscendNoticeText.text = message;
+        }
+
         if (equipmentDetailNoticeText != null)
         {
             equipmentDetailNoticeText.text = message;
+        }
+
+        if (equipmentDismantleNoticeText != null)
+        {
+            equipmentDismantleNoticeText.text = message;
+        }
+
+        if (equipmentBulkDismantleNoticeText != null)
+        {
+            equipmentBulkDismantleNoticeText.text = message;
         }
     }
 
@@ -4145,6 +5996,26 @@ public sealed class GameHud : MonoBehaviour
         float visualDeltaTime = GetBattleVisualDeltaTime();
         float fieldWidth = Mathf.Max(760f, battlefieldRect.rect.width);
         float fieldHeight = Mathf.Max(260f, battlefieldRect.rect.height);
+
+        if (IsWorldBattlefieldEnabled())
+        {
+            RefreshWorldBattlefieldImage();
+            SetLegacyBattlefieldActorsVisible(false);
+            if (centerSpawnText != null)
+            {
+                centerSpawnText.gameObject.SetActive(false);
+            }
+
+            damagePopupText.text = string.Empty;
+            return;
+        }
+
+        SetLegacyBattlefieldActorsVisible(true);
+        if (centerSpawnText != null)
+        {
+            centerSpawnText.gameObject.SetActive(true);
+        }
+
         Vector2[] heroFormation =
         {
             new Vector2(0f, -16f),
@@ -4347,6 +6218,47 @@ public sealed class GameHud : MonoBehaviour
             heroIndex += 1;
         }
 
+        RefreshDamagePopup(flashRatio);
+    }
+
+    private bool IsWorldBattlefieldEnabled()
+    {
+        return battlefieldWorldView != null && battlefieldWorldView.OutputTexture != null && battlefieldWorldImage != null;
+    }
+
+    private void RefreshWorldBattlefieldImage()
+    {
+        if (battlefieldWorldImage == null || battlefieldWorldView == null)
+        {
+            return;
+        }
+
+        battlefieldWorldImage.texture = battlefieldWorldView.OutputTexture;
+        battlefieldWorldImage.gameObject.SetActive(true);
+    }
+
+    private void SetLegacyBattlefieldActorsVisible(bool visible)
+    {
+        foreach (RectTransform heroRect in heroBattleRects.Values)
+        {
+            if (heroRect != null && heroRect.gameObject.activeSelf != visible)
+            {
+                heroRect.gameObject.SetActive(visible);
+            }
+        }
+
+        for (int i = 0; i < enemyBattleRects.Count; i++)
+        {
+            RectTransform enemyRect = enemyBattleRects[i];
+            if (enemyRect != null && enemyRect.gameObject.activeSelf != visible)
+            {
+                enemyRect.gameObject.SetActive(visible);
+            }
+        }
+    }
+
+    private void RefreshDamagePopup(float flashRatio)
+    {
         if (battleManager.HitSequence <= 0)
         {
             damagePopupText.text = "READY";
@@ -4871,6 +6783,27 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private string GetRarityLabel(HeroRarity rarity)
+    {
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return "커먼";
+            case HeroRarity.Uncommon:
+                return "언커먼";
+            case HeroRarity.Rare:
+                return "레어";
+            case HeroRarity.Epic:
+                return "에픽";
+            case HeroRarity.Legendary:
+                return "레전더리";
+            case HeroRarity.Mythic:
+                return "신화";
+            default:
+                return "미정";
+        }
+    }
+
     private string GetTraitBadge(HeroTrait trait)
     {
         switch (trait)
@@ -4995,6 +6928,56 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private Color GetTranscendGradeColor(HeroTranscendGrade grade)
+    {
+        switch (grade)
+        {
+            case HeroTranscendGrade.F:
+                return new Color(0.43f, 0.49f, 0.58f, 1f);
+            case HeroTranscendGrade.E:
+                return new Color(0.33f, 0.55f, 0.70f, 1f);
+            case HeroTranscendGrade.D:
+                return new Color(0.26f, 0.60f, 0.46f, 1f);
+            case HeroTranscendGrade.C:
+                return new Color(0.42f, 0.64f, 0.24f, 1f);
+            case HeroTranscendGrade.B:
+                return new Color(0.66f, 0.58f, 0.22f, 1f);
+            case HeroTranscendGrade.A:
+                return new Color(0.84f, 0.45f, 0.18f, 1f);
+            case HeroTranscendGrade.S:
+                return new Color(0.78f, 0.28f, 0.86f, 1f);
+            case HeroTranscendGrade.SS:
+                return new Color(0.33f, 0.72f, 1f, 1f);
+            default:
+                return Color.white;
+        }
+    }
+
+    private string GetTranscendGradeHex(HeroTranscendGrade grade)
+    {
+        switch (grade)
+        {
+            case HeroTranscendGrade.F:
+                return "#A9B2C4";
+            case HeroTranscendGrade.E:
+                return "#86C8FF";
+            case HeroTranscendGrade.D:
+                return "#65D29B";
+            case HeroTranscendGrade.C:
+                return "#9BDA5A";
+            case HeroTranscendGrade.B:
+                return "#FFD65A";
+            case HeroTranscendGrade.A:
+                return "#FF9C4A";
+            case HeroTranscendGrade.S:
+                return "#E66BFF";
+            case HeroTranscendGrade.SS:
+                return "#6DD7FF";
+            default:
+                return "#FFFFFF";
+        }
+    }
+
     private Color GetRarityColor(HeroRarity rarity)
     {
         switch (rarity)
@@ -5087,6 +7070,11 @@ public sealed class GameHud : MonoBehaviour
     }
 
     private string FormatShortNumber(double value)
+    {
+        return NumberFormatter.Format(value);
+    }
+
+    private string FormatShortNumber(GameNumber value)
     {
         return NumberFormatter.Format(value);
     }

@@ -36,11 +36,26 @@ public sealed class StageProgressManager : MonoBehaviour
 
         if (clearedStage.Type == StageType.Boss)
         {
-            ChapterOneBossCleared = true;
-            HighestStageId = GameData.MaxStageId(HighestStageId, clearedStage.Id);
-            CurrentStageId = GameData.BossFallbackStageId;
-            SelectedStageId = CurrentStageId;
-            Mode = ProgressMode.RepeatSelected;
+            if (clearedStage.Id == GameData.ChapterOneBossStageId)
+            {
+                ChapterOneBossCleared = true;
+            }
+
+            string nextStageId = GameData.GetNextStageId(clearedStage.Id);
+            HighestStageId = GameData.MaxStageId(HighestStageId, string.IsNullOrEmpty(nextStageId) ? clearedStage.Id : nextStageId);
+            if (Mode == ProgressMode.AutoProgress && !string.IsNullOrEmpty(nextStageId))
+            {
+                CurrentStageId = nextStageId;
+                SelectedStageId = CurrentStageId;
+                Mode = ProgressMode.AutoProgress;
+            }
+            else
+            {
+                CurrentStageId = GameData.GetPreviousNormalStageId(clearedStage.Id);
+                SelectedStageId = CurrentStageId;
+                Mode = ProgressMode.RepeatSelected;
+            }
+
             SaveProgress();
             NotifyChanged();
             return;
@@ -103,15 +118,7 @@ public sealed class StageProgressManager : MonoBehaviour
     public void ResumeAutoProgress()
     {
         Mode = ProgressMode.AutoProgress;
-
-        if (ChapterOneBossCleared)
-        {
-            CurrentStageId = GameData.BossFallbackStageId;
-        }
-        else
-        {
-            CurrentStageId = HighestStageId;
-        }
+        CurrentStageId = HighestStageId;
 
         SaveProgress();
         NotifyChanged();

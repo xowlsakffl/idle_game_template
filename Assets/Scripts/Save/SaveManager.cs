@@ -35,6 +35,34 @@ public sealed class SaveManager : MonoBehaviour
         PlayerPrefs.SetString(key, value.ToString());
     }
 
+    public double LoadDouble(string key, double fallback)
+    {
+        string raw = PlayerPrefs.GetString(key, fallback.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return double.TryParse(
+            raw,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out double value)
+            ? value
+            : fallback;
+    }
+
+    public void SaveDouble(string key, double value)
+    {
+        PlayerPrefs.SetString(key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    public GameNumber LoadGameNumber(string key, GameNumber fallback)
+    {
+        string raw = PlayerPrefs.GetString(key, fallback.ToSaveString());
+        return GameNumber.TryParse(raw, out GameNumber value) ? value : fallback;
+    }
+
+    public void SaveGameNumber(string key, GameNumber value)
+    {
+        PlayerPrefs.SetString(key, value.ToSaveString());
+    }
+
     public T LoadEnum<T>(string key, T fallback) where T : struct
     {
         string raw = PlayerPrefs.GetString(key, fallback.ToString());
@@ -49,7 +77,35 @@ public sealed class SaveManager : MonoBehaviour
             int level = PlayerPrefs.GetInt(SaveKeys.HeroLevel(definition.Id), 1);
             int shards = PlayerPrefs.GetInt(SaveKeys.HeroShards(definition.Id), 0);
             int stars = PlayerPrefs.GetInt(SaveKeys.HeroStars(definition.Id), 0);
-            heroes.Add(new HeroState(definition, level, shards, stars));
+            HeroState hero = new HeroState(definition, level, shards, stars);
+            string[] loadedTranscendOptionIds = new string[HeroDefinition.MaxTranscendSlots];
+            bool hasRolledTranscendMarker = false;
+            bool hasNonLegacyDefaultTranscendOption = false;
+            for (int slot = 0; slot < HeroDefinition.MaxTranscendSlots; slot++)
+            {
+                string optionId = PlayerPrefs.GetString(SaveKeys.HeroTranscendOption(definition.Id, slot), string.Empty);
+                loadedTranscendOptionIds[slot] = optionId;
+                hasRolledTranscendMarker |= PlayerPrefs.GetInt(SaveKeys.HeroTranscendOptionRolled(definition.Id, slot), 0) == 1;
+                hasNonLegacyDefaultTranscendOption |= !string.IsNullOrEmpty(optionId)
+                    && !(slot == 0 && optionId == "COMMON_ACCOUNT_EXP_F");
+            }
+
+            bool onlyLegacyDefaultOption = !hasRolledTranscendMarker
+                && !hasNonLegacyDefaultTranscendOption
+                && loadedTranscendOptionIds.Length > 0
+                && loadedTranscendOptionIds[0] == "COMMON_ACCOUNT_EXP_F";
+            if (onlyLegacyDefaultOption)
+            {
+                loadedTranscendOptionIds[0] = string.Empty;
+                PlayerPrefs.DeleteKey(SaveKeys.HeroTranscendOption(definition.Id, 0));
+            }
+
+            for (int slot = 0; slot < HeroDefinition.MaxTranscendSlots; slot++)
+            {
+                hero.SetTranscendOptionId(slot, loadedTranscendOptionIds[slot]);
+            }
+
+            heroes.Add(hero);
         }
 
         return heroes;
@@ -60,6 +116,30 @@ public sealed class SaveManager : MonoBehaviour
         PlayerPrefs.SetInt(SaveKeys.HeroLevel(hero.Definition.Id), hero.Level);
         PlayerPrefs.SetInt(SaveKeys.HeroShards(hero.Definition.Id), hero.Shards);
         PlayerPrefs.SetInt(SaveKeys.HeroStars(hero.Definition.Id), hero.Stars);
+        for (int slot = 0; slot < HeroDefinition.MaxTranscendSlots; slot++)
+        {
+            string optionId = hero.GetTranscendOptionId(slot);
+            PlayerPrefs.SetString(SaveKeys.HeroTranscendOption(hero.Definition.Id, slot), optionId);
+            if (!string.IsNullOrEmpty(optionId))
+            {
+                PlayerPrefs.SetInt(SaveKeys.HeroTranscendOptionRolled(hero.Definition.Id, slot), 1);
+            }
+        }
+    }
+
+    public void SaveHeroTranscendOption(HeroState hero, int slot)
+    {
+        if (hero == null || slot < 0 || slot >= HeroDefinition.MaxTranscendSlots)
+        {
+            return;
+        }
+
+        string optionId = hero.GetTranscendOptionId(slot);
+        PlayerPrefs.SetString(SaveKeys.HeroTranscendOption(hero.Definition.Id, slot), optionId);
+        if (!string.IsNullOrEmpty(optionId))
+        {
+            PlayerPrefs.SetInt(SaveKeys.HeroTranscendOptionRolled(hero.Definition.Id, slot), 1);
+        }
     }
 
     public DateTime? LoadLastOnlineUtc()
