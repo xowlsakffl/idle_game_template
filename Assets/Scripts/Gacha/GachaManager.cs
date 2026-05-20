@@ -45,7 +45,7 @@ public sealed class GachaManager : MonoBehaviour
         count = Mathf.Clamp(count, 1, 10);
         if (!wallet.SpendHeroSummonCost(count, RubyCostPerHeroSummon))
         {
-            LastResult = "히어로 뽑기 실패: 뽑기권과 루비 부족";
+            LastResult = "영웅 뽑기 실패: 뽑기권과 루비 부족";
             Changed?.Invoke();
             return;
         }

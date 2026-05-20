@@ -11,15 +11,19 @@ public static class GameData
     public const int MaxVisibleEnemies = 12;
     public const int MaxPartyHeroes = 8;
     public const int MaxHeroPresets = 3;
+    public const int MaxTotemSlots = 2;
+    public const int InitialUnlockedTotemSlots = 1;
+    public const int MaxRuneSlots = 4;
     public const int StagesPerChapter = 20;
-    private const double NormalStageHpGrowth = 1.155d;
-    private const double NormalStageGoldGrowth = 1.095d;
-    private const double GeneratedStageHpBase = 30d;
-    private const double GeneratedStageGoldBase = 5d;
-    private const double GeneratedStageHpOffset = 6d;
-    private const double GeneratedStageGoldOffset = 10d;
-    private const double BossHpMultiplier = 22d;
-    private const double BossGoldMultiplier = 14d;
+    public const int MaxIntBalanceValue = int.MaxValue / 4;
+    private const double NormalStageHpGrowth = 1.055d;
+    private const double NormalStageGoldGrowth = 1.032d;
+    private const double GeneratedStageHpBase = 26d;
+    private const double GeneratedStageGoldBase = 3d;
+    private const double GeneratedStageHpOffset = 2d;
+    private const double GeneratedStageGoldOffset = 1d;
+    private const double BossHpMultiplier = 8d;
+    private const double BossGoldMultiplier = 8d;
 
     private static readonly HeroDefinition[] heroes =
     {
@@ -103,13 +107,13 @@ public static class GameData
 
     private static readonly AbilityDefinition[] abilities =
     {
-        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "만렙 1,000,000 기준 4.89C", 4890d, 0d, 1000000, 25, 1.25f, AbilityDisplayKind.Flat),
-        new AbilityDefinition(AbilityKind.MaxHp, "체력 증가", "만렙 1,000,000 기준 26.6C", 26600d, 0d, 1000000, 30, 1.25f, AbilityDisplayKind.Flat),
-        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 2500, 1.75f, AbilityDisplayKind.Percent),
-        new AbilityDefinition(AbilityKind.CriticalDamage, "치명타 데미지 증가", "기본 5.0% + 레벨당 0.1%", 0.1d, 5d, 1000000, 75, 1.22f, AbilityDisplayKind.Percent),
-        new AbilityDefinition(AbilityKind.DoubleCriticalChance, "더블 치명타 확률 증가", "만렙 500 기준 50.0%", 0.1d, 0d, 500, 5000, 1.78f, AbilityDisplayKind.Percent),
-        new AbilityDefinition(AbilityKind.DoubleCriticalBonusDamage, "더블 치명타 추가 데미지 증가", "기본 5.0% + 레벨당 0.1%", 0.1d, 5d, 1000000, 100, 1.22f, AbilityDisplayKind.Percent),
-        new AbilityDefinition(AbilityKind.FinalDamage, "최종 데미지 증가", "레벨당 0.5%", 0.5d, 0d, 1000000, 150, 1.28f, AbilityDisplayKind.Percent)
+        new AbilityDefinition(AbilityKind.AttackPower, "공격력 증가", "최대 +3,000", 3d, 0d, 1000, 10, 1.12f, AbilityDisplayKind.Flat),
+        new AbilityDefinition(AbilityKind.MaxHp, "체력 증가", "최대 +18,000", 18d, 0d, 1000, 12, 1.12f, AbilityDisplayKind.Flat),
+        new AbilityDefinition(AbilityKind.CriticalChance, "치명타 확률 증가", "최대 50.0%", 0.1d, 0d, 500, 120, 1.28f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.CriticalDamage, "치명타 데미지 증가", "기본 5.0% + 레벨당 0.2%", 0.2d, 5d, 1000, 18, 1.10f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.DoubleCriticalChance, "더블 치명타 확률 증가", "최대 50.0%", 0.1d, 0d, 500, 180, 1.30f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.DoubleCriticalBonusDamage, "더블 치명타 추가 데미지 증가", "기본 5.0% + 레벨당 0.2%", 0.2d, 5d, 1000, 24, 1.10f, AbilityDisplayKind.Percent),
+        new AbilityDefinition(AbilityKind.FinalDamage, "최종 데미지 증가", "최대 +100.0%", 0.1d, 0d, 1000, 32, 1.12f, AbilityDisplayKind.Percent)
     };
 
     private static readonly CombatSkillDefinition[] skills =
@@ -121,6 +125,29 @@ public static class GameData
     private static readonly PetDefinition[] pets =
     {
         new PetDefinition("P001", "여우 루루", 8, 1.5f, 0.05f)
+    };
+
+    private static readonly TotemDefinition[] totems =
+    {
+        new TotemDefinition("TOTEM_COMBAT", "전투 토템", "⚔", "공격력, 치명타, 보스 피해", TotemArchetype.Combat),
+        new TotemDefinition("TOTEM_GUARDIAN", "수호 토템", "◆", "체력, 피해 감소, 방어형 보너스", TotemArchetype.Guardian),
+        new TotemDefinition("TOTEM_SUPPORT", "지원 토템", "✦", "골드, 경험치책, 계정 경험치", TotemArchetype.Support),
+        new TotemDefinition("TOTEM_ARCANE", "비전 토템", "✹", "스킬 피해, 스킬 쿨타임, 자동 스킬", TotemArchetype.Arcane),
+        new TotemDefinition("TOTEM_STORM", "폭풍 토템", "↯", "공속, 이속, 원거리 보너스", TotemArchetype.Storm)
+    };
+
+    private static readonly RuneDefinition[] runes =
+    {
+        new RuneDefinition("RUNE_STRIKE", "검격 룬", "◇", "기본 공격 보정", RuneEffectKind.Strike),
+        new RuneDefinition("RUNE_EXECUTE", "처형 룬", "◆", "최종 피해 보정", RuneEffectKind.Execute),
+        new RuneDefinition("RUNE_BARRIER", "방벽 룬", "⬟", "체력과 피해 감소", RuneEffectKind.Barrier),
+        new RuneDefinition("RUNE_HARVEST", "수확 룬", "✦", "골드와 경험치책 획득", RuneEffectKind.Harvest),
+        new RuneDefinition("RUNE_ARCANE", "비전 룬", "✧", "스킬 피해와 쿨타임", RuneEffectKind.Arcane),
+        new RuneDefinition("RUNE_STORM", "질풍 룬", "↯", "공속과 이속", RuneEffectKind.Storm),
+        new RuneDefinition("RUNE_FOCUS", "정밀 룬", "◎", "치명타 확률", RuneEffectKind.Focus),
+        new RuneDefinition("RUNE_VITALITY", "생명 룬", "✚", "파티 체력", RuneEffectKind.Vitality),
+        new RuneDefinition("RUNE_COMMAND", "지휘 룬", "☷", "공격력과 계정 경험치", RuneEffectKind.Command),
+        new RuneDefinition("RUNE_REGEN", "재생 룬", "♢", "지속 전투 안정성", RuneEffectKind.Regeneration)
     };
 
     private static readonly EquipmentDefinition[] equipments =
@@ -153,6 +180,8 @@ public static class GameData
     private static readonly HeroTranscendOptionDefinition[] heroTranscendOptions = BuildHeroTranscendOptions();
     private static readonly Dictionary<string, HeroDefinition> heroesById = BuildHeroMap();
     private static readonly Dictionary<string, EquipmentDefinition> equipmentsById = BuildEquipmentMap();
+    private static readonly Dictionary<string, TotemDefinition> totemsById = BuildTotemMap();
+    private static readonly Dictionary<string, RuneDefinition> runesById = BuildRuneMap();
     private static readonly Dictionary<string, HeroTranscendOptionDefinition> heroTranscendOptionsById = BuildHeroTranscendOptionMap();
     private static readonly Dictionary<string, EnemyDefinition> enemiesById = BuildEnemyMap();
     private static readonly Dictionary<string, BossDefinition> bossesById = BuildBossMap();
@@ -164,6 +193,8 @@ public static class GameData
     public static IReadOnlyList<AbilityDefinition> Abilities => abilities;
     public static IReadOnlyList<CombatSkillDefinition> Skills => skills;
     public static IReadOnlyList<PetDefinition> Pets => pets;
+    public static IReadOnlyList<TotemDefinition> Totems => totems;
+    public static IReadOnlyList<RuneDefinition> Runes => runes;
     public static IReadOnlyList<EquipmentDefinition> Equipments => equipments;
     public static IReadOnlyList<HeroTranscendOptionDefinition> HeroTranscendOptions => heroTranscendOptions;
 
@@ -175,6 +206,16 @@ public static class GameData
     public static EquipmentDefinition GetEquipment(string id)
     {
         return !string.IsNullOrEmpty(id) && equipmentsById.TryGetValue(id, out EquipmentDefinition equipment) ? equipment : equipments[0];
+    }
+
+    public static TotemDefinition GetTotem(string id)
+    {
+        return !string.IsNullOrEmpty(id) && totemsById.TryGetValue(id, out TotemDefinition totem) ? totem : totems[0];
+    }
+
+    public static RuneDefinition GetRune(string id)
+    {
+        return !string.IsNullOrEmpty(id) && runesById.TryGetValue(id, out RuneDefinition rune) ? rune : runes[0];
     }
 
     public static HeroTranscendOptionDefinition GetHeroTranscendOption(string id)
@@ -315,18 +356,18 @@ public static class GameData
     public static GameNumber GetEnemyHp(StageDefinition stage)
     {
         EnemyDefinition enemy = GetEnemy(stage.TargetId);
-        return GameNumber.Floor(enemy.BaseHp * stage.HpMultiplier);
+        return ClampNumber(GameNumber.Floor(enemy.BaseHp * stage.HpMultiplier));
     }
 
     public static GameNumber GetEnemyGold(StageDefinition stage)
     {
         EnemyDefinition enemy = GetEnemy(stage.TargetId);
-        return GameNumber.Floor(enemy.BaseGold * stage.GoldMultiplier);
+        return ClampNumber(GameNumber.Floor(enemy.BaseGold * stage.GoldMultiplier));
     }
 
     public static GameNumber GetEnemyHeroExpItem(StageDefinition stage)
     {
-        return GameNumber.Ceiling(GetEnemyGold(stage) * 0.6d);
+        return ClampNumber(GameNumber.Ceiling(GetEnemyGold(stage) * 0.20d));
     }
 
     public static StageClearReward GetStageFirstClearReward(StageDefinition stage)
@@ -342,18 +383,18 @@ public static class GameData
             return new StageClearReward(
                 heroSummonTickets: 1,
                 equipmentSummonTickets: 1,
-                ruby: 150,
-                heroExpItems: 60 + chapter * 20,
-                equipmentExpItems: 50 + chapter * 18,
-                heroTranscendStones: chapter % 5 == 0 ? 10 : 3);
+                ruby: 100,
+                heroExpItems: 30 + chapter * 10,
+                equipmentExpItems: 25 + chapter * 8,
+                heroTranscendStones: chapter % 5 == 0 ? 5 : 1);
         }
 
         int stageTier = Math.Max(1, stage.Chapter);
         int heroTickets = stage.Number == 10 ? 1 : 0;
         int equipmentTickets = stage.Number == 5 || stage.Number == 15 ? 1 : 0;
-        int ruby = stage.Number == 10 ? 50 : 0;
-        int heroExp = stage.Number > 0 && stage.Number % 3 == 0 ? 8 + stageTier * 4 : 0;
-        int equipmentExp = stage.Number > 0 && stage.Number % 6 == 0 ? 8 + stageTier * 4 : 0;
+        int ruby = stage.Number == 10 ? 25 : 0;
+        int heroExp = stage.Number > 0 && stage.Number % 3 == 0 ? 3 + stageTier * 2 : 0;
+        int equipmentExp = stage.Number > 0 && stage.Number % 6 == 0 ? 3 + stageTier * 2 : 0;
 
         return new StageClearReward(heroTickets, equipmentTickets, ruby, heroExp, equipmentExp, 0);
     }
@@ -361,13 +402,13 @@ public static class GameData
     public static GameNumber GetBossHp(StageDefinition stage)
     {
         BossDefinition boss = GetBoss(stage.TargetId);
-        return GameNumber.Floor(boss.BaseHp * stage.HpMultiplier);
+        return ClampNumber(GameNumber.Floor(boss.BaseHp * stage.HpMultiplier));
     }
 
     public static GameNumber GetBossClearGold(StageDefinition stage)
     {
         BossDefinition boss = GetBoss(stage.TargetId);
-        return GameNumber.Floor(boss.ClearGold * stage.GoldMultiplier);
+        return ClampNumber(GameNumber.Floor(boss.ClearGold * stage.GoldMultiplier));
     }
 
     public static GameNumber GetOfflineGoldPerSecond(string stageId)
@@ -400,7 +441,57 @@ public static class GameData
             multiplier = 0.40d;
         }
 
-        return GetEnemyGold(stage) * multiplier;
+        return ClampNumber(GetEnemyGold(stage) * multiplier);
+    }
+
+    public static double ClampVisibleNumber(double value)
+    {
+        if (double.IsNaN(value))
+        {
+            return 0d;
+        }
+
+        if (double.IsPositiveInfinity(value))
+        {
+            return double.MaxValue / 1024d;
+        }
+
+        if (double.IsNegativeInfinity(value))
+        {
+            return -double.MaxValue / 1024d;
+        }
+
+        return value;
+    }
+
+    public static GameNumber ClampNumber(GameNumber value)
+    {
+        if (double.IsNaN(value.Mantissa))
+        {
+            return GameNumber.Zero;
+        }
+
+        return value;
+    }
+
+    public static GameNumber ClampNumber(double value)
+    {
+        return GameNumber.FromDouble(ClampVisibleNumber(value));
+    }
+
+    public static double ClampCombatPower(double value)
+    {
+        if (double.IsNaN(value) || value <= 1d)
+        {
+            return 1d;
+        }
+
+        return ClampVisibleNumber(value);
+    }
+
+    public static long ClampCount(long value)
+    {
+        return Math.Max(0L, value);
     }
 
     private static StageDefinition Normal(string id, int number, string enemyId, double hpMultiplier, double goldMultiplier)
@@ -478,12 +569,18 @@ public static class GameData
 
     private static GameNumber GenerateTargetHp(int globalIndex)
     {
-        return GameNumber.FromGrowth(GeneratedStageHpBase, NormalStageHpGrowth, globalIndex - 1 + GeneratedStageHpOffset);
+        double growthValue = GeneratedStageHpBase
+            * Math.Pow(NormalStageHpGrowth, globalIndex - 1 + GeneratedStageHpOffset)
+            + globalIndex * 6d;
+        return ClampNumber(growthValue);
     }
 
     private static GameNumber GenerateTargetGold(int globalIndex)
     {
-        return GameNumber.FromGrowth(GeneratedStageGoldBase, NormalStageGoldGrowth, globalIndex - 1 + GeneratedStageGoldOffset);
+        double growthValue = GeneratedStageGoldBase
+            * Math.Pow(NormalStageGoldGrowth, globalIndex - 1 + GeneratedStageGoldOffset)
+            + globalIndex * 0.45d;
+        return ClampNumber(growthValue);
     }
 
     private static Dictionary<string, HeroDefinition> BuildHeroMap()
@@ -503,6 +600,28 @@ public static class GameData
         foreach (EquipmentDefinition equipment in equipments)
         {
             map[equipment.Id] = equipment;
+        }
+
+        return map;
+    }
+
+    private static Dictionary<string, TotemDefinition> BuildTotemMap()
+    {
+        var map = new Dictionary<string, TotemDefinition>();
+        foreach (TotemDefinition totem in totems)
+        {
+            map[totem.Id] = totem;
+        }
+
+        return map;
+    }
+
+    private static Dictionary<string, RuneDefinition> BuildRuneMap()
+    {
+        var map = new Dictionary<string, RuneDefinition>();
+        foreach (RuneDefinition rune in runes)
+        {
+            map[rune.Id] = rune;
         }
 
         return map;
@@ -531,14 +650,14 @@ public static class GameData
             new HeroTranscendOptionDefinition("COMMON_FINAL_A", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.A, "최종 데미지+10%", 5f),
             new HeroTranscendOptionDefinition("COMMON_FINAL_S", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.S, "최종 데미지+20%", 2f),
             new HeroTranscendOptionDefinition("COMMON_FINAL_SS", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.SS, "최종 데미지+40%", 0.35f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_F", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.F, "5% 확률로 히어로 스킬 추가 1회 발동", 1.1658f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_E", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.E, "6% 확률로 히어로 스킬 추가 1회 발동", 1.04926f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_D", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.D, "7% 확률로 히어로 스킬 추가 1회 발동", 0.8161f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_C", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.C, "8% 확률로 히어로 스킬 추가 1회 발동", 0.5829f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_B", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.B, "9% 확률로 히어로 스킬 추가 1회 발동", 0.3498f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_A", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.A, "10% 확률로 히어로 스킬 추가 1회 발동", 0.2332f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_S", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.S, "20% 확률로 히어로 스킬 추가 1회 발동", 0.1166f),
-            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_SS", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.SS, "30% 확률로 히어로 스킬 추가 1회 발동", 0.02915f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_F", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.F, "5% 확률로 영웅 스킬 추가 1회 발동", 1.1658f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_E", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.E, "6% 확률로 영웅 스킬 추가 1회 발동", 1.04926f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_D", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.D, "7% 확률로 영웅 스킬 추가 1회 발동", 0.8161f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_C", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.C, "8% 확률로 영웅 스킬 추가 1회 발동", 0.5829f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_B", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.B, "9% 확률로 영웅 스킬 추가 1회 발동", 0.3498f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_A", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.A, "10% 확률로 영웅 스킬 추가 1회 발동", 0.2332f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_S", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.S, "20% 확률로 영웅 스킬 추가 1회 발동", 0.1166f),
+            new HeroTranscendOptionDefinition("COMMON_EXTRA_SKILL_SS", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.SS, "30% 확률로 영웅 스킬 추가 1회 발동", 0.02915f),
             new HeroTranscendOptionDefinition("COMMON_STUN_A", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.A, "스킬 적중 시 10% 확률로 적 기절", 2.3317f),
             new HeroTranscendOptionDefinition("COMMON_STUN_S", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.S, "스킬 적중 시 20% 확률로 적 기절", 1.9819f),
             new HeroTranscendOptionDefinition("COMMON_STUN_SS", string.Empty, HeroTranscendOptionScope.Common, HeroTranscendGrade.SS, "스킬 적중 시 30% 확률로 적 기절", 0.02915f)

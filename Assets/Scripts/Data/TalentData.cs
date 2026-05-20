@@ -5,27 +5,92 @@ public static class TalentData
     private const int DefaultMaxLevel = 100;
     private const int DefaultCost = 1;
 
-    private static readonly TalentDefinition[] talents =
+    private static readonly TalentSpec[][] talentSpecs =
     {
-        new TalentDefinition("ATK_CORE", "검술 단련", "⚔", "공격", 0, 0, DefaultMaxLevel, DefaultCost, 1.0d, TalentEffectKind.AttackPercent),
-        new TalentDefinition("CRIT_EDGE", "약점 간파", "◆", "공격", 0, 1, DefaultMaxLevel, DefaultCost, 1.5d, TalentEffectKind.CriticalDamagePercent),
-        new TalentDefinition("FINAL_STRIKE", "결정타", "!", "공격", 0, 2, DefaultMaxLevel, DefaultCost, 0.5d, TalentEffectKind.FinalDamagePercent),
-        new TalentDefinition("SKILL_FORCE", "스킬 증폭", "✦", "공격", 0, 3, DefaultMaxLevel, DefaultCost, 0.8d, TalentEffectKind.SkillDamagePercent),
-
-        new TalentDefinition("HP_CORE", "생명 강화", "♥", "생존", 1, 0, DefaultMaxLevel, DefaultCost, 1.5d, TalentEffectKind.HpPercent),
-        new TalentDefinition("GUARD_CORE", "수호 자세", "▣", "생존", 1, 1, DefaultMaxLevel, DefaultCost, 0.2d, TalentEffectKind.DamageReductionPercent),
-        new TalentDefinition("MOVE_CORE", "전장 기동", "↗", "생존", 1, 2, DefaultMaxLevel, DefaultCost, 0.5d, TalentEffectKind.MoveSpeedPercent),
-        new TalentDefinition("HP_ADVANCE", "불굴의 체력", "✚", "생존", 1, 3, DefaultMaxLevel, DefaultCost, 1.0d, TalentEffectKind.HpPercent),
-
-        new TalentDefinition("GOLD_GAIN", "전리품 감각", "G", "성장", 2, 0, DefaultMaxLevel, DefaultCost, 1.0d, TalentEffectKind.GoldGainPercent),
-        new TalentDefinition("BOOK_GAIN", "수련 기록", "EXP", "성장", 2, 1, DefaultMaxLevel, DefaultCost, 1.0d, TalentEffectKind.HeroExpGainPercent),
-        new TalentDefinition("ACCOUNT_STUDY", "계정 숙련", "AP", "성장", 2, 2, DefaultMaxLevel, DefaultCost, 1.0d, TalentEffectKind.AccountExpGainPercent),
-        new TalentDefinition("GOLD_ADVANCE", "희귀 전리품", "★", "성장", 2, 3, DefaultMaxLevel, DefaultCost, 0.7d, TalentEffectKind.GoldGainPercent)
+        new[] { Spec("ATK_CORE", "검술 단련", "ATK", TalentEffectKind.AttackPercent, 0.05d) },
+        new[]
+        {
+            Spec("GOLD_GAIN", "전리품 감각", "GOLD", TalentEffectKind.GoldGainPercent, 0.08d),
+            Spec("HP_CORE", "생명 강화", "HP", TalentEffectKind.HpPercent, 0.08d),
+            Spec("CRIT_EDGE", "약점 간파", "CRIT", TalentEffectKind.CriticalDamagePercent, 0.06d)
+        },
+        new[]
+        {
+            Spec("BOOK_GAIN", "수련 기록", "BOOK", TalentEffectKind.HeroExpGainPercent, 0.08d),
+            Spec("GUARD_CORE", "수호 자세", "DEF", TalentEffectKind.DamageReductionPercent, 0.015d),
+            Spec("FINAL_STRIKE", "결정타", "FIN", TalentEffectKind.FinalDamagePercent, 0.04d)
+        },
+        new[] { Spec("BATTLE_FLOW", "전투 흐름", "SKL", TalentEffectKind.SkillDamagePercent, 0.05d) },
+        new[]
+        {
+            Spec("MOVE_CORE", "전장 기동", "SPD", TalentEffectKind.MoveSpeedPercent, 0.025d),
+            Spec("HP_ADVANCE", "불굴의 체력", "HP+", TalentEffectKind.HpPercent, 0.09d)
+        },
+        new[]
+        {
+            Spec("ACCOUNT_STUDY", "계정 숙련", "ACC", TalentEffectKind.AccountExpGainPercent, 0.07d),
+            Spec("GOLD_ADVANCE", "희귀 전리품", "G+", TalentEffectKind.GoldGainPercent, 0.07d)
+        },
+        new[] { Spec("SKILL_FORCE", "스킬 증폭", "SKL+", TalentEffectKind.SkillDamagePercent, 0.06d) },
+        new[]
+        {
+            Spec("CRIT_FORCE", "치명 집중", "CRIT+", TalentEffectKind.CriticalDamagePercent, 0.08d),
+            Spec("DAMAGE_GUARD", "피해 제어", "DR", TalentEffectKind.DamageReductionPercent, 0.012d),
+            Spec("ATTACK_DRILL", "전열 훈련", "ATK+", TalentEffectKind.AttackPercent, 0.06d)
+        },
+        new[]
+        {
+            Spec("FIELD_MOBILITY", "사냥 동선", "MOV", TalentEffectKind.MoveSpeedPercent, 0.025d),
+            Spec("BOOK_MASTERY", "교본 연구", "EXP", TalentEffectKind.HeroExpGainPercent, 0.08d),
+            Spec("FINAL_CORE", "마무리 감각", "FIN+", TalentEffectKind.FinalDamagePercent, 0.05d)
+        },
+        new[]
+        {
+            Spec("HP_MASTERY", "강인한 육체", "HP++", TalentEffectKind.HpPercent, 0.10d),
+            Spec("GOLD_MASTERY", "보상 증폭", "GOLD+", TalentEffectKind.GoldGainPercent, 0.08d)
+        },
+        new[] { Spec("ACCOUNT_FLOW", "계정 가속", "ACC+", TalentEffectKind.AccountExpGainPercent, 0.08d) },
+        new[]
+        {
+            Spec("SKILL_MASTERY", "스킬 숙련", "SKL", TalentEffectKind.SkillDamagePercent, 0.08d),
+            Spec("GUARD_MASTERY", "방어 숙련", "DEF+", TalentEffectKind.DamageReductionPercent, 0.015d)
+        },
+        new[] { Spec("ATTACK_MASTERY", "공격 숙련", "ATK", TalentEffectKind.AttackPercent, 0.07d) },
+        new[]
+        {
+            Spec("CRIT_MASTERY", "정밀 타격", "CRIT", TalentEffectKind.CriticalDamagePercent, 0.09d),
+            Spec("HP_EXPERT", "생존 본능", "HP", TalentEffectKind.HpPercent, 0.11d),
+            Spec("GOLD_EXPERT", "전리품 숙련", "G", TalentEffectKind.GoldGainPercent, 0.09d)
+        },
+        new[]
+        {
+            Spec("MOVE_EXPERT", "전장 지배", "SPD", TalentEffectKind.MoveSpeedPercent, 0.03d),
+            Spec("BOOK_EXPERT", "훈련 효율", "BOOK", TalentEffectKind.HeroExpGainPercent, 0.09d),
+            Spec("FINAL_EXPERT", "끝장내기", "FIN", TalentEffectKind.FinalDamagePercent, 0.06d)
+        },
+        new[]
+        {
+            Spec("SKILL_EXPERT", "스킬 과부하", "SKL+", TalentEffectKind.SkillDamagePercent, 0.09d),
+            Spec("GUARD_EXPERT", "피해 흡수", "DR", TalentEffectKind.DamageReductionPercent, 0.015d),
+            Spec("ACCOUNT_EXPERT", "계정 연구", "ACC", TalentEffectKind.AccountExpGainPercent, 0.09d)
+        },
+        new[] { Spec("GRAND_CORE", "영웅 지휘", "ALL", TalentEffectKind.AttackPercent, 0.09d) },
+        new[]
+        {
+            Spec("GRAND_SURVIVAL", "장기 생존", "HP+", TalentEffectKind.HpPercent, 0.12d),
+            Spec("GRAND_LOOT", "장기 보상", "G+", TalentEffectKind.GoldGainPercent, 0.10d)
+        },
+        new[] { Spec("MYTH_CORE", "신화 전투술", "MAX", TalentEffectKind.FinalDamagePercent, 0.07d) }
     };
 
+    private static readonly List<TalentDefinition> emptyTalents = new List<TalentDefinition>();
+    private static readonly TalentDefinition[] talents = BuildTalents();
     private static readonly Dictionary<string, TalentDefinition> talentsById = BuildTalentMap();
+    private static readonly Dictionary<int, List<TalentDefinition>> talentsByDepth = BuildTalentDepthMap();
 
     public static IReadOnlyList<TalentDefinition> Talents => talents;
+    public static int DepthCount => talentSpecs.Length;
+    public static int MaxDepth => DepthCount - 1;
 
     public static TalentDefinition GetTalent(string id)
     {
@@ -34,23 +99,138 @@ public static class TalentData
             : talents[0];
     }
 
-    public static TalentDefinition GetPreviousTalent(TalentDefinition talent)
+    public static bool TryGetTalent(string id, out TalentDefinition talent)
     {
-        if (talent == null || talent.Tier <= 0)
+        if (string.IsNullOrEmpty(id))
         {
-            return null;
+            talent = null;
+            return false;
         }
 
-        for (int i = 0; i < talents.Length; i++)
+        return talentsById.TryGetValue(id, out talent);
+    }
+
+    public static IReadOnlyList<TalentDefinition> GetTalentsInDepth(int depth)
+    {
+        return talentsByDepth.TryGetValue(depth, out List<TalentDefinition> depthTalents)
+            ? depthTalents
+            : emptyTalents;
+    }
+
+    public static IReadOnlyList<TalentDefinition> GetPrerequisiteTalents(TalentDefinition talent)
+    {
+        var prerequisites = new List<TalentDefinition>();
+        if (talent == null)
         {
-            TalentDefinition candidate = talents[i];
-            if (candidate.BranchIndex == talent.BranchIndex && candidate.Tier == talent.Tier - 1)
+            return prerequisites;
+        }
+
+        for (int i = 0; i < talent.PrerequisiteIds.Count; i++)
+        {
+            if (TryGetTalent(talent.PrerequisiteIds[i], out TalentDefinition prerequisite))
             {
-                return candidate;
+                prerequisites.Add(prerequisite);
             }
         }
 
-        return null;
+        return prerequisites;
+    }
+
+    public static TalentDefinition GetPreviousTalent(TalentDefinition talent)
+    {
+        IReadOnlyList<TalentDefinition> prerequisites = GetPrerequisiteTalents(talent);
+        return prerequisites.Count > 0 ? prerequisites[0] : null;
+    }
+
+    private static TalentDefinition[] BuildTalents()
+    {
+        var result = new List<TalentDefinition>();
+        TalentDefinition[] previousDepth = new TalentDefinition[0];
+
+        for (int depth = 0; depth < talentSpecs.Length; depth++)
+        {
+            TalentSpec[] specs = talentSpecs[depth];
+            var currentDepth = new TalentDefinition[specs.Length];
+            for (int nodeIndex = 0; nodeIndex < specs.Length; nodeIndex++)
+            {
+                TalentSpec spec = specs[nodeIndex];
+                currentDepth[nodeIndex] = new TalentDefinition(
+                    spec.Id,
+                    spec.DisplayName,
+                    spec.Icon,
+                    GetDepthLabel(depth),
+                    nodeIndex,
+                    depth,
+                    DefaultMaxLevel,
+                    DefaultCost,
+                    spec.ValuePerLevel,
+                    spec.EffectKind,
+                    GetPrerequisiteIds(previousDepth, nodeIndex, specs.Length));
+                result.Add(currentDepth[nodeIndex]);
+            }
+
+            previousDepth = currentDepth;
+        }
+
+        return result.ToArray();
+    }
+
+    private static string[] GetPrerequisiteIds(TalentDefinition[] previousDepth, int currentIndex, int currentCount)
+    {
+        if (previousDepth == null || previousDepth.Length == 0)
+        {
+            return new string[0];
+        }
+
+        var ids = new List<string>();
+        int previousCount = previousDepth.Length;
+
+        if (previousCount == 1)
+        {
+            ids.Add(previousDepth[0].Id);
+        }
+        else if (currentCount == 1)
+        {
+            for (int i = 0; i < previousDepth.Length; i++)
+            {
+                ids.Add(previousDepth[i].Id);
+            }
+        }
+        else if (previousCount == currentCount)
+        {
+            ids.Add(previousDepth[currentIndex].Id);
+        }
+        else if (previousCount == 2 && currentCount == 3)
+        {
+            if (currentIndex <= 1)
+            {
+                ids.Add(previousDepth[0].Id);
+            }
+
+            if (currentIndex >= 1)
+            {
+                ids.Add(previousDepth[1].Id);
+            }
+        }
+        else if (previousCount == 3 && currentCount == 2)
+        {
+            if (currentIndex == 0)
+            {
+                ids.Add(previousDepth[0].Id);
+                ids.Add(previousDepth[1].Id);
+            }
+            else
+            {
+                ids.Add(previousDepth[1].Id);
+                ids.Add(previousDepth[2].Id);
+            }
+        }
+        else
+        {
+            ids.Add(previousDepth[0].Id);
+        }
+
+        return ids.ToArray();
     }
 
     private static Dictionary<string, TalentDefinition> BuildTalentMap()
@@ -62,5 +242,61 @@ public static class TalentData
         }
 
         return map;
+    }
+
+    private static Dictionary<int, List<TalentDefinition>> BuildTalentDepthMap()
+    {
+        var map = new Dictionary<int, List<TalentDefinition>>();
+        for (int i = 0; i < talents.Length; i++)
+        {
+            TalentDefinition talent = talents[i];
+            if (!map.TryGetValue(talent.Tier, out List<TalentDefinition> depthTalents))
+            {
+                depthTalents = new List<TalentDefinition>();
+                map[talent.Tier] = depthTalents;
+            }
+
+            depthTalents.Add(talent);
+        }
+
+        return map;
+    }
+
+    private static string GetDepthLabel(int depth)
+    {
+        return (depth + 1) + "뎁스";
+    }
+
+    private static TalentSpec Spec(
+        string id,
+        string displayName,
+        string icon,
+        TalentEffectKind effectKind,
+        double valuePerLevel)
+    {
+        return new TalentSpec(id, displayName, icon, effectKind, valuePerLevel);
+    }
+
+    private sealed class TalentSpec
+    {
+        public TalentSpec(
+            string id,
+            string displayName,
+            string icon,
+            TalentEffectKind effectKind,
+            double valuePerLevel)
+        {
+            Id = id;
+            DisplayName = displayName;
+            Icon = icon;
+            EffectKind = effectKind;
+            ValuePerLevel = valuePerLevel;
+        }
+
+        public string Id { get; }
+        public string DisplayName { get; }
+        public string Icon { get; }
+        public TalentEffectKind EffectKind { get; }
+        public double ValuePerLevel { get; }
     }
 }

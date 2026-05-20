@@ -4,6 +4,8 @@ using UnityEngine;
 
 public sealed class BattleManager : MonoBehaviour
 {
+    private const string UnequippedTotemId = "__NONE__";
+    private const string UnequippedRuneId = "__NONE__";
     private const float InitialEnemySpawnGraceSeconds = 0.75f;
     private const float RespawnEnemySpawnGraceSeconds = 1.35f;
     private const float FieldHalfWidth = 3.85f;
@@ -29,6 +31,10 @@ public sealed class BattleManager : MonoBehaviour
     private readonly List<VisibleEnemyState> visibleEnemies = new List<VisibleEnemyState>();
     private readonly List<CombatSkillState> skills = new List<CombatSkillState>();
     private readonly List<PetState> pets = new List<PetState>();
+    private readonly List<TotemState> totems = new List<TotemState>();
+    private readonly Dictionary<string, TotemState> totemsById = new Dictionary<string, TotemState>();
+    private readonly List<RuneState> runes = new List<RuneState>();
+    private readonly Dictionary<string, RuneState> runesById = new Dictionary<string, RuneState>();
     private readonly Dictionary<string, GameNumber> heroDamageMeter = new Dictionary<string, GameNumber>();
     private readonly Dictionary<string, int> heroTargetSpawnSequences = new Dictionary<string, int>();
     private readonly Dictionary<string, int> skillTargetSpawnSequences = new Dictionary<string, int>();
@@ -58,6 +64,9 @@ public sealed class BattleManager : MonoBehaviour
     public int ActiveHeroPreset => activeHeroPreset;
     public IReadOnlyList<CombatSkillState> Skills => skills;
     public IReadOnlyList<PetState> Pets => pets;
+    public IReadOnlyList<TotemState> Totems => totems;
+    public IReadOnlyList<RuneState> Runes => runes;
+    public TotemState ActiveTotem => GetTotemState(GetEquippedTotemId(activeHeroPreset, 1));
     public string TargetName { get; private set; } = string.Empty;
     public GameNumber TargetHp { get; private set; }
     public GameNumber TargetMaxHp { get; private set; }
@@ -84,9 +93,10 @@ public sealed class BattleManager : MonoBehaviour
     public Vector2 LastDefeatedEnemyPosition => lastDefeatedEnemyPosition;
     public string SupportStatusText => BuildSupportStatusText();
     public double PartyAttackPower => GetPartyAttackPower();
-    public double TotalCombatPower => abilityManager != null
-        ? abilityManager.GetTotalCombatPower(DeployedHeroes) * GetTalentMultiplier(TalentEffectKind.AttackPercent) * GetTalentMultiplier(TalentEffectKind.HpPercent)
-        : 1d;
+    public double HeroOwnedAttackBonusPercent => GetHeroOwnedAttackBonusPercent();
+    public double TotalCombatPower => GameData.ClampCombatPower(abilityManager != null
+        ? abilityManager.GetTotalCombatPower(DeployedHeroes) * GetHeroOwnedAttackMultiplier() * GetTotemAttackMultiplier(null) * GetTotemHpMultiplier(null) * GetRuneAttackMultiplier(null) * GetRuneHpMultiplier() * GetTalentMultiplier(TalentEffectKind.AttackPercent) * GetTalentMultiplier(TalentEffectKind.HpPercent)
+        : 1d);
     public float PetGoldBonusPercent => (GetPetGoldBonusMultiplier() - 1f) * 100f;
     public bool SkillAutoEnabled => skillAutoEnabled;
     public bool FeverAutoEnabled => feverAutoEnabled;
@@ -244,6 +254,8 @@ public sealed class BattleManager : MonoBehaviour
         activeHeroPreset = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.HeroFormationPreset, 1), 1, GameData.MaxHeroPresets);
         skillAutoEnabled = saveManager.LoadBool(SaveKeys.SkillAutoEnabled, true);
         feverAutoEnabled = saveManager.LoadBool(SaveKeys.FeverAutoEnabled, true);
+        LoadTotems();
+        LoadRunes();
         RefreshDeployedHeroes();
         skills.Clear();
         pets.Clear();
@@ -608,7 +620,419 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         saveManager.Flush();
-        LastBattleLog = "QA: 모든 히어로 레벨 +" + levels;
+        LastBattleLog = "QA: 모든 영웅 레벨 +" + levels;
+        NotifyChanged();
+    }
+
+    public TotemState GetTotemState(string totemId)
+    {
+        return !string.IsNullOrEmpty(totemId) && totemsById.TryGetValue(totemId, out TotemState state)
+            ? state
+            : null;
+    }
+
+    public string GetEquippedTotemId(int preset)
+    {
+        return GetEquippedTotemId(preset, 1);
+    }
+
+    public string GetEquippedTotemId(int preset, int slot)
+    {
+        string fallbackId = slot <= 1 && GameData.Totems.Count > 0 ? GameData.Totems[0].Id : string.Empty;
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxTotemSlots);
+        if (saveManager == null)
+        {
+            string playerPrefValue = PlayerPrefs.GetString(SaveKeys.HeroFormationTotem(normalizedPreset, normalizedSlot), fallbackId);
+            if (playerPrefValue == UnequippedTotemId)
+            {
+                return string.Empty;
+            }
+
+            return string.IsNullOrEmpty(playerPrefValue) ? fallbackId : GameData.GetTotem(playerPrefValue).Id;
+        }
+
+        string savedId = saveManager.LoadString(SaveKeys.HeroFormationTotem(normalizedPreset, normalizedSlot), fallbackId);
+        if (savedId == UnequippedTotemId)
+        {
+            return string.Empty;
+        }
+
+        return string.IsNullOrEmpty(savedId) ? fallbackId : GameData.GetTotem(savedId).Id;
+    }
+
+    public bool IsTotemSlotUnlocked(int slot)
+    {
+        return slot >= 1 && slot <= GameData.InitialUnlockedTotemSlots;
+    }
+
+    public bool SetTotemForPreset(int preset, string totemId)
+    {
+        return SetTotemForPreset(preset, 1, totemId);
+    }
+
+    public bool SetTotemForPreset(int preset, int slot, string totemId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxTotemSlots);
+        if (!IsTotemSlotUnlocked(normalizedSlot))
+        {
+            LastBattleLog = "토템 장착 실패: " + normalizedSlot + "번 슬롯은 아직 잠겨 있음";
+            NotifyChanged();
+            return false;
+        }
+
+        TotemState state = GetTotemState(totemId);
+        if (state == null || !state.Unlocked)
+        {
+            LastBattleLog = "토템 장착 실패: 보유하지 않은 토템";
+            NotifyChanged();
+            return false;
+        }
+
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        for (int i = 1; i <= GameData.MaxTotemSlots; i++)
+        {
+            if (i != normalizedSlot && GetEquippedTotemId(normalizedPreset, i) == state.Definition.Id)
+            {
+                LastBattleLog = "토템 장착 실패: 이미 다른 슬롯에 장착됨";
+                NotifyChanged();
+                return false;
+            }
+        }
+
+        saveManager.SaveString(SaveKeys.HeroFormationTotem(normalizedPreset, normalizedSlot), state.Definition.Id);
+        saveManager.Flush();
+        LastBattleLog = "프리셋 " + normalizedPreset + " " + normalizedSlot + "번 토템 장착: " + state.DisplayName;
+
+        if (normalizedPreset == activeHeroPreset)
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public bool ClearTotemForPreset(int preset, int slot)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxTotemSlots);
+        if (!IsTotemSlotUnlocked(normalizedSlot))
+        {
+            LastBattleLog = "토템 해제 실패: " + normalizedSlot + "번 슬롯은 아직 잠겨 있음";
+            NotifyChanged();
+            return false;
+        }
+
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        saveManager.SaveString(SaveKeys.HeroFormationTotem(normalizedPreset, normalizedSlot), UnequippedTotemId);
+        saveManager.Flush();
+        LastBattleLog = "프리셋 " + normalizedPreset + " " + normalizedSlot + "번 토템 해제";
+
+        if (normalizedPreset == activeHeroPreset)
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public bool TryLevelUpTotem(string totemId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        TotemState state = GetTotemState(totemId);
+        if (state == null)
+        {
+            return false;
+        }
+
+        if (!state.Unlocked)
+        {
+            LastBattleLog = state.DisplayName + " 강화 실패: 보유하지 않은 토템";
+            NotifyChanged();
+            return false;
+        }
+
+        if (state.IsMaxed)
+        {
+            LastBattleLog = state.DisplayName + " MAX";
+            NotifyChanged();
+            return false;
+        }
+
+        int cost = state.LevelUpCost;
+        if (!wallet.SpendTotemEssence(cost))
+        {
+            LastBattleLog = state.DisplayName + " 강화 실패: 토템 정수 부족";
+            NotifyChanged();
+            return false;
+        }
+
+        state.Level += 1;
+        state.Unlocked = true;
+        PlayerPrefs.SetInt(SaveKeys.TotemLevel(state.Definition.Id), state.Level);
+        saveManager.SaveBool(SaveKeys.TotemUnlocked(state.Definition.Id), true);
+        saveManager.Flush();
+        LastBattleLog = state.DisplayName + " Lv." + state.Level;
+
+        if (IsTotemEquipped(activeHeroPreset, state.Definition.Id))
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public bool TryPromoteTotem(string totemId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        TotemState state = GetTotemState(totemId);
+        if (state == null || !state.Unlocked)
+        {
+            LastBattleLog = "토템 진화 실패: 보유하지 않은 토템";
+            NotifyChanged();
+            return false;
+        }
+
+        if (!state.CanPromote)
+        {
+            LastBattleLog = state.DisplayName + " 진화 불가";
+            NotifyChanged();
+            return false;
+        }
+
+        int cost = state.PromoteCost;
+        if (!wallet.SpendTotemEssence(cost))
+        {
+            LastBattleLog = state.DisplayName + " 진화 실패: 토템 정수 부족";
+            NotifyChanged();
+            return false;
+        }
+
+        state.Grade = TotemDefinition.GetNextGrade(state.Grade);
+        state.Level = 1;
+        state.Unlocked = true;
+        PlayerPrefs.SetInt(SaveKeys.TotemLevel(state.Definition.Id), state.Level);
+        PlayerPrefs.SetInt(SaveKeys.TotemGrade(state.Definition.Id), (int)state.Grade);
+        saveManager.SaveBool(SaveKeys.TotemUnlocked(state.Definition.Id), true);
+        saveManager.Flush();
+        LastBattleLog = state.DisplayName + " 진화 완료";
+
+        if (IsTotemEquipped(activeHeroPreset, state.Definition.Id))
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public void DebugUnlockAllTotems()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        foreach (TotemState state in totems)
+        {
+            state.Unlocked = true;
+            saveManager.SaveBool(SaveKeys.TotemUnlocked(state.Definition.Id), true);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "QA: 모든 기본 토템 보유";
+        NotifyChanged();
+    }
+
+    public RuneState GetRuneState(string runeId)
+    {
+        return !string.IsNullOrEmpty(runeId) && runesById.TryGetValue(runeId, out RuneState state)
+            ? state
+            : null;
+    }
+
+    public string GetEquippedRuneId(int preset, int slot)
+    {
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxRuneSlots);
+        string key = SaveKeys.HeroFormationRune(normalizedPreset, normalizedSlot);
+        string savedId = saveManager != null
+            ? saveManager.LoadString(key, string.Empty)
+            : PlayerPrefs.GetString(key, string.Empty);
+
+        if (savedId == UnequippedRuneId)
+        {
+            return string.Empty;
+        }
+
+        RuneState state = GetRuneState(savedId);
+        return state != null ? state.Definition.Id : string.Empty;
+    }
+
+    public bool SetRuneForPreset(int preset, int slot, string runeId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        RuneState state = GetRuneState(runeId);
+        if (state == null || !state.Unlocked)
+        {
+            LastBattleLog = "룬 장착 실패: 보유하지 않은 룬";
+            NotifyChanged();
+            return false;
+        }
+
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxRuneSlots);
+        for (int i = 1; i <= GameData.MaxRuneSlots; i++)
+        {
+            if (i != normalizedSlot && GetEquippedRuneId(normalizedPreset, i) == state.Definition.Id)
+            {
+                LastBattleLog = "룬 장착 실패: 이미 다른 슬롯에 장착됨";
+                NotifyChanged();
+                return false;
+            }
+        }
+
+        saveManager.SaveString(SaveKeys.HeroFormationRune(normalizedPreset, normalizedSlot), state.Definition.Id);
+        saveManager.Flush();
+        LastBattleLog = "프리셋 " + normalizedPreset + " " + normalizedSlot + "번 룬 장착: " + state.Definition.DisplayName;
+
+        if (normalizedPreset == activeHeroPreset)
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public bool ClearRuneForPreset(int preset, int slot)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxRuneSlots);
+        saveManager.SaveString(SaveKeys.HeroFormationRune(normalizedPreset, normalizedSlot), UnequippedRuneId);
+        saveManager.Flush();
+        LastBattleLog = "프리셋 " + normalizedPreset + " " + normalizedSlot + "번 룬 해제";
+
+        if (normalizedPreset == activeHeroPreset)
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public bool TryLevelUpRune(string runeId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        RuneState state = GetRuneState(runeId);
+        if (state == null || !state.Unlocked)
+        {
+            LastBattleLog = "룬 강화 실패: 보유하지 않은 룬";
+            NotifyChanged();
+            return false;
+        }
+
+        if (state.IsMaxed)
+        {
+            LastBattleLog = state.Definition.DisplayName + " MAX";
+            NotifyChanged();
+            return false;
+        }
+
+        int cost = state.LevelUpCost;
+        if (!wallet.SpendRuneDust(cost))
+        {
+            LastBattleLog = state.Definition.DisplayName + " 강화 실패: 룬 가루 부족";
+            NotifyChanged();
+            return false;
+        }
+
+        state.Level += 1;
+        state.Unlocked = true;
+        PlayerPrefs.SetInt(SaveKeys.RuneLevel(state.Definition.Id), state.Level);
+        saveManager.SaveBool(SaveKeys.RuneUnlocked(state.Definition.Id), true);
+        saveManager.Flush();
+        LastBattleLog = state.Definition.DisplayName + " Lv." + state.Level;
+
+        if (IsRuneEquipped(activeHeroPreset, state.Definition.Id))
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return true;
+    }
+
+    public void DebugUnlockAllRunes()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        foreach (RuneState state in runes)
+        {
+            state.Unlocked = true;
+            saveManager.SaveBool(SaveKeys.RuneUnlocked(state.Definition.Id), true);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "QA: 모든 기본 룬 보유";
         NotifyChanged();
     }
 
@@ -643,7 +1067,7 @@ public sealed class BattleManager : MonoBehaviour
 
         foreach (CombatSkillState skill in skills)
         {
-            skill.CooldownRemaining = skill.Definition.CooldownSeconds;
+            skill.CooldownRemaining = skill.Definition.CooldownSeconds * (float)(GetTotemSkillCooldownMultiplier() * GetRuneSkillCooldownMultiplier());
         }
 
         foreach (PetState pet in pets)
@@ -966,7 +1390,7 @@ public sealed class BattleManager : MonoBehaviour
                 continue;
             }
 
-            hero.AttackCooldown += hero.AttackInterval;
+            hero.AttackCooldown += hero.AttackInterval / (float)(GetTotemAttackSpeedMultiplier(hero) * GetRuneAttackSpeedMultiplier(hero));
             readyHeroAttacks.Add(hero);
         }
 
@@ -1044,12 +1468,14 @@ public sealed class BattleManager : MonoBehaviour
                 continue;
             }
 
-            skill.CooldownRemaining += skill.Definition.CooldownSeconds;
+            skill.CooldownRemaining += skill.Definition.CooldownSeconds * (float)(GetTotemSkillCooldownMultiplier() * GetRuneSkillCooldownMultiplier());
             GameNumber damage = NormalizeDamage(GetPartyAttackPower()
                 * skill.Definition.PartyAttackMultiplier
                 * abilityManager.FinalDamageMultiplier
                 * GetTalentMultiplier(TalentEffectKind.FinalDamagePercent)
-                * GetTalentMultiplier(TalentEffectKind.SkillDamagePercent));
+                * GetTalentMultiplier(TalentEffectKind.SkillDamagePercent)
+                * GetTotemSkillDamageMultiplier()
+                * GetRuneSkillDamageMultiplier());
             if (IsBossFight)
             {
                 ApplyDamage(damage, skill.Definition.DisplayName, false);
@@ -1104,8 +1530,12 @@ public sealed class BattleManager : MonoBehaviour
     private GameNumber CalculateDamage(HeroState hero, out bool isCritical)
     {
         double damage = (hero.AttackPower + abilityManager.AttackPowerBonus)
-            * GetTalentMultiplier(TalentEffectKind.AttackPercent);
-        isCritical = random.NextDouble() < abilityManager.CriticalChance;
+            * GetHeroOwnedAttackMultiplier()
+            * GetTalentMultiplier(TalentEffectKind.AttackPercent)
+            * GetTotemAttackMultiplier(hero)
+            * GetRuneAttackMultiplier(hero);
+        double criticalChance = Math.Min(0.75d, abilityManager.CriticalChance + (GetTotemCriticalChanceBonus() + GetRuneCriticalChanceBonus()) / 100d);
+        isCritical = random.NextDouble() < criticalChance;
         if (isCritical)
         {
             damage *= abilityManager.CriticalDamageMultiplier * GetTalentMultiplier(TalentEffectKind.CriticalDamagePercent);
@@ -1115,7 +1545,7 @@ public sealed class BattleManager : MonoBehaviour
             }
         }
 
-        damage *= abilityManager.FinalDamageMultiplier * GetTalentMultiplier(TalentEffectKind.FinalDamagePercent);
+        damage *= abilityManager.FinalDamageMultiplier * GetTalentMultiplier(TalentEffectKind.FinalDamagePercent) * GetRuneFinalDamageMultiplier();
         return NormalizeDamage(damage);
     }
 
@@ -1129,10 +1559,45 @@ public sealed class BattleManager : MonoBehaviour
         double total = 0d;
         foreach (HeroState hero in deployedHeroes)
         {
-            total += (hero.AttackPower + abilityManager.AttackPowerBonus) * GetTalentMultiplier(TalentEffectKind.AttackPercent);
+            total += (hero.AttackPower + abilityManager.AttackPowerBonus)
+                * GetHeroOwnedAttackMultiplier()
+                * GetTalentMultiplier(TalentEffectKind.AttackPercent)
+                * GetTotemAttackMultiplier(hero)
+                * GetRuneAttackMultiplier(hero);
         }
 
         return Math.Max(1d, total);
+    }
+
+    public double GetHeroOwnedAttackBonusPercent(HeroState hero)
+    {
+        if (hero == null || !hero.IsOwned)
+        {
+            return 0d;
+        }
+
+        return 0.5d + Math.Max(0, hero.Stars) * 0.08d;
+    }
+
+    private double GetHeroOwnedAttackBonusPercent()
+    {
+        if (heroes == null)
+        {
+            return 0d;
+        }
+
+        double total = 0d;
+        foreach (HeroState hero in heroes)
+        {
+            total += GetHeroOwnedAttackBonusPercent(hero);
+        }
+
+        return total;
+    }
+
+    private double GetHeroOwnedAttackMultiplier()
+    {
+        return 1d + GetHeroOwnedAttackBonusPercent() / 100d;
     }
 
     private static GameNumber NormalizeDamage(double damage)
@@ -1144,15 +1609,15 @@ public sealed class BattleManager : MonoBehaviour
 
         if (double.IsInfinity(damage))
         {
-            return new GameNumber(999.999d, 1000000000);
+            return GameNumber.FromDouble(double.MaxValue / 1024d);
         }
 
-        return GameNumber.Floor(GameNumber.Max(GameNumber.One, damage));
+        return GameData.ClampNumber(GameNumber.Floor(GameNumber.Max(GameNumber.One, damage)));
     }
 
     private static GameNumber NormalizeDamage(GameNumber damage)
     {
-        return GameNumber.Floor(GameNumber.Max(GameNumber.One, damage));
+        return GameData.ClampNumber(GameNumber.Floor(GameNumber.Max(GameNumber.One, damage)));
     }
 
     private float GetPetGoldBonusMultiplier()
@@ -1350,7 +1815,7 @@ public sealed class BattleManager : MonoBehaviour
 
         if (stage.Type == StageType.Boss)
         {
-            GameNumber bossGold = GameNumber.Floor(GameData.GetBossClearGold(stage) * GetTalentMultiplier(TalentEffectKind.GoldGainPercent));
+            GameNumber bossGold = GameNumber.Floor(GameData.GetBossClearGold(stage) * GetTalentMultiplier(TalentEffectKind.GoldGainPercent) * GetTotemGoldMultiplier() * GetRuneGoldMultiplier());
             GameNumber bossAccountExp = GetAccountExperienceReward(stage, true);
             StageClearReward firstClearReward = ShouldGrantFirstClearReward(stage)
                 ? GameData.GetStageFirstClearReward(stage)
@@ -1367,8 +1832,8 @@ public sealed class BattleManager : MonoBehaviour
             return;
         }
 
-        GameNumber gold = GameNumber.Floor(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier() * GetTalentMultiplier(TalentEffectKind.GoldGainPercent));
-        GameNumber heroExp = GameNumber.Floor(GameData.GetEnemyHeroExpItem(stage) * GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent));
+        GameNumber gold = GameNumber.Floor(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier() * GetTalentMultiplier(TalentEffectKind.GoldGainPercent) * GetTotemGoldMultiplier() * GetRuneGoldMultiplier());
+        GameNumber heroExp = GameNumber.Floor(GameData.GetEnemyHeroExpItem(stage) * GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent) * GetTotemHeroExpMultiplier() * GetRuneHeroExpMultiplier());
         GameNumber accountExp = GetAccountExperienceReward(stage, false);
         LastRewardLog = "+" + NumberFormatter.Format(gold) + " 골드, +" + NumberFormatter.Format(heroExp) + " EXP";
         wallet.AddGold(gold);
@@ -1397,8 +1862,8 @@ public sealed class BattleManager : MonoBehaviour
     private void HandleVisibleEnemyDefeated(int enemyIndex, int defeatedSpawnSequence)
     {
         StageDefinition stage = progressManager.CurrentStage;
-        GameNumber gold = GameNumber.Floor(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier() * GetTalentMultiplier(TalentEffectKind.GoldGainPercent));
-        GameNumber heroExp = GameNumber.Floor(GameData.GetEnemyHeroExpItem(stage) * GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent));
+        GameNumber gold = GameNumber.Floor(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier() * GetTalentMultiplier(TalentEffectKind.GoldGainPercent) * GetTotemGoldMultiplier() * GetRuneGoldMultiplier());
+        GameNumber heroExp = GameNumber.Floor(GameData.GetEnemyHeroExpItem(stage) * GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent) * GetTotemHeroExpMultiplier() * GetRuneHeroExpMultiplier());
         GameNumber accountExp = GetAccountExperienceReward(stage, false);
         LastRewardLog = "+" + NumberFormatter.Format(gold) + " 골드, +" + NumberFormatter.Format(heroExp) + " EXP";
         wallet.AddGold(gold);
@@ -1496,7 +1961,7 @@ public sealed class BattleManager : MonoBehaviour
         var parts = new List<string>();
         if (reward.HeroSummonTickets > 0)
         {
-            parts.Add("히어로권 +" + reward.HeroSummonTickets);
+            parts.Add("영웅권 +" + reward.HeroSummonTickets);
         }
 
         if (reward.EquipmentSummonTickets > 0)
@@ -1875,7 +2340,9 @@ public sealed class BattleManager : MonoBehaviour
     private float GetHeroMoveSpeed(HeroState hero)
     {
         return (0.95f + Mathf.Max(0.1f, hero.MoveSpeed) * 0.34f)
-            * (float)GetTalentMultiplier(TalentEffectKind.MoveSpeedPercent);
+            * (float)GetTalentMultiplier(TalentEffectKind.MoveSpeedPercent)
+            * (float)GetTotemMoveSpeedMultiplier()
+            * (float)GetRuneMoveSpeedMultiplier();
     }
 
     private float CalculateHeroBattleMaxHp(HeroState hero)
@@ -1886,7 +2353,7 @@ public sealed class BattleManager : MonoBehaviour
             hp += abilityManager.MaxHpBonus;
         }
 
-        hp *= GetTalentMultiplier(TalentEffectKind.HpPercent);
+        hp *= GetTalentMultiplier(TalentEffectKind.HpPercent) * GetTotemHpMultiplier(hero) * GetRuneHpMultiplier();
         return Mathf.Max(1f, (float)Math.Min(float.MaxValue, hp));
     }
 
@@ -1903,7 +2370,7 @@ public sealed class BattleManager : MonoBehaviour
             baseReward *= 30d;
         }
 
-        baseReward *= GetTalentMultiplier(TalentEffectKind.AccountExpGainPercent);
+        baseReward *= GetTalentMultiplier(TalentEffectKind.AccountExpGainPercent) * GetTotemAccountExpMultiplier() * GetRuneAccountExpMultiplier();
         return GameNumber.Floor(GameNumber.FromDouble(Math.Max(1d, baseReward)));
     }
 
@@ -1914,7 +2381,9 @@ public sealed class BattleManager : MonoBehaviour
 
     private double GetDamageTakenMultiplier()
     {
-        return accountProgressManager != null ? accountProgressManager.DamageTakenMultiplier : 1d;
+        return (accountProgressManager != null ? accountProgressManager.DamageTakenMultiplier : 1d)
+            * GetTotemDamageTakenMultiplier()
+            * GetRuneDamageTakenMultiplier();
     }
 
     private static float GetEnemyMoveSpeed(VisibleEnemyState enemy)
@@ -1953,6 +2422,447 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         heroDamageMeter[heroId] += damage;
+    }
+
+    private void LoadTotems()
+    {
+        totems.Clear();
+        totemsById.Clear();
+        foreach (TotemDefinition definition in GameData.Totems)
+        {
+            int level = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.TotemLevel(definition.Id), 1), 1, TotemDefinition.MaxLevel);
+            TotemGrade grade = (TotemGrade)Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.TotemGrade(definition.Id), 0), 0, (int)TotemGrade.Mythic);
+            bool unlocked = saveManager.LoadBool(SaveKeys.TotemUnlocked(definition.Id), definition.StartUnlocked);
+            var state = new TotemState(definition, level, grade, unlocked);
+            totems.Add(state);
+            totemsById[definition.Id] = state;
+        }
+    }
+
+    private void LoadRunes()
+    {
+        runes.Clear();
+        runesById.Clear();
+        foreach (RuneDefinition definition in GameData.Runes)
+        {
+            int level = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.RuneLevel(definition.Id), 1), 1, RuneDefinition.MaxLevel);
+            bool unlocked = saveManager.LoadBool(SaveKeys.RuneUnlocked(definition.Id), definition.StartUnlocked);
+            var state = new RuneState(definition, level, unlocked);
+            runes.Add(state);
+            runesById[definition.Id] = state;
+        }
+    }
+
+    private bool IsTotemEquipped(int preset, string totemId)
+    {
+        if (string.IsNullOrEmpty(totemId))
+        {
+            return false;
+        }
+
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            if (IsTotemSlotUnlocked(slot) && GetEquippedTotemId(preset, slot) == totemId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsRuneEquipped(int preset, string runeId)
+    {
+        if (string.IsNullOrEmpty(runeId))
+        {
+            return false;
+        }
+
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            if (GetEquippedRuneId(preset, slot) == runeId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private TotemState GetActiveUsableTotem(int slot)
+    {
+        if (!IsTotemSlotUnlocked(slot))
+        {
+            return null;
+        }
+
+        TotemState state = GetTotemState(GetEquippedTotemId(activeHeroPreset, slot));
+        return state != null && state.Unlocked ? state : null;
+    }
+
+    private double GetTotemAttackMultiplier(HeroState hero)
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state == null)
+            {
+                continue;
+            }
+
+            percent += state.Definition.GetAttackPercent(state.Level, state.Grade, deployedHeroes, IsBossFight);
+            if (hero != null)
+            {
+                percent += state.Definition.GetTraitAttackPercent(state.Level, state.Grade, hero.Definition.Trait, deployedHeroes);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemHpMultiplier(HeroState hero)
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state == null)
+            {
+                continue;
+            }
+
+            percent += state.Definition.GetHpPercent(state.Level, state.Grade, deployedHeroes);
+            if (hero != null)
+            {
+                percent += state.Definition.GetTraitHpPercent(state.Level, state.Grade, hero.Definition.Trait);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemGoldMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetGoldGainPercent(state.Level, state.Grade);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemHeroExpMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetHeroExpGainPercent(state.Level, state.Grade);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemAccountExpMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetAccountExpGainPercent(state.Level, state.Grade);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemAttackSpeedMultiplier(HeroState hero)
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetAttackSpeedPercent(state.Level, state.Grade, hero);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemMoveSpeedMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetMoveSpeedPercent(state.Level, state.Grade);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemSkillDamageMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetSkillDamagePercent(state.Level, state.Grade);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetTotemSkillCooldownMultiplier()
+    {
+        double reduction = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                reduction += state.Definition.GetSkillCooldownReductionPercent(state.Level, state.Grade);
+            }
+        }
+
+        return Math.Max(0.65d, 1d - Math.Min(35d, reduction) / 100d);
+    }
+
+    private double GetTotemCriticalChanceBonus()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetCriticalChancePercent(state.Level, state.Grade);
+            }
+        }
+
+        return Math.Max(0d, percent);
+    }
+
+    private double GetTotemDamageTakenMultiplier()
+    {
+        double reduction = 0d;
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            TotemState state = GetActiveUsableTotem(slot);
+            if (state != null)
+            {
+                reduction += state.Definition.GetDamageReductionPercent(state.Level, state.Grade);
+            }
+        }
+
+        reduction = Math.Min(90d, Math.Max(0d, reduction));
+        return Math.Max(0.1d, 1d - reduction / 100d);
+    }
+
+    private RuneState GetActiveUsableRune(int slot)
+    {
+        RuneState state = GetRuneState(GetEquippedRuneId(activeHeroPreset, slot));
+        return state != null && state.Unlocked ? state : null;
+    }
+
+    private double GetRuneAttackMultiplier(HeroState hero)
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetAttackPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneFinalDamageMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetFinalDamagePercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneHpMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetHpPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneGoldMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetGoldGainPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneHeroExpMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetHeroExpGainPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneAccountExpMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetAccountExpGainPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneAttackSpeedMultiplier(HeroState hero)
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetAttackSpeedPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneMoveSpeedMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetMoveSpeedPercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneSkillDamageMultiplier()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetSkillDamagePercent(state.Level);
+            }
+        }
+
+        return 1d + Math.Max(0d, percent) / 100d;
+    }
+
+    private double GetRuneSkillCooldownMultiplier()
+    {
+        double reduction = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                reduction += state.Definition.GetSkillCooldownReductionPercent(state.Level);
+            }
+        }
+
+        return Math.Max(0.75d, 1d - Math.Min(25d, reduction) / 100d);
+    }
+
+    private double GetRuneCriticalChanceBonus()
+    {
+        double percent = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                percent += state.Definition.GetCriticalChancePercent(state.Level);
+            }
+        }
+
+        return Math.Max(0d, percent);
+    }
+
+    private double GetRuneDamageTakenMultiplier()
+    {
+        double reduction = 0d;
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            RuneState state = GetActiveUsableRune(slot);
+            if (state != null)
+            {
+                reduction += state.Definition.GetDamageReductionPercent(state.Level);
+            }
+        }
+
+        reduction = Math.Min(80d, Math.Max(0d, reduction));
+        return Math.Max(0.2d, 1d - reduction / 100d);
     }
 
     private void RefreshDeployedHeroes()

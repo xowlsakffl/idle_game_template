@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public enum TalentEffectKind
@@ -28,7 +29,8 @@ public sealed class TalentDefinition
         int maxLevel,
         int costPerLevel,
         double valuePerLevel,
-        TalentEffectKind effectKind)
+        TalentEffectKind effectKind,
+        params string[] prerequisiteIds)
     {
         Id = id;
         DisplayName = displayName;
@@ -40,6 +42,9 @@ public sealed class TalentDefinition
         CostPerLevel = Mathf.Max(1, costPerLevel);
         ValuePerLevel = Math.Max(0d, valuePerLevel);
         EffectKind = effectKind;
+        PrerequisiteIds = prerequisiteIds != null
+            ? new List<string>(prerequisiteIds).AsReadOnly()
+            : new List<string>().AsReadOnly();
     }
 
     public string Id { get; }
@@ -52,6 +57,7 @@ public sealed class TalentDefinition
     public int CostPerLevel { get; }
     public double ValuePerLevel { get; }
     public TalentEffectKind EffectKind { get; }
+    public IReadOnlyList<string> PrerequisiteIds { get; }
 
     public double GetValue(int level)
     {

@@ -12,6 +12,14 @@ public sealed class GameHud : MonoBehaviour
     private const float EnemyDeathVisualSeconds = 0.28f;
     private const float HeroTranscendAutoRollIntervalSeconds = 0.14f;
     private static readonly StringComparer KoreanNameComparer = StringComparer.Create(CultureInfo.GetCultureInfo("ko-KR"), false);
+    private static Sprite roundedPanelSprite;
+    private static Sprite roundedButtonSprite;
+    private static Sprite roundedPillSprite;
+    private static Sprite circleSprite;
+    private static Sprite ringSprite;
+    private static Sprite coinIconSprite;
+    private static Sprite gemIconSprite;
+    private static Sprite powerIconSprite;
     private static readonly EquipmentSlot[] HeroDetailEquipmentFilterSlots =
     {
         EquipmentSlot.Weapon,
@@ -64,8 +72,10 @@ public sealed class GameHud : MonoBehaviour
     private GameObject canvasObject;
 
     private Text resourceText;
+    private Text rubyResourceText;
     private Text stageText;
     private Text modeText;
+    private Text accountLevelText;
     private Text targetText;
     private Text hpText;
     private Text progressText;
@@ -81,6 +91,7 @@ public sealed class GameHud : MonoBehaviour
     private Text damageMeterText;
     private Text centerSpawnText;
     private Image hpFill;
+    private Image accountExpFill;
     private RawImage battlefieldWorldImage;
     private RectTransform battlefieldRect;
     private LayoutElement battleLayoutElement;
@@ -97,9 +108,17 @@ public sealed class GameHud : MonoBehaviour
     private GameObject heroPanel;
     private GameObject heroFormationContent;
     private GameObject heroTraitContent;
+    private GameObject heroTotemContent;
+    private GameObject heroRuneContent;
     private Text heroFormationSummaryText;
     private Text heroTraitSummaryText;
     private Text heroTraitDetailText;
+    private Text heroTotemSummaryText;
+    private Text heroTotemDetailText;
+    private Text heroRuneSummaryText;
+    private Text heroRuneDetailText;
+    private Text heroFormationTotemText;
+    private Text heroFormationTotemSecondText;
     private Text heroOwnedEffectText;
     private Text heroPlaceholderText;
     private GameObject stagePanel;
@@ -118,6 +137,7 @@ public sealed class GameHud : MonoBehaviour
     private GameObject heroTranscendConfirmPrompt;
     private Transform heroDetailEquipmentGridTransform;
     private Transform equipmentDismantleGridTransform;
+    private RectTransform heroRosterGridRect;
     private GameObject heroFormationSavePrompt;
     private GameObject guideQuestDot;
     private Text gachaText;
@@ -160,6 +180,11 @@ public sealed class GameHud : MonoBehaviour
     private string selectedHeroDetailId = string.Empty;
     private string selectedHeroDetailEquipmentId = string.Empty;
     private string selectedEquipmentDetailId = string.Empty;
+    private string selectedTotemId = "TOTEM_COMBAT";
+    private string pendingTotemEquipId = string.Empty;
+    private int selectedTotemSlot = 1;
+    private string selectedRuneId = "RUNE_STRIKE";
+    private int selectedRuneSlot = 1;
     private EquipmentSlot selectedHeroDetailEquipmentSlot = EquipmentSlot.Weapon;
     private HeroRarity selectedBulkDismantleRarity = HeroRarity.Rare;
     private int selectedHeroTranscendSlotIndex = 0;
@@ -186,6 +211,12 @@ public sealed class GameHud : MonoBehaviour
     private readonly Dictionary<string, Text> heroButtonTexts = new Dictionary<string, Text>();
     private readonly Dictionary<string, Button> heroTraitButtons = new Dictionary<string, Button>();
     private readonly Dictionary<string, Text> heroTraitButtonTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<string, Button> heroTotemButtons = new Dictionary<string, Button>();
+    private readonly Dictionary<string, Text> heroTotemButtonTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<string, Button> heroRuneButtons = new Dictionary<string, Button>();
+    private readonly Dictionary<string, Text> heroRuneButtonTexts = new Dictionary<string, Text>();
+    private readonly Dictionary<int, Button> heroRuneSlotButtons = new Dictionary<int, Button>();
+    private readonly Dictionary<int, Text> heroRuneSlotTexts = new Dictionary<int, Text>();
     private readonly Dictionary<HeroPageTab, Button> heroPageTabButtons = new Dictionary<HeroPageTab, Button>();
     private readonly Dictionary<HeroDetailTab, Button> heroDetailTabButtons = new Dictionary<HeroDetailTab, Button>();
     private readonly Dictionary<EquipmentSlot, Button> heroDetailEquipmentSlotButtons = new Dictionary<EquipmentSlot, Button>();
@@ -206,6 +237,7 @@ public sealed class GameHud : MonoBehaviour
     private readonly Dictionary<int, Button> heroPresetButtons = new Dictionary<int, Button>();
     private readonly Dictionary<int, Button> heroFormationSlotButtons = new Dictionary<int, Button>();
     private readonly Dictionary<int, Button> heroFormationSlotRemoveButtons = new Dictionary<int, Button>();
+    private readonly Dictionary<string, Button> heroRosterButtons = new Dictionary<string, Button>();
     private readonly Dictionary<string, Button> heroRosterActionButtons = new Dictionary<string, Button>();
     private readonly Dictionary<string, GameObject> heroRosterDeployedOverlays = new Dictionary<string, GameObject>();
     private readonly List<Text> heroFormationSlotTexts = new List<Text>();
@@ -248,6 +280,12 @@ public sealed class GameHud : MonoBehaviour
     private Button heroDetailExcludeButton;
     private Button heroDetailLevelUpButton;
     private Button heroDetailStarUpButton;
+    private Button heroFormationTotemButton;
+    private Button heroFormationTotemSecondButton;
+    private Button heroTotemEquipButton;
+    private Button heroTotemLevelUpButton;
+    private Button heroRuneEquipButton;
+    private Button heroRuneLevelUpButton;
     private Button heroDetailTranscendChangeButton;
     private Button heroDetailTranscendAutoButton;
     private Button heroDetailTranscendStopButton;
@@ -355,6 +393,7 @@ public sealed class GameHud : MonoBehaviour
         }
 
         RefreshBattlefieldVisuals();
+        RefreshPendingTotemSlotGlow();
     }
 
     private void OnDestroy()
@@ -421,8 +460,10 @@ public sealed class GameHud : MonoBehaviour
     private void ResetRuntimeUiState()
     {
         resourceText = null;
+        rubyResourceText = null;
         stageText = null;
         modeText = null;
+        accountLevelText = null;
         targetText = null;
         hpText = null;
         progressText = null;
@@ -438,6 +479,7 @@ public sealed class GameHud : MonoBehaviour
         damageMeterText = null;
         centerSpawnText = null;
         hpFill = null;
+        accountExpFill = null;
         battlefieldWorldImage = null;
         battlefieldRect = null;
         battleLayoutElement = null;
@@ -455,9 +497,17 @@ public sealed class GameHud : MonoBehaviour
         heroPanel = null;
         heroFormationContent = null;
         heroTraitContent = null;
+        heroTotemContent = null;
+        heroRuneContent = null;
         heroFormationSummaryText = null;
         heroTraitSummaryText = null;
         heroTraitDetailText = null;
+        heroTotemSummaryText = null;
+        heroTotemDetailText = null;
+        heroRuneSummaryText = null;
+        heroRuneDetailText = null;
+        heroFormationTotemText = null;
+        heroFormationTotemSecondText = null;
         heroOwnedEffectText = null;
         heroPlaceholderText = null;
         stagePanel = null;
@@ -476,6 +526,7 @@ public sealed class GameHud : MonoBehaviour
         heroTranscendConfirmPrompt = null;
         heroDetailEquipmentGridTransform = null;
         equipmentDismantleGridTransform = null;
+        heroRosterGridRect = null;
         heroFormationSavePrompt = null;
         guideQuestDot = null;
         gachaText = null;
@@ -518,6 +569,11 @@ public sealed class GameHud : MonoBehaviour
         selectedHeroDetailId = string.Empty;
         selectedHeroDetailEquipmentId = string.Empty;
         selectedEquipmentDetailId = string.Empty;
+        selectedTotemId = "TOTEM_COMBAT";
+        pendingTotemEquipId = string.Empty;
+        selectedTotemSlot = 1;
+        selectedRuneId = "RUNE_STRIKE";
+        selectedRuneSlot = 1;
         selectedDismantleEquipmentIds.Clear();
         selectedHeroDetailEquipmentSlot = EquipmentSlot.Weapon;
         selectedBulkDismantleRarity = HeroRarity.Rare;
@@ -547,6 +603,12 @@ public sealed class GameHud : MonoBehaviour
         heroButtonTexts.Clear();
         heroTraitButtons.Clear();
         heroTraitButtonTexts.Clear();
+        heroTotemButtons.Clear();
+        heroTotemButtonTexts.Clear();
+        heroRuneButtons.Clear();
+        heroRuneButtonTexts.Clear();
+        heroRuneSlotButtons.Clear();
+        heroRuneSlotTexts.Clear();
         heroPageTabButtons.Clear();
         heroDetailTabButtons.Clear();
         heroDetailEquipmentSlotButtons.Clear();
@@ -566,6 +628,7 @@ public sealed class GameHud : MonoBehaviour
         heroPresetButtons.Clear();
         heroFormationSlotButtons.Clear();
         heroFormationSlotRemoveButtons.Clear();
+        heroRosterButtons.Clear();
         heroRosterActionButtons.Clear();
         heroRosterDeployedOverlays.Clear();
         heroFormationSlotTexts.Clear();
@@ -608,6 +671,12 @@ public sealed class GameHud : MonoBehaviour
         heroDetailExcludeButton = null;
         heroDetailLevelUpButton = null;
         heroDetailStarUpButton = null;
+        heroFormationTotemButton = null;
+        heroFormationTotemSecondButton = null;
+        heroTotemEquipButton = null;
+        heroTotemLevelUpButton = null;
+        heroRuneEquipButton = null;
+        heroRuneLevelUpButton = null;
         heroDetailTranscendChangeButton = null;
         heroDetailTranscendAutoButton = null;
         heroDetailTranscendStopButton = null;
@@ -680,47 +749,77 @@ public sealed class GameHud : MonoBehaviour
 
     private void CreateHeader(Transform parent)
     {
-        GameObject panel = CreatePanel("Header", parent, new Color(0.02f, 0.025f, 0.035f, 0.98f));
+        GameObject panel = CreatePanel("Header", parent, new Color(0.06f, 0.19f, 0.33f, 0.98f));
         AddLayoutElement(panel, -1, 160);
 
-        GameObject avatar = CreatePanel("PlayerAvatar", panel.transform, new Color(0.12f, 0.22f, 0.32f, 1f));
+        GameObject avatar = CreatePanel("PlayerAvatar", panel.transform, new Color(0.10f, 0.48f, 0.72f, 1f));
         RectTransform avatarRect = avatar.GetComponent<RectTransform>();
         avatarRect.anchorMin = new Vector2(0f, 0.5f);
         avatarRect.anchorMax = new Vector2(0f, 0.5f);
         avatarRect.pivot = new Vector2(0f, 0.5f);
-        avatarRect.sizeDelta = new Vector2(112f, 112f);
-        avatarRect.anchoredPosition = new Vector2(22f, 0f);
+        avatarRect.sizeDelta = new Vector2(104f, 104f);
+        avatarRect.anchoredPosition = new Vector2(22f, 2f);
 
         Text avatarText = CreateText("AvatarText", avatar.transform, 38, FontStyle.Bold, TextAnchor.MiddleCenter);
         avatarText.text = "G";
         StretchToParent(avatarText.gameObject);
 
-        stageText = CreateText("Stage", panel.transform, 31, FontStyle.Bold, TextAnchor.MiddleLeft);
+        stageText = CreateText("Stage", panel.transform, 25, FontStyle.Bold, TextAnchor.MiddleLeft);
         RectTransform stageRect = stageText.GetComponent<RectTransform>();
         stageRect.anchorMin = new Vector2(0f, 0.5f);
         stageRect.anchorMax = new Vector2(0f, 0.5f);
         stageRect.pivot = new Vector2(0f, 0.5f);
-        stageRect.sizeDelta = new Vector2(360f, 44f);
-        stageRect.anchoredPosition = new Vector2(152f, 24f);
+        stageRect.sizeDelta = new Vector2(410f, 34f);
+        stageRect.anchoredPosition = new Vector2(146f, 42f);
 
-        modeText = CreateText("Mode", panel.transform, 22, FontStyle.Bold, TextAnchor.MiddleLeft);
+        CreateAnchoredIcon("CombatPowerIcon", panel.transform, GetPowerIconSprite(), new Vector2(146f, 8f), new Vector2(40f, 40f));
+
+        modeText = CreateText("Mode", panel.transform, 31, FontStyle.Bold, TextAnchor.MiddleLeft);
         RectTransform modeRect = modeText.GetComponent<RectTransform>();
         modeRect.anchorMin = new Vector2(0f, 0.5f);
         modeRect.anchorMax = new Vector2(0f, 0.5f);
         modeRect.pivot = new Vector2(0f, 0.5f);
-        modeRect.sizeDelta = new Vector2(360f, 34f);
-        modeRect.anchoredPosition = new Vector2(152f, -20f);
+        modeRect.sizeDelta = new Vector2(382f, 42f);
+        modeRect.anchoredPosition = new Vector2(192f, 8f);
 
-        GameObject resourcePill = CreatePanel("ResourcePill", panel.transform, new Color(0.09f, 0.10f, 0.13f, 0.95f));
+        GameObject accountExpBar = CreatePanel("AccountExpBar", panel.transform, new Color(0.03f, 0.08f, 0.15f, 1f));
+        RectTransform accountBarRect = accountExpBar.GetComponent<RectTransform>();
+        accountBarRect.anchorMin = new Vector2(0f, 0.5f);
+        accountBarRect.anchorMax = new Vector2(0f, 0.5f);
+        accountBarRect.pivot = new Vector2(0f, 0.5f);
+        accountBarRect.sizeDelta = new Vector2(430f, 30f);
+        accountBarRect.anchoredPosition = new Vector2(146f, -38f);
+
+        accountExpFill = CreatePanel("AccountExpFill", accountExpBar.transform, new Color(0.10f, 0.79f, 0.96f, 1f)).GetComponent<Image>();
+        RectTransform accountFillRect = accountExpFill.GetComponent<RectTransform>();
+        accountFillRect.anchorMin = Vector2.zero;
+        accountFillRect.anchorMax = new Vector2(0f, 1f);
+        accountFillRect.offsetMin = Vector2.zero;
+        accountFillRect.offsetMax = Vector2.zero;
+
+        accountLevelText = CreateText("AccountLevelText", accountExpBar.transform, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
+        StretchToParent(accountLevelText.gameObject);
+
+        GameObject resourcePill = CreatePanel("ResourcePill", panel.transform, new Color(0.03f, 0.09f, 0.16f, 0.96f));
         RectTransform resourceRect = resourcePill.GetComponent<RectTransform>();
         resourceRect.anchorMin = new Vector2(1f, 0.5f);
         resourceRect.anchorMax = new Vector2(1f, 0.5f);
         resourceRect.pivot = new Vector2(1f, 0.5f);
         bool showDebugGrantButton = IsDebugPanelEnabled();
-        resourceRect.sizeDelta = new Vector2(showDebugGrantButton ? 430f : 520f, 66f);
-        resourceRect.anchoredPosition = new Vector2(showDebugGrantButton ? -194f : -112f, 18f);
-        resourceText = CreateText("Resources", resourcePill.transform, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
-        StretchToParent(resourceText.gameObject);
+        resourceRect.sizeDelta = new Vector2(showDebugGrantButton ? 330f : 430f, 58f);
+        resourceRect.anchoredPosition = new Vector2(showDebugGrantButton ? -194f : -112f, 34f);
+        CreateHeaderResourceDisplay(
+            resourcePill.transform,
+            "GoldResource",
+            GetCoinIconSprite(),
+            new Vector2(18f, 0f),
+            out resourceText);
+        CreateHeaderResourceDisplay(
+            resourcePill.transform,
+            "RubyResource",
+            GetGemIconSprite(),
+            new Vector2(showDebugGrantButton ? 178f : 226f, 0f),
+            out rubyResourceText);
 
         if (showDebugGrantButton)
         {
@@ -729,8 +828,8 @@ public sealed class GameHud : MonoBehaviour
             debugRect.anchorMin = new Vector2(1f, 0.5f);
             debugRect.anchorMax = new Vector2(1f, 0.5f);
             debugRect.pivot = new Vector2(1f, 0.5f);
-            debugRect.sizeDelta = new Vector2(76f, 66f);
-            debugRect.anchoredPosition = new Vector2(-108f, 18f);
+            debugRect.sizeDelta = new Vector2(76f, 58f);
+            debugRect.anchoredPosition = new Vector2(-108f, 34f);
             debugGrantButton.onClick.AddListener(DebugGrantTestCurrency);
         }
 
@@ -739,8 +838,8 @@ public sealed class GameHud : MonoBehaviour
         menuRect.anchorMin = new Vector2(1f, 0.5f);
         menuRect.anchorMax = new Vector2(1f, 0.5f);
         menuRect.pivot = new Vector2(1f, 0.5f);
-        menuRect.sizeDelta = new Vector2(76f, 66f);
-        menuRect.anchoredPosition = new Vector2(-22f, 18f);
+        menuRect.sizeDelta = new Vector2(76f, 58f);
+        menuRect.anchoredPosition = new Vector2(-22f, 34f);
     }
 
     private void CreateHeroFormationSavePrompt(Transform parent)
@@ -774,7 +873,7 @@ public sealed class GameHud : MonoBehaviour
         messageRect.pivot = new Vector2(0.5f, 0.5f);
         messageRect.sizeDelta = new Vector2(0f, 92f);
         messageRect.anchoredPosition = new Vector2(0f, 12f);
-        message.text = "변경된 히어로 편성을 저장하시겠습니까?\n저장하면 현재 스테이지가 다시 시작됩니다.";
+        message.text = "변경된 영웅 편성을 저장하시겠습니까?\n저장하면 현재 스테이지가 다시 시작됩니다.";
 
         GameObject buttonRow = new GameObject("HeroFormationSaveButtons", typeof(RectTransform));
         buttonRow.transform.SetParent(dialog.transform, false);
@@ -1082,7 +1181,7 @@ public sealed class GameHud : MonoBehaviour
         equipmentDetailLevelUpButton = CreateButton("레벨업", actionRow.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
         equipmentDetailStarUpButton = CreateButton("승급", actionRow.transform, 27, new Color(0.88f, 0.62f, 0.16f, 1f));
         equipmentDetailEquipButton.onClick.AddListener(ToggleSelectedEquipmentDetailEquip);
-        equipmentDetailLevelUpButton.onClick.AddListener(LevelUpSelectedEquipmentDetail);
+        ConfigureHoldRepeat(equipmentDetailLevelUpButton, LevelUpSelectedEquipmentDetail, CanLevelUpSelectedEquipmentDetail);
         equipmentDetailStarUpButton.onClick.AddListener(StarUpSelectedEquipmentDetail);
 
         Button closeButton = CreateButton("X", equipmentDetailPopup.transform, 40, new Color(0.20f, 0.28f, 0.43f, 1f));
@@ -1502,7 +1601,7 @@ public sealed class GameHud : MonoBehaviour
         heroDetailStarUpButton = CreateButton("승급", heroDetailActionRow.transform, 23, new Color(0.34f, 0.36f, 0.34f, 1f));
 
         heroDetailExcludeButton.onClick.AddListener(ToggleSelectedHeroDetailFormation);
-        heroDetailLevelUpButton.onClick.AddListener(LevelUpSelectedHeroDetail);
+        ConfigureHoldRepeat(heroDetailLevelUpButton, LevelUpSelectedHeroDetail, CanLevelUpSelectedHeroDetail);
         heroDetailStarUpButton.onClick.AddListener(StarUpSelectedHeroDetail);
     }
 
@@ -2032,7 +2131,7 @@ public sealed class GameHud : MonoBehaviour
             AddLayoutElement(button.gameObject, -1, 64);
 
             AbilityKind kind = ability.Definition.Kind;
-            button.onClick.AddListener(() => TryLevelUpAbilityFromHud(kind));
+            ConfigureHoldRepeat(button, () => TryLevelUpAbilityFromHud(kind), () => CanLevelUpAbilityFromHud(kind));
             Text rowText = button.GetComponentInChildren<Text>();
             rowText.alignment = TextAnchor.MiddleLeft;
             rowText.color = Color.white;
@@ -2125,6 +2224,34 @@ public sealed class GameHud : MonoBehaviour
             heroFormationSlotRemoveButtons[i] = removeButton;
         }
 
+        GameObject totemColumn = new GameObject("FormationTotemColumn", typeof(RectTransform));
+        totemColumn.transform.SetParent(formationArea.transform, false);
+        VerticalLayoutGroup totemColumnLayout = totemColumn.AddComponent<VerticalLayoutGroup>();
+        totemColumnLayout.spacing = 10;
+        totemColumnLayout.childControlWidth = true;
+        totemColumnLayout.childControlHeight = true;
+        totemColumnLayout.childForceExpandWidth = true;
+        totemColumnLayout.childForceExpandHeight = true;
+        AddLayoutElement(totemColumn, 150, -1);
+
+        Text totemTitle = CreateText("FormationTotemTitle", totemColumn.transform, 21, FontStyle.Bold, TextAnchor.MiddleCenter);
+        totemTitle.text = "토템";
+        AddLayoutElement(totemTitle.gameObject, -1, 32);
+
+        heroFormationTotemButton = CreateButton(string.Empty, totemColumn.transform, 18, new Color(0.20f, 0.28f, 0.42f, 1f));
+        heroFormationTotemButton.onClick.AddListener(() =>
+        {
+            HandleFormationTotemSlotClick(1);
+        });
+        heroFormationTotemText = heroFormationTotemButton.GetComponentInChildren<Text>();
+
+        heroFormationTotemSecondButton = CreateButton(string.Empty, totemColumn.transform, 18, new Color(0.18f, 0.20f, 0.26f, 1f));
+        heroFormationTotemSecondButton.onClick.AddListener(() =>
+        {
+            HandleFormationTotemSlotClick(2);
+        });
+        heroFormationTotemSecondText = heroFormationTotemSecondButton.GetComponentInChildren<Text>();
+
         GameObject presetColumn = new GameObject("PresetColumn", typeof(RectTransform));
         presetColumn.transform.SetParent(formationArea.transform, false);
         VerticalLayoutGroup presetLayout = presetColumn.AddComponent<VerticalLayoutGroup>();
@@ -2172,6 +2299,7 @@ public sealed class GameHud : MonoBehaviour
         GameObject rosterGrid = new GameObject("HeroRosterGrid", typeof(RectTransform));
         rosterGrid.transform.SetParent(rosterViewport.transform, false);
         RectTransform rosterGridRect = rosterGrid.GetComponent<RectTransform>();
+        heroRosterGridRect = rosterGridRect;
         int rosterColumns = 6;
         float rosterCellWidth = 154f;
         float rosterCellHeight = 124f;
@@ -2199,6 +2327,7 @@ public sealed class GameHud : MonoBehaviour
             Button button = CreateButton(hero.DisplayName, rosterGrid.transform, 15, GetRarityColor(hero.Rarity));
             string heroId = hero.Id;
             button.onClick.AddListener(() => OpenHeroDetailPanel(heroId));
+            heroRosterButtons[hero.Id] = button;
             heroButtonTexts[hero.Id] = button.GetComponentInChildren<Text>();
 
             GameObject deployedOverlay = CreatePanel(hero.Id + "DeployedOverlay", button.transform, new Color(0f, 0f, 0f, 0.62f));
@@ -2242,6 +2371,8 @@ public sealed class GameHud : MonoBehaviour
         bulkStarUpButton.onClick.AddListener(BulkStarUpHeroesFromHud);
 
         CreateHeroTraitContent(parent);
+        CreateHeroTotemContent(parent);
+        CreateHeroRuneContent(parent);
 
         heroPlaceholderText = CreateText("HeroPagePlaceholder", parent, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
         heroPlaceholderText.text = "준비 중";
@@ -2265,9 +2396,9 @@ public sealed class GameHud : MonoBehaviour
 
         CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Formation, "편성");
         CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Trait, "특성");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Statue, "석상");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Seal, "인장");
-        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Relic, "유물");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Statue, "토템");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Seal, "룬");
+        CreateHeroPageTabButton(heroPageTabs.transform, HeroPageTab.Relic, "성물");
     }
 
     private void CreateHeroTraitContent(Transform parent)
@@ -2287,42 +2418,52 @@ public sealed class GameHud : MonoBehaviour
 
         GameObject treePanel = CreatePanel("HeroTraitTree", heroTraitContent.transform, new Color(0.30f, 0.39f, 0.56f, 1f));
         AddLayoutElement(treePanel, -1, 338);
-        VerticalLayoutGroup treeLayout = treePanel.AddComponent<VerticalLayoutGroup>();
-        treeLayout.padding = new RectOffset(12, 12, 12, 12);
-        treeLayout.spacing = 8;
+        ScrollRect treeScroll = treePanel.AddComponent<ScrollRect>();
+        treeScroll.horizontal = true;
+        treeScroll.vertical = false;
+        treeScroll.inertia = true;
+        treeScroll.scrollSensitivity = 34f;
+
+        GameObject viewport = new GameObject("HeroTraitTreeViewport", typeof(RectTransform), typeof(RectMask2D));
+        viewport.transform.SetParent(treePanel.transform, false);
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        viewportRect.anchorMin = Vector2.zero;
+        viewportRect.anchorMax = Vector2.one;
+        viewportRect.offsetMin = new Vector2(10f, 10f);
+        viewportRect.offsetMax = new Vector2(-10f, -10f);
+
+        GameObject content = new GameObject("HeroTraitTreeContent", typeof(RectTransform));
+        content.transform.SetParent(viewport.transform, false);
+        RectTransform contentRect = content.GetComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0f, 0f);
+        contentRect.anchorMax = new Vector2(0f, 1f);
+        contentRect.pivot = new Vector2(0f, 0.5f);
+        contentRect.offsetMin = Vector2.zero;
+        contentRect.offsetMax = Vector2.zero;
+
+        HorizontalLayoutGroup treeLayout = content.AddComponent<HorizontalLayoutGroup>();
+        treeLayout.padding = new RectOffset(4, 4, 0, 0);
+        treeLayout.spacing = 0;
         treeLayout.childControlWidth = true;
         treeLayout.childControlHeight = true;
-        treeLayout.childForceExpandWidth = true;
+        treeLayout.childForceExpandWidth = false;
         treeLayout.childForceExpandHeight = true;
 
-        for (int branch = 0; branch < 3; branch++)
+        ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        treeScroll.viewport = viewportRect;
+        treeScroll.content = contentRect;
+
+        for (int depth = 0; depth < TalentData.DepthCount; depth++)
         {
-            GameObject row = new GameObject("HeroTraitBranch" + branch, typeof(RectTransform));
-            row.transform.SetParent(treePanel.transform, false);
-            HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
-            rowLayout.spacing = 10;
-            rowLayout.childControlWidth = true;
-            rowLayout.childControlHeight = true;
-            rowLayout.childForceExpandWidth = true;
-            rowLayout.childForceExpandHeight = true;
-
-            foreach (TalentDefinition talent in TalentData.Talents)
+            IReadOnlyList<TalentDefinition> depthTalents = TalentData.GetTalentsInDepth(depth);
+            if (depth > 0)
             {
-                if (talent.BranchIndex != branch)
-                {
-                    continue;
-                }
-
-                Button node = CreateButton(string.Empty, row.transform, 19, new Color(0.22f, 0.28f, 0.38f, 1f));
-                string talentId = talent.Id;
-                node.onClick.AddListener(() =>
-                {
-                    selectedHeroTraitId = talentId;
-                    UpdateView();
-                });
-                heroTraitButtons[talent.Id] = node;
-                heroTraitButtonTexts[talent.Id] = node.GetComponentInChildren<Text>();
+                CreateHeroTraitConnector(content.transform, TalentData.GetTalentsInDepth(depth - 1), depthTalents);
             }
+
+            CreateHeroTraitDepthColumn(content.transform, depth, depthTalents);
         }
 
         GameObject detailPanel = CreatePanel("HeroTraitDetail", heroTraitContent.transform, new Color(0.20f, 0.27f, 0.40f, 1f));
@@ -2338,9 +2479,401 @@ public sealed class GameHud : MonoBehaviour
         heroTraitDetailText = CreateText("HeroTraitDetailText", detailPanel.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
         heroTraitLevelUpButton = CreateButton("레벨업", detailPanel.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
         AddLayoutElement(heroTraitLevelUpButton.gameObject, 220, -1);
-        heroTraitLevelUpButton.onClick.AddListener(LevelUpSelectedHeroTrait);
+        ConfigureHoldRepeat(heroTraitLevelUpButton, LevelUpSelectedHeroTrait, CanLevelUpSelectedHeroTrait);
 
         heroTraitContent.SetActive(false);
+    }
+
+    private void CreateHeroTotemContent(Transform parent)
+    {
+        heroTotemContent = CreatePanel("HeroTotemContent", parent, new Color(0.24f, 0.31f, 0.45f, 1f));
+        VerticalLayoutGroup layout = heroTotemContent.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(16, 16, 12, 12);
+        layout.spacing = 10;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        AddLayoutElement(heroTotemContent, -1, 594);
+
+        heroTotemSummaryText = CreateText("HeroTotemSummary", heroTotemContent.transform, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
+        AddLayoutElement(heroTotemSummaryText.gameObject, -1, 42);
+
+        GameObject circlePanel = CreatePanel("HeroTotemCirclePanel", heroTotemContent.transform, new Color(0.30f, 0.39f, 0.56f, 1f));
+        AddLayoutElement(circlePanel, -1, 420);
+
+        GameObject ring = new GameObject("HeroTotemCircleRing", typeof(RectTransform), typeof(Image));
+        ring.transform.SetParent(circlePanel.transform, false);
+        Image ringImage = ring.GetComponent<Image>();
+        ringImage.sprite = GetRingSprite();
+        ringImage.color = new Color(0.70f, 0.84f, 1f, 0.28f);
+        ringImage.raycastTarget = false;
+        RectTransform ringRect = ring.GetComponent<RectTransform>();
+        ringRect.anchorMin = new Vector2(0.5f, 0.5f);
+        ringRect.anchorMax = new Vector2(0.5f, 0.5f);
+        ringRect.pivot = new Vector2(0.5f, 0.5f);
+        ringRect.sizeDelta = new Vector2(390f, 390f);
+        ringRect.anchoredPosition = Vector2.zero;
+
+        GameObject centerPanel = CreatePanel("HeroTotemCenterEffect", circlePanel.transform, new Color(0.18f, 0.24f, 0.36f, 0.94f));
+        RectTransform centerRect = centerPanel.GetComponent<RectTransform>();
+        centerRect.anchorMin = new Vector2(0.5f, 0.5f);
+        centerRect.anchorMax = new Vector2(0.5f, 0.5f);
+        centerRect.pivot = new Vector2(0.5f, 0.5f);
+        centerRect.sizeDelta = new Vector2(360f, 176f);
+        centerRect.anchoredPosition = Vector2.zero;
+
+        GameObject centerGlow = new GameObject("HeroTotemCenterGlow", typeof(RectTransform), typeof(Image));
+        centerGlow.transform.SetParent(centerPanel.transform, false);
+        Image centerGlowImage = centerGlow.GetComponent<Image>();
+        centerGlowImage.sprite = GetCircleSprite();
+        centerGlowImage.color = new Color(0.55f, 0.78f, 1f, 0.08f);
+        centerGlowImage.raycastTarget = false;
+        RectTransform centerGlowRect = centerGlow.GetComponent<RectTransform>();
+        centerGlowRect.anchorMin = new Vector2(0.5f, 0.5f);
+        centerGlowRect.anchorMax = new Vector2(0.5f, 0.5f);
+        centerGlowRect.pivot = new Vector2(0.5f, 0.5f);
+        centerGlowRect.sizeDelta = new Vector2(330f, 330f);
+        centerGlowRect.anchoredPosition = Vector2.zero;
+
+        heroTotemDetailText = CreateText("HeroTotemDetailText", centerPanel.transform, 20, FontStyle.Bold, TextAnchor.MiddleCenter);
+        RectTransform detailTextRect = heroTotemDetailText.GetComponent<RectTransform>();
+        detailTextRect.anchorMin = Vector2.zero;
+        detailTextRect.anchorMax = Vector2.one;
+        detailTextRect.offsetMin = new Vector2(18f, 12f);
+        detailTextRect.offsetMax = new Vector2(-18f, -12f);
+        heroTotemDetailText.resizeTextForBestFit = true;
+        heroTotemDetailText.resizeTextMinSize = 15;
+        heroTotemDetailText.resizeTextMaxSize = 20;
+        heroTotemDetailText.lineSpacing = 0.92f;
+
+        foreach (TotemDefinition totem in GameData.Totems)
+        {
+            Button button = CreateButton(string.Empty, circlePanel.transform, 18, GetTotemColor(totem));
+            RectTransform buttonRect = button.GetComponent<RectTransform>();
+            buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
+            buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            buttonRect.pivot = new Vector2(0.5f, 0.5f);
+            buttonRect.sizeDelta = new Vector2(132f, 132f);
+            buttonRect.anchoredPosition = GetTotemCirclePosition(totem.Archetype);
+            ConfigureTotemNodeButton(button);
+
+            string capturedId = totem.Id;
+            button.onClick.AddListener(() => SelectTotem(capturedId));
+            heroTotemButtons[totem.Id] = button;
+            heroTotemButtonTexts[totem.Id] = button.GetComponentInChildren<Text>();
+            Text buttonText = heroTotemButtonTexts[totem.Id];
+            if (buttonText != null)
+            {
+                buttonText.resizeTextForBestFit = true;
+                buttonText.resizeTextMinSize = 11;
+                buttonText.resizeTextMaxSize = 18;
+                buttonText.lineSpacing = 0.86f;
+            }
+        }
+
+        GameObject actionRow = new GameObject("HeroTotemActions", typeof(RectTransform));
+        actionRow.transform.SetParent(heroTotemContent.transform, false);
+        HorizontalLayoutGroup actionLayout = actionRow.AddComponent<HorizontalLayoutGroup>();
+        actionLayout.spacing = 14;
+        actionLayout.childControlWidth = true;
+        actionLayout.childControlHeight = true;
+        actionLayout.childForceExpandWidth = true;
+        actionLayout.childForceExpandHeight = true;
+        AddLayoutElement(actionRow, -1, 68);
+
+        heroTotemEquipButton = CreateButton("장착", actionRow.transform, 26, new Color(0.54f, 0.76f, 0.96f, 1f));
+        heroTotemEquipButton.onClick.AddListener(EquipSelectedTotem);
+
+        heroTotemLevelUpButton = CreateButton("강화", actionRow.transform, 26, new Color(0.54f, 0.78f, 0.22f, 1f));
+        ConfigureHoldRepeat(heroTotemLevelUpButton, LevelUpSelectedTotem, CanLevelUpSelectedTotem);
+
+        heroTotemContent.SetActive(false);
+    }
+
+    private void CreateHeroRuneContent(Transform parent)
+    {
+        heroRuneContent = CreatePanel("HeroRuneContent", parent, new Color(0.23f, 0.30f, 0.44f, 1f));
+        VerticalLayoutGroup layout = heroRuneContent.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(16, 16, 12, 12);
+        layout.spacing = 10;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        AddLayoutElement(heroRuneContent, -1, 594);
+
+        heroRuneSummaryText = CreateText("HeroRuneSummary", heroRuneContent.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
+        AddLayoutElement(heroRuneSummaryText.gameObject, -1, 42);
+
+        GameObject slotRow = CreatePanel("HeroRuneSlotRow", heroRuneContent.transform, new Color(0.18f, 0.24f, 0.36f, 1f));
+        HorizontalLayoutGroup slotLayout = slotRow.AddComponent<HorizontalLayoutGroup>();
+        slotLayout.padding = new RectOffset(10, 10, 10, 10);
+        slotLayout.spacing = 10;
+        slotLayout.childControlWidth = true;
+        slotLayout.childControlHeight = true;
+        slotLayout.childForceExpandWidth = true;
+        slotLayout.childForceExpandHeight = true;
+        AddLayoutElement(slotRow, -1, 102);
+
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            int capturedSlot = slot;
+            Button slotButton = CreateButton(string.Empty, slotRow.transform, 18, new Color(0.17f, 0.21f, 0.31f, 1f));
+            slotButton.onClick.AddListener(() =>
+            {
+                selectedRuneSlot = capturedSlot;
+                string equippedRuneId = battleManager != null ? battleManager.GetEquippedRuneId(selectedHeroPreset, capturedSlot) : string.Empty;
+                if (!string.IsNullOrEmpty(equippedRuneId))
+                {
+                    selectedRuneId = equippedRuneId;
+                }
+
+                RefreshHeroRunePanel();
+            });
+            heroRuneSlotButtons[capturedSlot] = slotButton;
+            heroRuneSlotTexts[capturedSlot] = slotButton.GetComponentInChildren<Text>();
+        }
+
+        GameObject runeGridPanel = CreatePanel("HeroRuneGridPanel", heroRuneContent.transform, new Color(0.28f, 0.36f, 0.52f, 1f));
+        GridLayoutGroup runeGrid = runeGridPanel.AddComponent<GridLayoutGroup>();
+        runeGrid.padding = new RectOffset(10, 10, 10, 10);
+        runeGrid.spacing = new Vector2(8f, 8f);
+        runeGrid.cellSize = new Vector2(128f, 90f);
+        runeGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        runeGrid.constraintCount = 5;
+        AddLayoutElement(runeGridPanel, -1, 208);
+
+        foreach (RuneDefinition rune in GameData.Runes)
+        {
+            Button button = CreateButton(string.Empty, runeGridPanel.transform, 15, GetRuneColor(rune));
+            string capturedId = rune.Id;
+            button.onClick.AddListener(() => SelectRune(capturedId));
+            heroRuneButtons[rune.Id] = button;
+            heroRuneButtonTexts[rune.Id] = button.GetComponentInChildren<Text>();
+
+            Text buttonText = heroRuneButtonTexts[rune.Id];
+            if (buttonText != null)
+            {
+                buttonText.resizeTextForBestFit = true;
+                buttonText.resizeTextMinSize = 10;
+                buttonText.resizeTextMaxSize = 15;
+                buttonText.lineSpacing = 0.86f;
+            }
+        }
+
+        GameObject detailPanel = CreatePanel("HeroRuneDetailPanel", heroRuneContent.transform, new Color(0.20f, 0.26f, 0.39f, 1f));
+        AddLayoutElement(detailPanel, -1, 116);
+        heroRuneDetailText = CreateText("HeroRuneDetailText", detailPanel.transform, 21, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform detailRect = heroRuneDetailText.GetComponent<RectTransform>();
+        detailRect.anchorMin = Vector2.zero;
+        detailRect.anchorMax = Vector2.one;
+        detailRect.offsetMin = new Vector2(18f, 10f);
+        detailRect.offsetMax = new Vector2(-18f, -10f);
+        heroRuneDetailText.resizeTextForBestFit = true;
+        heroRuneDetailText.resizeTextMinSize = 14;
+        heroRuneDetailText.resizeTextMaxSize = 21;
+        heroRuneDetailText.lineSpacing = 0.92f;
+
+        GameObject actionRow = new GameObject("HeroRuneActions", typeof(RectTransform));
+        actionRow.transform.SetParent(heroRuneContent.transform, false);
+        HorizontalLayoutGroup actionLayout = actionRow.AddComponent<HorizontalLayoutGroup>();
+        actionLayout.spacing = 14;
+        actionLayout.childControlWidth = true;
+        actionLayout.childControlHeight = true;
+        actionLayout.childForceExpandWidth = true;
+        actionLayout.childForceExpandHeight = true;
+        AddLayoutElement(actionRow, -1, 68);
+
+        heroRuneEquipButton = CreateButton("장착", actionRow.transform, 25, new Color(0.54f, 0.76f, 0.96f, 1f));
+        heroRuneEquipButton.onClick.AddListener(EquipSelectedRune);
+
+        heroRuneLevelUpButton = CreateButton("강화", actionRow.transform, 25, new Color(0.54f, 0.78f, 0.22f, 1f));
+        ConfigureHoldRepeat(heroRuneLevelUpButton, LevelUpSelectedRune, CanLevelUpSelectedRune);
+
+        heroRuneContent.SetActive(false);
+    }
+
+    private static Vector2 GetTotemCirclePosition(TotemArchetype archetype)
+    {
+        switch (archetype)
+        {
+            case TotemArchetype.Combat:
+                return new Vector2(-250f, 126f);
+            case TotemArchetype.Guardian:
+                return new Vector2(250f, 126f);
+            case TotemArchetype.Storm:
+                return new Vector2(250f, -126f);
+            case TotemArchetype.Support:
+                return new Vector2(0f, -190f);
+            case TotemArchetype.Arcane:
+                return new Vector2(-250f, -126f);
+            default:
+                return Vector2.zero;
+        }
+    }
+
+    private void ConfigureTotemNodeButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Image buttonImage = button.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.sprite = GetCircleSprite();
+            buttonImage.type = Image.Type.Simple;
+        }
+
+        GameObject rim = new GameObject("TotemNodeRim", typeof(RectTransform), typeof(Image));
+        rim.transform.SetParent(button.transform, false);
+        rim.transform.SetAsFirstSibling();
+        Image rimImage = rim.GetComponent<Image>();
+        rimImage.sprite = GetRingSprite();
+        rimImage.color = new Color(0.02f, 0.04f, 0.08f, 0.72f);
+        rimImage.raycastTarget = false;
+        StretchToParent(rim);
+
+        GameObject inner = new GameObject("TotemNodeInnerGlow", typeof(RectTransform), typeof(Image));
+        inner.transform.SetParent(button.transform, false);
+        inner.transform.SetAsFirstSibling();
+        Image innerImage = inner.GetComponent<Image>();
+        innerImage.sprite = GetCircleSprite();
+        innerImage.color = new Color(1f, 1f, 1f, 0.10f);
+        innerImage.raycastTarget = false;
+        RectTransform innerRect = inner.GetComponent<RectTransform>();
+        innerRect.anchorMin = new Vector2(0.14f, 0.14f);
+        innerRect.anchorMax = new Vector2(0.86f, 0.86f);
+        innerRect.offsetMin = Vector2.zero;
+        innerRect.offsetMax = Vector2.zero;
+    }
+
+    private void CreateHeroTraitDepthColumn(Transform parent, int depth, IReadOnlyList<TalentDefinition> depthTalents)
+    {
+        GameObject column = new GameObject("HeroTraitDepth" + depth, typeof(RectTransform));
+        column.transform.SetParent(parent, false);
+        AddLayoutElement(column, 132, -1);
+
+        Text depthLabel = CreateText("HeroTraitDepthLabel" + depth, column.transform, 14, FontStyle.Bold, TextAnchor.MiddleCenter);
+        depthLabel.text = "D" + (depth + 1);
+        depthLabel.color = new Color(0.78f, 0.86f, 1f, 1f);
+        RectTransform depthLabelRect = depthLabel.GetComponent<RectTransform>();
+        depthLabelRect.anchorMin = new Vector2(0f, 0.92f);
+        depthLabelRect.anchorMax = new Vector2(1f, 1f);
+        depthLabelRect.offsetMin = Vector2.zero;
+        depthLabelRect.offsetMax = Vector2.zero;
+
+        for (int i = 0; i < depthTalents.Count; i++)
+        {
+            TalentDefinition talent = depthTalents[i];
+            Button node = CreateButton(string.Empty, column.transform, 15, new Color(0.22f, 0.28f, 0.38f, 1f));
+            RectTransform nodeRect = node.GetComponent<RectTransform>();
+            float laneY = GetHeroTraitLaneY(depthTalents.Count, i);
+            nodeRect.anchorMin = new Vector2(0.5f, laneY);
+            nodeRect.anchorMax = new Vector2(0.5f, laneY);
+            nodeRect.pivot = new Vector2(0.5f, 0.5f);
+            nodeRect.sizeDelta = new Vector2(112f, 78f);
+            nodeRect.anchoredPosition = Vector2.zero;
+
+            Text nodeText = node.GetComponentInChildren<Text>();
+            if (nodeText != null)
+            {
+                nodeText.resizeTextForBestFit = true;
+                nodeText.resizeTextMinSize = 10;
+                nodeText.resizeTextMaxSize = 15;
+                nodeText.lineSpacing = 0.88f;
+            }
+
+            string talentId = talent.Id;
+            node.onClick.AddListener(() =>
+            {
+                selectedHeroTraitId = talentId;
+                UpdateView();
+            });
+            heroTraitButtons[talent.Id] = node;
+            heroTraitButtonTexts[talent.Id] = nodeText;
+        }
+    }
+
+    private void CreateHeroTraitConnector(
+        Transform parent,
+        IReadOnlyList<TalentDefinition> previousDepth,
+        IReadOnlyList<TalentDefinition> currentDepth)
+    {
+        GameObject connector = new GameObject("HeroTraitConnector", typeof(RectTransform));
+        connector.transform.SetParent(parent, false);
+        AddLayoutElement(connector, 44, -1);
+
+        for (int currentIndex = 0; currentIndex < currentDepth.Count; currentIndex++)
+        {
+            TalentDefinition current = currentDepth[currentIndex];
+            for (int prerequisiteIndex = 0; prerequisiteIndex < current.PrerequisiteIds.Count; prerequisiteIndex++)
+            {
+                int previousIndex = FindHeroTraitDepthIndex(previousDepth, current.PrerequisiteIds[prerequisiteIndex]);
+                if (previousIndex < 0)
+                {
+                    continue;
+                }
+
+                CreateHeroTraitConnectorLine(
+                    connector.transform,
+                    GetHeroTraitLaneY(previousDepth.Count, previousIndex),
+                    GetHeroTraitLaneY(currentDepth.Count, currentIndex));
+            }
+        }
+    }
+
+    private void CreateHeroTraitConnectorLine(Transform parent, float fromLaneY, float toLaneY)
+    {
+        const float width = 44f;
+        const float height = 252f;
+        Vector2 start = new Vector2(width * -0.5f, (fromLaneY - 0.5f) * height);
+        Vector2 end = new Vector2(width * 0.5f, (toLaneY - 0.5f) * height);
+        Vector2 delta = end - start;
+
+        GameObject line = new GameObject("HeroTraitConnectorLine", typeof(RectTransform), typeof(Image));
+        line.transform.SetParent(parent, false);
+        Image image = line.GetComponent<Image>();
+        image.color = new Color(0.16f, 0.22f, 0.35f, 0.95f);
+        image.raycastTarget = false;
+
+        RectTransform rect = line.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(delta.magnitude, 5f);
+        rect.anchoredPosition = (start + end) * 0.5f;
+        rect.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+    }
+
+    private static int FindHeroTraitDepthIndex(IReadOnlyList<TalentDefinition> depthTalents, string talentId)
+    {
+        for (int i = 0; i < depthTalents.Count; i++)
+        {
+            if (depthTalents[i].Id == talentId)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static float GetHeroTraitLaneY(int nodeCount, int nodeIndex)
+    {
+        if (nodeCount <= 1)
+        {
+            return 0.50f;
+        }
+
+        if (nodeCount == 2)
+        {
+            return nodeIndex == 0 ? 0.64f : 0.36f;
+        }
+
+        return 0.78f - Mathf.Clamp(nodeIndex, 0, 2) * 0.28f;
     }
 
     private List<HeroDefinition> GetSortedHeroRosterDefinitions()
@@ -2432,12 +2965,12 @@ public sealed class GameHud : MonoBehaviour
         AddLayoutElement(title.gameObject, -1, 58);
 
         Text heroTitle = CreateText("HeroSummonTitle", parent, 27, FontStyle.Bold, TextAnchor.MiddleLeft);
-        heroTitle.text = "히어로 뽑기";
+        heroTitle.text = "영웅 뽑기";
         AddLayoutElement(heroTitle.gameObject, -1, 36);
 
         GameObject heroButtonRow = CreateSummonButtonRow(parent, "HeroSummonButtons");
-        Button heroRollOne = CreateButton("히어로 1회", heroButtonRow.transform, 28, new Color(0.36f, 0.24f, 0.45f, 1f));
-        Button heroRollTen = CreateButton("히어로 10회", heroButtonRow.transform, 28, new Color(0.36f, 0.24f, 0.45f, 1f));
+        Button heroRollOne = CreateButton("영웅 1회", heroButtonRow.transform, 28, new Color(0.36f, 0.24f, 0.45f, 1f));
+        Button heroRollTen = CreateButton("영웅 10회", heroButtonRow.transform, 28, new Color(0.36f, 0.24f, 0.45f, 1f));
         heroRollOne.onClick.AddListener(() => gachaManager.RollHeroes(1));
         heroRollTen.onClick.AddListener(() => gachaManager.RollHeroes(10));
 
@@ -2452,10 +2985,10 @@ public sealed class GameHud : MonoBehaviour
         equipmentRollTen.onClick.AddListener(() => gachaManager.RollEquipment(10));
 
         Text rule = CreateText("SummonRule", parent, 25, FontStyle.Normal, TextAnchor.UpperLeft);
-        rule.text = "히어로: 뽑기권 우선, 부족분 루비 150개"
+        rule.text = "영웅: 뽑기권 우선, 부족분 루비 150개"
             + "\n장비: 장비 뽑기권 우선, 부족분 루비 100개"
             + "\n확률: " + GachaManager.GetRateSummaryText()
-            + "\n히어로 조각: 1회당 선택 영웅 조각 1개";
+            + "\n영웅 조각: 1회당 선택 영웅 조각 1개";
         AddLayoutElement(rule.gameObject, -1, 120);
 
         gachaText = CreateText("GachaResult", parent, 26, FontStyle.Normal, TextAnchor.UpperLeft);
@@ -2572,16 +3105,23 @@ public sealed class GameHud : MonoBehaviour
         grid.spacing = new Vector2(16, 16);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 3;
-        AddLayoutElement(gridObject, -1, 520);
+        AddLayoutElement(gridObject, -1, 620);
 
         CreateDebugButton("Gold +5000", gridObject.transform, () => wallet.AddGold(5000));
         CreateDebugButton("EXP +5000", gridObject.transform, () => wallet.AddHeroExpItem(5000));
         CreateDebugButton("Equip EXP +5000", gridObject.transform, () => wallet.AddEquipmentExpItem(5000));
+        CreateDebugButton("Totem Essence +5000", gridObject.transform, () => wallet.AddTotemEssence(5000));
+        CreateDebugButton("Rune Dust +5000", gridObject.transform, () => wallet.AddRuneDust(5000));
         CreateDebugButton("Ruby +1500", gridObject.transform, () => wallet.AddRuby(1500));
         CreateDebugButton("Transcend +100", gridObject.transform, () => wallet.AddHeroTranscendStone(100));
         CreateDebugButton("Hero Ticket +10", gridObject.transform, () => wallet.AddHeroSummonTicket(10));
         CreateDebugButton("Equip Ticket +10", gridObject.transform, () => wallet.AddEquipmentSummonTicket(10));
         CreateDebugButton("Hero Lv +5", gridObject.transform, () => battleManager.DebugLevelAllHeroes(5));
+        CreateDebugButton("계정 EXP +50K", gridObject.transform, () => accountProgressManager.AddExperience(GameNumber.FromDouble(50000)));
+        CreateDebugButton("계정 Lv +100", gridObject.transform, () => accountProgressManager.DebugAddLevels(100));
+        CreateDebugButton("특성P +1000", gridObject.transform, () => accountProgressManager.DebugAddTalentPoints(1000));
+        CreateDebugButton("Unlock Totems", gridObject.transform, () => battleManager.DebugUnlockAllTotems());
+        CreateDebugButton("Unlock Runes", gridObject.transform, () => battleManager.DebugUnlockAllRunes());
         CreateDebugButton("Unlock 4x", gridObject.transform, () => speedManager.DebugSetFourTimesEntitlement(true));
         CreateDebugButton("Unlock All", gridObject.transform, () => progressManager.DebugUnlockThrough(GameData.ChapterOneBossStageId));
         CreateDebugButton("1-19 Repeat", gridObject.transform, () => progressManager.DebugJumpToStage(GameData.BossFallbackStageId, ProgressMode.RepeatSelected));
@@ -2624,13 +3164,17 @@ public sealed class GameHud : MonoBehaviour
 
     private void DebugGrantTestCurrency()
     {
-        wallet.AddGold(50000000);
-        wallet.AddRuby(15000);
-        wallet.AddHeroExpItem(100000);
-        wallet.AddEquipmentExpItem(100000);
-        wallet.AddHeroTranscendStone(1000);
-        wallet.AddHeroSummonTicket(100);
-        wallet.AddEquipmentSummonTicket(100);
+        wallet.AddGold(100000);
+        wallet.AddRuby(5000);
+        wallet.AddHeroExpItem(20000);
+        wallet.AddEquipmentExpItem(20000);
+        wallet.AddTotemEssence(10000);
+        wallet.AddRuneDust(10000);
+        wallet.AddHeroTranscendStone(300);
+        wallet.AddHeroSummonTicket(50);
+        wallet.AddEquipmentSummonTicket(50);
+        accountProgressManager.DebugAddLevels(25);
+        accountProgressManager.DebugAddTalentPoints(200);
         UpdateView();
     }
 
@@ -2648,7 +3192,7 @@ public sealed class GameHud : MonoBehaviour
         layout.childForceExpandHeight = true;
 
         CreateTabButton(panel.transform, HudTab.Growth, "⚔\n성장");
-        CreateTabButton(panel.transform, HudTab.Hero, "★\n히어로");
+        CreateTabButton(panel.transform, HudTab.Hero, "★\n영웅");
         CreateTabButton(panel.transform, HudTab.Summon, "◇\n소환");
         CreateTabButton(panel.transform, HudTab.Stage, "▣\n던전 배틀");
         CreateTabButton(panel.transform, HudTab.Shop, "▤\n상점");
@@ -2815,17 +3359,30 @@ public sealed class GameHud : MonoBehaviour
         }
 
         StageDefinition stage = progressManager.CurrentStage;
-        resourceText.text = "G " + FormatShortNumber(wallet.Gold)
-            + "    R " + FormatCountNumber(wallet.Ruby)
-            + "    HT " + FormatCountNumber(wallet.HeroSummonTicket)
-            + "    ET " + FormatCountNumber(wallet.EquipmentSummonTicket)
-            + "    TS " + FormatCountNumber(wallet.HeroTranscendStone)
-            + (accountProgressManager != null ? "    Lv " + accountProgressManager.Level : string.Empty)
-            + "    x" + speedManager.CurrentMultiplier;
-        stageText.text = "Guardian";
-        modeText.text = "전투력 " + FormatShortNumber(battleManager.TotalCombatPower)
-            + "    " + GetModeLabel(progressManager.Mode)
-            + "    MAX " + progressManager.HighestStageId;
+        resourceText.text = FormatShortNumber(wallet.Gold);
+        if (rubyResourceText != null)
+        {
+            rubyResourceText.text = FormatCountNumber(wallet.Ruby);
+        }
+
+        stageText.text = "프로필 캐릭터";
+        modeText.text = FormatShortNumber(battleManager.TotalCombatPower);
+
+        if (accountProgressManager != null)
+        {
+            float accountExpRatio = Mathf.Clamp01((float)accountProgressManager.Experience.RatioTo(accountProgressManager.NextLevelExperience));
+            if (accountExpFill != null)
+            {
+                accountExpFill.rectTransform.anchorMax = new Vector2(accountExpRatio, 1f);
+            }
+
+            if (accountLevelText != null)
+            {
+                accountLevelText.text = "계정 Lv." + accountProgressManager.Level
+                    + "  " + FormatShortNumber(accountProgressManager.Experience)
+                    + "/" + FormatShortNumber(accountProgressManager.NextLevelExperience);
+            }
+        }
         if (fieldStagePillText != null)
         {
             fieldStagePillText.text = battleManager.IsBossFight ? stage.Id + " BOSS" : stage.Id;
@@ -2956,6 +3513,11 @@ public sealed class GameHud : MonoBehaviour
             {
                 bool canLevel = hero.LevelUpCost <= wallet.HeroExpItem;
                 bool isOwned = hero.IsOwned;
+                if (heroRosterButtons.TryGetValue(hero.Definition.Id, out Button rosterButton) && rosterButton != null)
+                {
+                    rosterButton.gameObject.SetActive(isOwned);
+                }
+
                 bool needsAttention = isOwned && (hero.CanStarUp || canLevel);
                 hasHeroAttention |= needsAttention;
                 SetNotificationDot(heroNotificationDots, hero.Definition.Id, needsAttention);
@@ -2979,9 +3541,7 @@ public sealed class GameHud : MonoBehaviour
                 Button heroButton = text.GetComponentInParent<Button>();
                 if (heroButton != null)
                 {
-                    SetButtonColor(heroButton, !isOwned
-                        ? new Color(0.10f, 0.11f, 0.14f, 1f)
-                        : isDeployed
+                    SetButtonColor(heroButton, isDeployed
                         ? new Color(0.13f, 0.15f, 0.18f, 1f)
                         : isSelectedForPlacement ? new Color(0.55f, 0.49f, 0.20f, 1f) : GetRarityColor(hero.Definition.Rarity));
                 }
@@ -3007,6 +3567,11 @@ public sealed class GameHud : MonoBehaviour
                         : new Color(0.88f, 0.72f, 0.20f, 1f));
                 }
             }
+        }
+
+        if (heroRosterGridRect != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(heroRosterGridRect);
         }
 
         if (supportSummaryText != null)
@@ -3089,9 +3654,20 @@ public sealed class GameHud : MonoBehaviour
 
         if (debugText != null)
         {
+            string accountDebugText = accountProgressManager != null
+                ? "\nAccount Lv: " + accountProgressManager.Level
+                    + " EXP " + FormatShortNumber(accountProgressManager.Experience)
+                    + "/" + FormatShortNumber(accountProgressManager.NextLevelExperience)
+                    + " TP " + accountProgressManager.AvailableTalentPoints
+                    + "/" + accountProgressManager.TotalTalentPointsEarned
+                    + " Bonus " + accountProgressManager.DebugTalentPointBonus
+                : string.Empty;
             debugText.text = "Time Scale x" + Time.timeScale.ToString("0.##")
                 + "\nCombat Speed x" + speedManager.CurrentMultiplier
                 + "\n4x Entitlement: " + speedManager.HasFourTimesSpeedEntitlement
+                + "\nTotem Essence: " + FormatCountNumber(wallet.TotemEssence)
+                + "\nRune Dust: " + FormatCountNumber(wallet.RuneDust)
+                + accountDebugText
                 + "\nOffline Reward Stage: " + progressManager.GetOfflineRewardStageId()
                 + "\nBoss Cleared: " + progressManager.ChapterOneBossCleared
                 + "\nLast Battle: " + battleManager.LastBattleLog;
@@ -3171,7 +3747,7 @@ public sealed class GameHud : MonoBehaviour
                 string label = tabButtonLabels.TryGetValue(pair.Key, out string savedLabel) ? savedLabel : text.text;
                 if (heroDetailCloseTab)
                 {
-                    text.text = "X\n히어로";
+                    text.text = "X\n영웅";
                 }
                 else if ((pair.Key == HudTab.Growth || pair.Key == HudTab.Hero) && activeAndOpen)
                 {
@@ -3194,7 +3770,7 @@ public sealed class GameHud : MonoBehaviour
             case HudTab.Growth:
                 return "X\n성장";
             case HudTab.Hero:
-                return "X\n히어로";
+                return "X\n영웅";
             default:
                 return "X";
         }
@@ -3681,6 +4257,16 @@ public sealed class GameHud : MonoBehaviour
         UpdateView();
     }
 
+    private bool CanLevelUpSelectedEquipmentDetail()
+    {
+        EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(selectedEquipmentDetailId) : null;
+        return state != null
+            && state.IsOwned
+            && wallet != null
+            && state.Level < state.MaxLevel
+            && wallet.EquipmentExpItem >= state.LevelUpCost;
+    }
+
     private void StarUpSelectedEquipmentDetail()
     {
         EquipmentState state = equipmentInventory != null ? equipmentInventory.GetState(selectedEquipmentDetailId) : null;
@@ -3918,7 +4504,7 @@ public sealed class GameHud : MonoBehaviour
         if (heroDetailOwnedEffectText != null)
         {
             heroDetailOwnedEffectText.text = hero.IsOwned
-                ? "[보유 효과]  공격력 +" + (10 + hero.Stars * 2) + "%"
+                ? "[보유 효과]  공격력 +" + battleManager.GetHeroOwnedAttackBonusPercent(hero).ToString("0.##") + "%"
                 : "[미보유]  뽑기로 조각을 획득하면 배치 가능";
         }
 
@@ -5292,6 +5878,8 @@ public sealed class GameHud : MonoBehaviour
         EnsureHeroFormationDraft();
         bool formationOpen = activeHeroPageTab == HeroPageTab.Formation;
         bool traitOpen = activeHeroPageTab == HeroPageTab.Trait;
+        bool totemOpen = activeHeroPageTab == HeroPageTab.Statue;
+        bool runeOpen = activeHeroPageTab == HeroPageTab.Seal;
         if (heroFormationContent != null)
         {
             heroFormationContent.SetActive(formationOpen);
@@ -5302,9 +5890,19 @@ public sealed class GameHud : MonoBehaviour
             heroTraitContent.SetActive(traitOpen);
         }
 
+        if (heroTotemContent != null)
+        {
+            heroTotemContent.SetActive(totemOpen);
+        }
+
+        if (heroRuneContent != null)
+        {
+            heroRuneContent.SetActive(runeOpen);
+        }
+
         if (heroPlaceholderText != null)
         {
-            bool placeholderOpen = !formationOpen && !traitOpen;
+            bool placeholderOpen = !formationOpen && !traitOpen && !totemOpen && !runeOpen;
             heroPlaceholderText.gameObject.SetActive(placeholderOpen);
             if (placeholderOpen)
             {
@@ -5371,26 +5969,414 @@ public sealed class GameHud : MonoBehaviour
 
         if (heroOwnedEffectText != null)
         {
-            int totalStars = 0;
-            int ownedCount = 0;
-            foreach (HeroState hero in battleManager.Heroes)
-            {
-                if (!hero.IsOwned)
-                {
-                    continue;
-                }
-
-                ownedCount += 1;
-                totalStars += hero.Stars;
-            }
-
-            heroOwnedEffectText.text = "보유 효과 : 공격력+" + (ownedCount * 10 + totalStars * 2) + "%";
+            heroOwnedEffectText.text = "보유 효과 : 공격력+" + battleManager.HeroOwnedAttackBonusPercent.ToString("0.##") + "%";
         }
+
+        RefreshFormationTotemSlot();
 
         if (traitOpen)
         {
             RefreshHeroTraitPanel();
         }
+
+        if (totemOpen)
+        {
+            RefreshHeroTotemPanel();
+        }
+
+        if (runeOpen)
+        {
+            RefreshHeroRunePanel();
+        }
+    }
+
+    private void RefreshFormationTotemSlot()
+    {
+        if (battleManager == null)
+        {
+            return;
+        }
+
+        RefreshFormationTotemSlot(1, heroFormationTotemButton, heroFormationTotemText);
+        RefreshFormationTotemSlot(2, heroFormationTotemSecondButton, heroFormationTotemSecondText);
+    }
+
+    private void RefreshFormationTotemSlot(int slot, Button button, Text text)
+    {
+        if (text == null || battleManager == null)
+        {
+            return;
+        }
+
+        if (!battleManager.IsTotemSlotUnlocked(slot))
+        {
+            text.text = "잠김\n토템 " + slot;
+            if (button != null)
+            {
+                SetButtonColor(button, new Color(0.18f, 0.20f, 0.26f, 1f));
+            }
+
+            return;
+        }
+
+        TotemState pendingState = battleManager.GetTotemState(pendingTotemEquipId);
+        string equippedTotemId = battleManager.GetEquippedTotemId(selectedHeroPreset, slot);
+        TotemState state = battleManager.GetTotemState(equippedTotemId);
+        if (state == null)
+        {
+            text.text = pendingState != null
+                ? "+\n" + pendingState.DisplayName + "\n장착"
+                : "+\n토템 " + slot;
+            if (button != null)
+            {
+                SetButtonColor(button, pendingState != null ? Color.Lerp(GetTotemColor(pendingState.Definition), Color.white, 0.22f) : new Color(0.20f, 0.28f, 0.42f, 1f));
+            }
+
+            return;
+        }
+
+        text.text = state.Definition.Icon
+            + "\n" + state.DisplayName
+            + "\n" + state.GradeLabel + " Lv." + state.Level + "/" + TotemDefinition.MaxLevel
+            + (pendingState != null && state.Definition.Id != pendingState.Definition.Id ? "\n교체 가능" : string.Empty);
+
+        if (button != null)
+        {
+            SetButtonColor(button, GetTotemColor(state.Definition));
+        }
+    }
+
+    private void RefreshHeroTotemPanel()
+    {
+        if (battleManager == null || wallet == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(selectedTotemId))
+        {
+            selectedTotemId = battleManager.GetEquippedTotemId(selectedHeroPreset, selectedTotemSlot);
+        }
+
+        string equippedTotemId = battleManager.GetEquippedTotemId(selectedHeroPreset, selectedTotemSlot);
+        TotemState selectedState = battleManager.GetTotemState(selectedTotemId) ?? battleManager.GetTotemState(equippedTotemId);
+        if (selectedState == null && GameData.Totems.Count > 0)
+        {
+            selectedState = battleManager.GetTotemState(GameData.Totems[0].Id);
+        }
+
+        if (selectedState != null)
+        {
+            selectedTotemId = selectedState.Definition.Id;
+        }
+
+        if (heroTotemSummaryText != null)
+        {
+            string slotOneName = GetEquippedTotemLabel(1);
+            string slotTwoName = battleManager.IsTotemSlotUnlocked(2) ? GetEquippedTotemLabel(2) : "2번 슬롯 잠김";
+            heroTotemSummaryText.text = "프리셋 " + selectedHeroPreset
+                + "  선택 슬롯 " + selectedTotemSlot
+                + "  정수 " + FormatCountNumber(wallet.TotemEssence)
+                + "\n1번 " + slotOneName + " / 2번 " + slotTwoName;
+        }
+
+        foreach (TotemDefinition totem in GameData.Totems)
+        {
+            TotemState state = battleManager.GetTotemState(totem.Id);
+            bool selected = selectedState != null && selectedState.Definition.Id == totem.Id;
+            bool equippedInSelectedSlot = equippedTotemId == totem.Id;
+            bool equippedInAnySlot = IsTotemEquippedInAnySlot(totem.Id);
+            bool unlocked = state != null && state.Unlocked;
+
+            if (heroTotemButtonTexts.TryGetValue(totem.Id, out Text text) && text != null)
+            {
+                text.text = totem.Icon
+                    + "\n" + GetTotemCategoryLabel(totem.Archetype)
+                    + "\n" + (state != null ? state.GradeLabel : TotemDefinition.GetGradeLabel(TotemGrade.Common))
+                    + " Lv." + (state != null ? state.Level : 1)
+                    + (equippedInSelectedSlot ? "\n선택 슬롯" : equippedInAnySlot ? "\n장착중" : string.Empty)
+                    + (unlocked ? string.Empty : "\n미보유");
+            }
+
+            if (heroTotemButtons.TryGetValue(totem.Id, out Button button) && button != null)
+            {
+                Color baseColor = unlocked ? GetTotemColor(totem) : new Color(0.20f, 0.22f, 0.26f, 1f);
+                SetButtonColor(button, selected ? Color.Lerp(baseColor, Color.white, 0.35f) : baseColor);
+            }
+        }
+
+        if (heroTotemDetailText != null && selectedState != null)
+        {
+            bool isBoss = progressManager != null && progressManager.CurrentStage.Type == StageType.Boss;
+            heroTotemDetailText.text = selectedState.Definition.Icon + " " + selectedState.DisplayName
+                + "  " + selectedState.GradeLabel + " Lv." + selectedState.Level + "/" + TotemDefinition.MaxLevel
+                + "\n효과: " + selectedState.Definition.Role
+                + "\n" + selectedState.Definition.GetEffectSummary(selectedState.Level, selectedState.Grade, battleManager.DeployedHeroes, isBoss);
+        }
+
+        if (heroTotemEquipButton != null && selectedState != null)
+        {
+            int equippedSlot = GetEquippedTotemSlot(selectedState.Definition.Id);
+            bool equipped = equippedSlot > 0;
+            heroTotemEquipButton.interactable = selectedState.Unlocked;
+            SetButtonText(heroTotemEquipButton, equipped ? "장착 해제" : "장착");
+            SetButtonColor(heroTotemEquipButton, equipped
+                ? new Color(0.42f, 0.54f, 0.82f, 1f)
+                : selectedState.Unlocked ? new Color(0.54f, 0.76f, 0.96f, 1f) : new Color(0.35f, 0.36f, 0.38f, 1f));
+        }
+
+        if (heroTotemLevelUpButton != null && selectedState != null)
+        {
+            bool canLevel = selectedState.Unlocked && !selectedState.IsMaxed && wallet.TotemEssence >= selectedState.LevelUpCost;
+            bool canPromote = selectedState.Unlocked && selectedState.CanPromote && wallet.TotemEssence >= selectedState.PromoteCost;
+            heroTotemLevelUpButton.interactable = selectedState.Unlocked;
+            SetButtonText(heroTotemLevelUpButton, selectedState.CanPromote
+                ? "진화\n" + FormatCountNumber(selectedState.PromoteCost)
+                : selectedState.IsMaxed ? "MAX" : "강화\n" + FormatCountNumber(selectedState.LevelUpCost));
+            SetButtonColor(heroTotemLevelUpButton, selectedState.CanPromote
+                ? canPromote ? new Color(0.92f, 0.58f, 0.18f, 1f) : new Color(0.36f, 0.30f, 0.22f, 1f)
+                : selectedState.IsMaxed ? new Color(0.34f, 0.36f, 0.40f, 1f)
+                : canLevel ? new Color(0.54f, 0.78f, 0.22f, 1f) : new Color(0.35f, 0.36f, 0.34f, 1f));
+        }
+    }
+
+    private string GetEquippedTotemLabel(int slot)
+    {
+        if (battleManager == null || !battleManager.IsTotemSlotUnlocked(slot))
+        {
+            return "잠김";
+        }
+
+        TotemState state = battleManager.GetTotemState(battleManager.GetEquippedTotemId(selectedHeroPreset, slot));
+        return state != null ? state.DisplayName : "없음";
+    }
+
+    private void RefreshHeroRunePanel()
+    {
+        if (battleManager == null || wallet == null)
+        {
+            return;
+        }
+
+        selectedRuneSlot = Mathf.Clamp(selectedRuneSlot, 1, GameData.MaxRuneSlots);
+        if (string.IsNullOrEmpty(selectedRuneId) && GameData.Runes.Count > 0)
+        {
+            selectedRuneId = GameData.Runes[0].Id;
+        }
+
+        RuneState selectedState = battleManager.GetRuneState(selectedRuneId);
+        if (selectedState == null && GameData.Runes.Count > 0)
+        {
+            selectedState = battleManager.GetRuneState(GameData.Runes[0].Id);
+        }
+
+        if (selectedState != null)
+        {
+            selectedRuneId = selectedState.Definition.Id;
+        }
+
+        if (heroRuneSummaryText != null)
+        {
+            heroRuneSummaryText.text = "프리셋 " + selectedHeroPreset
+                + "  룬 슬롯 " + selectedRuneSlot + "/" + GameData.MaxRuneSlots
+                + "  룬 가루 " + FormatCountNumber(wallet.RuneDust);
+        }
+
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            string equippedRuneId = battleManager.GetEquippedRuneId(selectedHeroPreset, slot);
+            RuneState state = battleManager.GetRuneState(equippedRuneId);
+            bool selectedSlot = slot == selectedRuneSlot;
+            if (heroRuneSlotTexts.TryGetValue(slot, out Text slotText) && slotText != null)
+            {
+                slotText.text = state != null
+                    ? slot + "\n" + state.Definition.Icon + " " + state.Definition.DisplayName + "\nLv." + state.Level + "/" + RuneDefinition.MaxLevel
+                    : slot + "\n+\n빈 룬 슬롯";
+                slotText.resizeTextForBestFit = true;
+                slotText.resizeTextMinSize = 10;
+                slotText.resizeTextMaxSize = 18;
+            }
+
+            if (heroRuneSlotButtons.TryGetValue(slot, out Button slotButton) && slotButton != null)
+            {
+                Color baseColor = state != null ? GetRuneColor(state.Definition) : new Color(0.17f, 0.21f, 0.31f, 1f);
+                SetButtonColor(slotButton, selectedSlot ? Color.Lerp(baseColor, Color.white, 0.28f) : baseColor);
+            }
+        }
+
+        foreach (RuneDefinition rune in GameData.Runes)
+        {
+            RuneState state = battleManager.GetRuneState(rune.Id);
+            bool selected = selectedState != null && selectedState.Definition.Id == rune.Id;
+            bool equipped = IsRuneEquippedInAnySlot(rune.Id);
+            bool unlocked = state != null && state.Unlocked;
+
+            if (heroRuneButtonTexts.TryGetValue(rune.Id, out Text text) && text != null)
+            {
+                text.text = rune.Icon
+                    + "\n" + rune.DisplayName
+                    + "\nLv." + (state != null ? state.Level : 1)
+                    + (equipped ? "\n장착중" : string.Empty)
+                    + (unlocked ? string.Empty : "\n미보유");
+            }
+
+            if (heroRuneButtons.TryGetValue(rune.Id, out Button button) && button != null)
+            {
+                Color baseColor = unlocked ? GetRuneColor(rune) : new Color(0.20f, 0.22f, 0.26f, 1f);
+                SetButtonColor(button, selected ? Color.Lerp(baseColor, Color.white, 0.35f) : baseColor);
+            }
+        }
+
+        if (heroRuneDetailText != null && selectedState != null)
+        {
+            heroRuneDetailText.text = selectedState.Definition.Icon + " " + selectedState.Definition.DisplayName
+                + "  Lv." + selectedState.Level + "/" + RuneDefinition.MaxLevel
+                + "\n" + selectedState.Definition.Role
+                + "\n" + selectedState.Definition.GetEffectSummary(selectedState.Level);
+        }
+
+        if (heroRuneEquipButton != null && selectedState != null)
+        {
+            int equippedSlot = GetEquippedRuneSlot(selectedState.Definition.Id);
+            bool equipped = equippedSlot > 0;
+            SetButtonText(heroRuneEquipButton, equipped ? "장착 해제" : selectedRuneSlot + "번 슬롯 장착");
+            SetButtonColor(heroRuneEquipButton, equipped
+                ? new Color(0.42f, 0.54f, 0.82f, 1f)
+                : new Color(0.54f, 0.76f, 0.96f, 1f));
+        }
+
+        if (heroRuneLevelUpButton != null && selectedState != null)
+        {
+            bool canLevel = selectedState.Unlocked && !selectedState.IsMaxed && wallet.RuneDust >= selectedState.LevelUpCost;
+            SetButtonText(heroRuneLevelUpButton, selectedState.IsMaxed ? "MAX" : "강화\n" + FormatCountNumber(selectedState.LevelUpCost));
+            SetButtonColor(heroRuneLevelUpButton, selectedState.IsMaxed
+                ? new Color(0.34f, 0.36f, 0.40f, 1f)
+                : canLevel ? new Color(0.54f, 0.78f, 0.22f, 1f) : new Color(0.35f, 0.36f, 0.34f, 1f));
+        }
+    }
+
+    private void SelectRune(string runeId)
+    {
+        selectedRuneId = runeId;
+        RefreshHeroRunePanel();
+    }
+
+    private void EquipSelectedRune()
+    {
+        if (battleManager == null || string.IsNullOrEmpty(selectedRuneId))
+        {
+            return;
+        }
+
+        int equippedSlot = GetEquippedRuneSlot(selectedRuneId);
+        if (equippedSlot > 0)
+        {
+            if (battleManager.ClearRuneForPreset(selectedHeroPreset, equippedSlot))
+            {
+                ShowGrowthNotice(equippedSlot + "번 룬을 해제했습니다.");
+            }
+
+            UpdateView();
+            return;
+        }
+
+        if (battleManager.SetRuneForPreset(selectedHeroPreset, selectedRuneSlot, selectedRuneId))
+        {
+            RuneState state = battleManager.GetRuneState(selectedRuneId);
+            ShowGrowthNotice((state != null ? state.Definition.DisplayName : "룬") + "을 " + selectedRuneSlot + "번 슬롯에 장착했습니다.");
+        }
+        else
+        {
+            ShowGrowthNotice("룬을 장착할 수 없습니다.");
+        }
+
+        UpdateView();
+    }
+
+    private void LevelUpSelectedRune()
+    {
+        if (battleManager == null || string.IsNullOrEmpty(selectedRuneId))
+        {
+            return;
+        }
+
+        RuneState state = battleManager.GetRuneState(selectedRuneId);
+        if (state == null)
+        {
+            return;
+        }
+
+        if (state.IsMaxed)
+        {
+            ShowGrowthNotice("이미 최대 레벨입니다.");
+            return;
+        }
+
+        if (wallet == null || wallet.RuneDust < state.LevelUpCost)
+        {
+            ShowGrowthNotice("룬 가루가 부족합니다.");
+            return;
+        }
+
+        battleManager.TryLevelUpRune(selectedRuneId);
+        UpdateView();
+    }
+
+    private bool CanLevelUpSelectedRune()
+    {
+        if (battleManager == null || wallet == null || string.IsNullOrEmpty(selectedRuneId))
+        {
+            return false;
+        }
+
+        RuneState state = battleManager.GetRuneState(selectedRuneId);
+        return state != null && state.Unlocked && !state.IsMaxed && wallet.RuneDust >= state.LevelUpCost;
+    }
+
+    private bool IsRuneEquippedInAnySlot(string runeId)
+    {
+        return GetEquippedRuneSlot(runeId) > 0;
+    }
+
+    private int GetEquippedRuneSlot(string runeId)
+    {
+        if (battleManager == null || string.IsNullOrEmpty(runeId))
+        {
+            return 0;
+        }
+
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            if (battleManager.GetEquippedRuneId(selectedHeroPreset, slot) == runeId)
+            {
+                return slot;
+            }
+        }
+
+        return 0;
+    }
+
+    private bool IsTotemEquippedInAnySlot(string totemId)
+    {
+        return GetEquippedTotemSlot(totemId) > 0;
+    }
+
+    private int GetEquippedTotemSlot(string totemId)
+    {
+        if (battleManager == null || string.IsNullOrEmpty(totemId))
+        {
+            return 0;
+        }
+
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            if (battleManager.IsTotemSlotUnlocked(slot) && battleManager.GetEquippedTotemId(selectedHeroPreset, slot) == totemId)
+            {
+                return slot;
+            }
+        }
+
+        return 0;
     }
 
     private void RefreshHeroTraitPanel()
@@ -5439,7 +6425,6 @@ public sealed class GameHud : MonoBehaviour
         int selectedLevel = accountProgressManager.GetTalentLevel(selectedTalent.Id);
         bool selectedUnlocked = accountProgressManager.IsTalentUnlocked(selectedTalent);
         bool selectedMaxed = selectedLevel >= selectedTalent.MaxLevel;
-        TalentDefinition previousTalent = TalentData.GetPreviousTalent(selectedTalent);
 
         if (heroTraitDetailText != null)
         {
@@ -5448,7 +6433,7 @@ public sealed class GameHud : MonoBehaviour
                 + "\n현재: " + selectedTalent.FormatValue(selectedLevel)
                 + (selectedMaxed ? "\n다음: MAX" : "\n다음: " + selectedTalent.FormatValue(selectedLevel + 1))
                 + "\nLv." + selectedLevel + "/" + selectedTalent.MaxLevel
-                + (!selectedUnlocked && previousTalent != null ? "\n해금 조건: " + previousTalent.DisplayName + " MAX" : string.Empty);
+                + (!selectedUnlocked ? BuildHeroTraitUnlockConditionText(selectedTalent) : string.Empty);
         }
 
         if (heroTraitLevelUpButton != null)
@@ -5480,6 +6465,215 @@ public sealed class GameHud : MonoBehaviour
             : new Color(0.22f, 0.48f, 0.58f, 1f);
     }
 
+    private string BuildHeroTraitUnlockConditionText(TalentDefinition talent)
+    {
+        IReadOnlyList<TalentDefinition> prerequisites = TalentData.GetPrerequisiteTalents(talent);
+        if (prerequisites.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        string label = prerequisites[0].DisplayName;
+        for (int i = 1; i < prerequisites.Count; i++)
+        {
+            label += " / " + prerequisites[i].DisplayName;
+        }
+
+        return "\n해금 조건: 연결된 이전 특성 MAX (" + label + ")";
+    }
+
+    private void SelectTotem(string totemId)
+    {
+        selectedTotemId = totemId;
+        pendingTotemEquipId = string.Empty;
+        RefreshHeroTotemPanel();
+    }
+
+    private void EquipSelectedTotem()
+    {
+        if (battleManager == null || string.IsNullOrEmpty(selectedTotemId))
+        {
+            return;
+        }
+
+        int equippedSlot = GetEquippedTotemSlot(selectedTotemId);
+        if (equippedSlot > 0)
+        {
+            if (battleManager.ClearTotemForPreset(selectedHeroPreset, equippedSlot))
+            {
+                pendingTotemEquipId = string.Empty;
+                ShowGrowthNotice(equippedSlot + "번 토템을 해제했습니다.");
+            }
+            else
+            {
+                ShowGrowthNotice("토템을 해제할 수 없습니다.");
+            }
+
+            UpdateView();
+            return;
+        }
+
+        pendingTotemEquipId = selectedTotemId;
+        activeTab = HudTab.Hero;
+        contentPanelOpen = true;
+        activeHeroPageTab = HeroPageTab.Formation;
+        TotemState pendingState = battleManager.GetTotemState(pendingTotemEquipId);
+        ShowGrowthNotice((pendingState != null ? pendingState.DisplayName : "토템") + "을 장착할 슬롯을 선택하세요.");
+        UpdateView();
+    }
+
+    private void HandleFormationTotemSlotClick(int slot)
+    {
+        selectedTotemSlot = slot;
+        if (!string.IsNullOrEmpty(pendingTotemEquipId))
+        {
+            TryEquipPendingTotemInSlot(slot);
+            return;
+        }
+
+        if (battleManager != null && !battleManager.IsTotemSlotUnlocked(selectedTotemSlot))
+        {
+            ShowGrowthNotice(selectedTotemSlot + "번 토템 슬롯은 추후 해금됩니다.");
+            UpdateView();
+            return;
+        }
+
+        selectedTotemId = battleManager != null ? battleManager.GetEquippedTotemId(selectedHeroPreset, selectedTotemSlot) : selectedTotemId;
+        activeHeroPageTab = HeroPageTab.Statue;
+        UpdateView();
+    }
+
+    private void TryEquipPendingTotemInSlot(int slot)
+    {
+        if (battleManager == null || string.IsNullOrEmpty(pendingTotemEquipId))
+        {
+            return;
+        }
+
+        if (!battleManager.IsTotemSlotUnlocked(slot))
+        {
+            ShowGrowthNotice(slot + "번 토템 슬롯은 아직 잠겨 있습니다.");
+            UpdateView();
+            return;
+        }
+
+        selectedTotemSlot = slot;
+        selectedTotemId = pendingTotemEquipId;
+        if (battleManager.SetTotemForPreset(selectedHeroPreset, slot, pendingTotemEquipId))
+        {
+            TotemState state = battleManager.GetTotemState(pendingTotemEquipId);
+            pendingTotemEquipId = string.Empty;
+            ShowGrowthNotice((state != null ? state.DisplayName : "토템") + "을 " + slot + "번 슬롯에 장착했습니다.");
+        }
+        else
+        {
+            ShowGrowthNotice("장착할 수 없는 토템입니다.");
+        }
+
+        UpdateView();
+    }
+
+    private void RefreshPendingTotemSlotGlow()
+    {
+        if (battleManager == null
+            || string.IsNullOrEmpty(pendingTotemEquipId)
+            || activeTab != HudTab.Hero
+            || activeHeroPageTab != HeroPageTab.Formation)
+        {
+            return;
+        }
+
+        TotemState state = battleManager.GetTotemState(pendingTotemEquipId);
+        if (state == null)
+        {
+            return;
+        }
+
+        float glow = 0.35f + Mathf.PingPong(Time.unscaledTime * 2.4f, 1f) * 0.45f;
+        Color glowColor = Color.Lerp(GetTotemColor(state.Definition), Color.white, glow);
+        if (heroFormationTotemButton != null && battleManager.IsTotemSlotUnlocked(1))
+        {
+            SetButtonColor(heroFormationTotemButton, glowColor);
+        }
+
+        if (heroFormationTotemSecondButton != null && battleManager.IsTotemSlotUnlocked(2))
+        {
+            SetButtonColor(heroFormationTotemSecondButton, glowColor);
+        }
+    }
+
+    private void LevelUpSelectedTotem()
+    {
+        if (battleManager == null || string.IsNullOrEmpty(selectedTotemId))
+        {
+            return;
+        }
+
+        TotemState state = battleManager.GetTotemState(selectedTotemId);
+        if (state == null)
+        {
+            return;
+        }
+
+        if (!state.Unlocked)
+        {
+            ShowGrowthNotice("보유하지 않은 토템입니다.");
+            return;
+        }
+
+        if (state.IsMaxed)
+        {
+            if (!state.CanPromote)
+            {
+                ShowGrowthNotice("이미 최대 등급입니다.");
+                return;
+            }
+
+            if (wallet == null || wallet.TotemEssence < state.PromoteCost)
+            {
+                ShowGrowthNotice("토템 정수가 부족합니다.");
+                return;
+            }
+
+            if (!battleManager.TryPromoteTotem(selectedTotemId))
+            {
+                ShowGrowthNotice("토템 진화에 실패했습니다.");
+                return;
+            }
+
+            UpdateView();
+            return;
+        }
+
+        if (wallet == null || wallet.TotemEssence < state.LevelUpCost)
+        {
+            ShowGrowthNotice("토템 정수가 부족합니다.");
+            return;
+        }
+
+        if (!battleManager.TryLevelUpTotem(selectedTotemId))
+        {
+            ShowGrowthNotice("토템 강화에 실패했습니다.");
+            return;
+        }
+
+        UpdateView();
+    }
+
+    private bool CanLevelUpSelectedTotem()
+    {
+        if (battleManager == null || wallet == null || string.IsNullOrEmpty(selectedTotemId))
+        {
+            return false;
+        }
+
+        TotemState state = battleManager.GetTotemState(selectedTotemId);
+        return state != null
+            && state.Unlocked
+            && ((!state.IsMaxed && wallet.TotemEssence >= state.LevelUpCost)
+                || (state.CanPromote && wallet.TotemEssence >= state.PromoteCost));
+    }
+
     private void LevelUpSelectedHeroTrait()
     {
         if (accountProgressManager == null)
@@ -5490,7 +6684,7 @@ public sealed class GameHud : MonoBehaviour
         TalentDefinition talent = TalentData.GetTalent(selectedHeroTraitId);
         if (!accountProgressManager.IsTalentUnlocked(talent))
         {
-            ShowGrowthNotice("이전 특성을 MAX 찍어야 합니다.");
+            ShowGrowthNotice("선으로 연결된 이전 특성을 MAX 찍어야 합니다.");
             return;
         }
 
@@ -5514,6 +6708,20 @@ public sealed class GameHud : MonoBehaviour
 
         ShowGrowthNotice(talent.DisplayName + " Lv." + accountProgressManager.GetTalentLevel(talent.Id));
         UpdateView();
+    }
+
+    private bool CanLevelUpSelectedHeroTrait()
+    {
+        if (accountProgressManager == null)
+        {
+            return false;
+        }
+
+        TalentDefinition talent = TalentData.GetTalent(selectedHeroTraitId);
+        int level = accountProgressManager.GetTalentLevel(talent.Id);
+        return accountProgressManager.IsTalentUnlocked(talent)
+            && level < talent.MaxLevel
+            && accountProgressManager.AvailableTalentPoints >= talent.CostPerLevel;
     }
 
     private void TryLevelUpAbilityFromHud(AbilityKind kind)
@@ -5542,6 +6750,19 @@ public sealed class GameHud : MonoBehaviour
         {
             ShowGrowthNotice("골드가 부족합니다.");
         }
+    }
+
+    private bool CanLevelUpAbilityFromHud(AbilityKind kind)
+    {
+        AbilityState ability = FindAbilityState(kind);
+        if (ability == null || ability.IsMaxed || abilityManager == null || wallet == null)
+        {
+            return false;
+        }
+
+        int cappedLevels = abilityManager.GetCappedLevelCount(ability, selectedGrowthLevelStep);
+        long cost = abilityManager.GetLevelUpCost(ability, cappedLevels);
+        return cappedLevels > 0 && cost > 0 && wallet.Gold >= cost;
     }
 
     private bool IsHeroInEditingFormation(string heroId)
@@ -5595,7 +6816,15 @@ public sealed class GameHud : MonoBehaviour
             return;
         }
 
-        var sortedHeroes = new List<HeroState>(battleManager.Heroes);
+        var sortedHeroes = new List<HeroState>();
+        foreach (HeroState hero in battleManager.Heroes)
+        {
+            if (hero != null && hero.IsOwned)
+            {
+                sortedHeroes.Add(hero);
+            }
+        }
+
         sortedHeroes.Sort(CompareHeroesForAutoFormation);
 
         editingFormationHeroIds.Clear();
@@ -5755,6 +6984,16 @@ public sealed class GameHud : MonoBehaviour
         }
 
         UpdateView();
+    }
+
+    private bool CanLevelUpSelectedHeroDetail()
+    {
+        HeroState hero = FindHeroState(selectedHeroDetailId);
+        return hero != null
+            && hero.IsOwned
+            && hero.Level < hero.MaxLevel
+            && wallet != null
+            && wallet.HeroExpItem >= hero.LevelUpCost;
     }
 
     private void StarUpSelectedHeroDetail()
@@ -6734,11 +7973,11 @@ public sealed class GameHud : MonoBehaviour
             case HeroPageTab.Trait:
                 return "특성";
             case HeroPageTab.Statue:
-                return "석상";
+                return "토템";
             case HeroPageTab.Seal:
-                return "인장";
+                return "룬";
             case HeroPageTab.Relic:
-                return "유물";
+                return "성물";
             default:
                 return tab.ToString();
         }
@@ -6999,6 +8238,83 @@ public sealed class GameHud : MonoBehaviour
         }
     }
 
+    private Color GetTotemColor(TotemDefinition totem)
+    {
+        if (totem == null)
+        {
+            return new Color(0.20f, 0.27f, 0.38f, 1f);
+        }
+
+        switch (totem.Archetype)
+        {
+            case TotemArchetype.Combat:
+                return new Color(0.55f, 0.20f, 0.20f, 1f);
+            case TotemArchetype.Support:
+                return new Color(0.42f, 0.36f, 0.14f, 1f);
+            case TotemArchetype.Guardian:
+                return new Color(0.22f, 0.42f, 0.54f, 1f);
+            case TotemArchetype.Storm:
+                return new Color(0.18f, 0.48f, 0.44f, 1f);
+            case TotemArchetype.Arcane:
+                return new Color(0.42f, 0.22f, 0.58f, 1f);
+            default:
+                return new Color(0.20f, 0.27f, 0.38f, 1f);
+        }
+    }
+
+    private Color GetRuneColor(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return new Color(0.20f, 0.27f, 0.38f, 1f);
+        }
+
+        switch (rune.EffectKind)
+        {
+            case RuneEffectKind.Strike:
+                return new Color(0.46f, 0.24f, 0.22f, 1f);
+            case RuneEffectKind.Execute:
+                return new Color(0.42f, 0.18f, 0.30f, 1f);
+            case RuneEffectKind.Barrier:
+                return new Color(0.20f, 0.34f, 0.48f, 1f);
+            case RuneEffectKind.Harvest:
+                return new Color(0.42f, 0.36f, 0.16f, 1f);
+            case RuneEffectKind.Arcane:
+                return new Color(0.36f, 0.22f, 0.56f, 1f);
+            case RuneEffectKind.Storm:
+                return new Color(0.18f, 0.45f, 0.43f, 1f);
+            case RuneEffectKind.Focus:
+                return new Color(0.30f, 0.40f, 0.60f, 1f);
+            case RuneEffectKind.Vitality:
+                return new Color(0.24f, 0.42f, 0.30f, 1f);
+            case RuneEffectKind.Command:
+                return new Color(0.38f, 0.32f, 0.52f, 1f);
+            case RuneEffectKind.Regeneration:
+                return new Color(0.25f, 0.38f, 0.34f, 1f);
+            default:
+                return new Color(0.20f, 0.27f, 0.38f, 1f);
+        }
+    }
+
+    private static string GetTotemCategoryLabel(TotemArchetype archetype)
+    {
+        switch (archetype)
+        {
+            case TotemArchetype.Combat:
+                return "전투\n토템";
+            case TotemArchetype.Guardian:
+                return "수호\n토템";
+            case TotemArchetype.Support:
+                return "지원\n토템";
+            case TotemArchetype.Arcane:
+                return "비전\n토템";
+            case TotemArchetype.Storm:
+                return "폭풍\n토템";
+            default:
+                return "토템";
+        }
+    }
+
     private Vector2 GetHeroTraitMotionOffset(HeroState hero, int heroIndex, float time, bool isLastSource, float flashRatio)
     {
         float phase = heroIndex * 0.73f;
@@ -7081,7 +8397,453 @@ public sealed class GameHud : MonoBehaviour
 
     private string FormatCountNumber(long value)
     {
-        return value.ToString("#,0");
+        return GameData.ClampCount(value).ToString("#,0");
+    }
+
+    private static Sprite GetRoundedPanelSprite()
+    {
+        if (roundedPanelSprite == null)
+        {
+            roundedPanelSprite = CreateRoundedRectSprite(64, 14, 16);
+        }
+
+        return roundedPanelSprite;
+    }
+
+    private static Sprite GetRoundedButtonSprite()
+    {
+        if (roundedButtonSprite == null)
+        {
+            roundedButtonSprite = CreateRoundedRectSprite(64, 20, 22);
+        }
+
+        return roundedButtonSprite;
+    }
+
+    private static Sprite GetRoundedPillSprite()
+    {
+        if (roundedPillSprite == null)
+        {
+            roundedPillSprite = CreateRoundedRectSprite(64, 28, 28);
+        }
+
+        return roundedPillSprite;
+    }
+
+    private static Sprite GetCircleSprite()
+    {
+        if (circleSprite == null)
+        {
+            circleSprite = CreateCircleSprite(96, 0f);
+        }
+
+        return circleSprite;
+    }
+
+    private static Sprite GetRingSprite()
+    {
+        if (ringSprite == null)
+        {
+            ringSprite = CreateCircleSprite(128, 0.72f);
+        }
+
+        return ringSprite;
+    }
+
+    private static Sprite GetCoinIconSprite()
+    {
+        if (coinIconSprite == null)
+        {
+            coinIconSprite = CreateCoinIconSprite(64);
+        }
+
+        return coinIconSprite;
+    }
+
+    private static Sprite GetGemIconSprite()
+    {
+        if (gemIconSprite == null)
+        {
+            gemIconSprite = CreateGemIconSprite(64);
+        }
+
+        return gemIconSprite;
+    }
+
+    private static Sprite GetPowerIconSprite()
+    {
+        if (powerIconSprite == null)
+        {
+            powerIconSprite = CreatePowerIconSprite(64);
+        }
+
+        return powerIconSprite;
+    }
+
+    private static Sprite CreateRoundedRectSprite(int size, int radius, int border)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float px = x + 0.5f;
+                float py = y + 0.5f;
+                float cx = Mathf.Clamp(px, radius, size - radius);
+                float cy = Mathf.Clamp(py, radius, size - radius);
+                float distance = Vector2.Distance(new Vector2(px, py), new Vector2(cx, cy));
+                float alpha = Mathf.Clamp01(radius + 0.5f - distance);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply(false, true);
+        texture.hideFlags = HideFlags.HideAndDontSave;
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, size, size),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border));
+        sprite.hideFlags = HideFlags.HideAndDontSave;
+        return sprite;
+    }
+
+    private static Sprite CreateCircleSprite(int size, float innerCutoutRatio)
+    {
+        Texture2D texture = CreateTransparentTexture(size);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float outerRadius = size * 0.47f;
+        float innerRadius = outerRadius * Mathf.Clamp01(innerCutoutRatio);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
+                float outerAlpha = Mathf.Clamp01(outerRadius + 0.8f - distance);
+                float innerAlpha = innerRadius > 0.01f ? Mathf.Clamp01(distance - innerRadius + 0.8f) : 1f;
+                float alpha = Mathf.Clamp01(outerAlpha * innerAlpha);
+                if (alpha > 0f)
+                {
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+        }
+
+        return CreateSpriteFromTexture(texture);
+    }
+
+    private static Sprite CreateCoinIconSprite(int size)
+    {
+        Texture2D texture = CreateTransparentTexture(size);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.44f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 point = new Vector2(x, y);
+                float distance = Vector2.Distance(point, center);
+                if (distance > radius)
+                {
+                    continue;
+                }
+
+                float vertical = Mathf.InverseLerp(0f, size, y);
+                Color color = Color.Lerp(new Color(0.88f, 0.42f, 0.04f, 1f), new Color(1f, 0.92f, 0.20f, 1f), vertical);
+                if (distance > radius - 5f)
+                {
+                    color = new Color(0.54f, 0.25f, 0.02f, 1f);
+                }
+                else if (Mathf.Abs(distance - radius * 0.62f) < 2.1f)
+                {
+                    color = new Color(1f, 0.98f, 0.48f, 1f);
+                }
+
+                Vector2 highlightCenter = center + new Vector2(-radius * 0.25f, radius * 0.25f);
+                if (Vector2.Distance(point, highlightCenter) < radius * 0.24f)
+                {
+                    color = Color.Lerp(color, Color.white, 0.45f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        return CreateSpriteFromTexture(texture);
+    }
+
+    private static Sprite CreateGemIconSprite(int size)
+    {
+        Texture2D texture = CreateTransparentTexture(size);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.43f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float nx = (x - center.x) / radius;
+                float ny = (y - center.y) / radius;
+                float diamond = Mathf.Abs(nx) + Mathf.Abs(ny);
+                if (diamond > 1f)
+                {
+                    continue;
+                }
+
+                Color color = ny > 0.10f
+                    ? new Color(0.46f, 1f, 0.76f, 1f)
+                    : new Color(0.10f, 0.72f, 0.96f, 1f);
+                if (nx > 0.18f)
+                {
+                    color = Color.Lerp(color, new Color(0.03f, 0.36f, 0.86f, 1f), 0.45f);
+                }
+                else if (nx < -0.18f)
+                {
+                    color = Color.Lerp(color, Color.white, 0.18f);
+                }
+
+                if (diamond > 0.88f || Mathf.Abs(nx) < 0.025f || Mathf.Abs(nx + ny) < 0.025f || Mathf.Abs(nx - ny) < 0.025f)
+                {
+                    color = Color.Lerp(color, new Color(0.02f, 0.20f, 0.50f, 1f), diamond > 0.88f ? 0.75f : 0.30f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        return CreateSpriteFromTexture(texture);
+    }
+
+    private static Sprite CreatePowerIconSprite(int size)
+    {
+        Texture2D texture = CreateTransparentTexture(size);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.44f;
+        Vector2 bladeStart = new Vector2(size * 0.30f, size * 0.25f);
+        Vector2 bladeEnd = new Vector2(size * 0.70f, size * 0.74f);
+        Vector2 guardStart = new Vector2(size * 0.26f, size * 0.34f);
+        Vector2 guardEnd = new Vector2(size * 0.42f, size * 0.20f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 point = new Vector2(x, y);
+                float distance = Vector2.Distance(point, center);
+                if (distance <= radius)
+                {
+                    Color color = distance > radius - 4f
+                        ? new Color(0.02f, 0.08f, 0.18f, 1f)
+                        : Color.Lerp(new Color(0.10f, 0.32f, 0.54f, 1f), new Color(0.20f, 0.68f, 0.95f, 1f), Mathf.InverseLerp(0f, size, y));
+                    texture.SetPixel(x, y, color);
+                }
+
+                float bladeDistance = DistanceToSegment(point, bladeStart, bladeEnd);
+                float guardDistance = DistanceToSegment(point, guardStart, guardEnd);
+                if (bladeDistance < 3.2f || guardDistance < 3.0f)
+                {
+                    texture.SetPixel(x, y, bladeDistance < 1.5f ? Color.white : new Color(0.82f, 0.90f, 0.98f, 1f));
+                }
+
+                if (Vector2.Distance(point, bladeEnd) < 5f)
+                {
+                    texture.SetPixel(x, y, new Color(1f, 0.92f, 0.42f, 1f));
+                }
+            }
+        }
+
+        return CreateSpriteFromTexture(texture);
+    }
+
+    private static Texture2D CreateTransparentTexture(int size)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                texture.SetPixel(x, y, Color.clear);
+            }
+        }
+
+        return texture;
+    }
+
+    private static Sprite CreateSpriteFromTexture(Texture2D texture)
+    {
+        texture.Apply(false, true);
+        texture.hideFlags = HideFlags.HideAndDontSave;
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0,
+            SpriteMeshType.FullRect);
+        sprite.hideFlags = HideFlags.HideAndDontSave;
+        return sprite;
+    }
+
+    private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
+    {
+        Vector2 segment = end - start;
+        float segmentLengthSquared = segment.sqrMagnitude;
+        if (segmentLengthSquared <= 0.001f)
+        {
+            return Vector2.Distance(point, start);
+        }
+
+        float t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / segmentLengthSquared);
+        return Vector2.Distance(point, start + segment * t);
+    }
+
+    private void ApplyPanelVisualStyle(GameObject panel, Image image, string name, Color color)
+    {
+        if (image == null || color.a <= 0.01f)
+        {
+            return;
+        }
+
+        if (!IsFlatUiPanel(name))
+        {
+            image.sprite = IsPillUiPanel(name) ? GetRoundedPillSprite() : GetRoundedPanelSprite();
+            image.type = Image.Type.Sliced;
+        }
+
+        if (ShouldDecorateUiPanel(name))
+        {
+            Shadow shadow = panel.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.38f);
+            shadow.effectDistance = new Vector2(0f, -4f);
+            shadow.useGraphicAlpha = true;
+
+            Outline outline = panel.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.58f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            outline.useGraphicAlpha = true;
+        }
+    }
+
+    private static bool IsFlatUiPanel(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        return name == "Root"
+            || name.Contains("Viewport")
+            || name.Contains("World")
+            || name.Contains("ConnectorLine")
+            || name.Contains("Projectile")
+            || name.Contains("DamagePopup");
+    }
+
+    private static bool IsPillUiPanel(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        return name.Contains("Pill")
+            || name.Contains("Badge")
+            || name.Contains("Bar")
+            || name.Contains("Fill")
+            || name.Contains("Dot");
+    }
+
+    private static bool ShouldDecorateUiPanel(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return true;
+        }
+
+        return !name.Contains("Fill")
+            && !name.Contains("Viewport")
+            && !name.Contains("Overlay")
+            && !name.Contains("Prompt")
+            && !name.Contains("Popup")
+            && !name.Contains("World")
+            && !name.Contains("Root")
+            && !name.Contains("ConnectorLine")
+            && !name.Contains("DamagePopup");
+    }
+
+    private void AddInsetHighlight(Transform parent, float alpha)
+    {
+        GameObject highlight = new GameObject("InsetHighlight", typeof(RectTransform), typeof(Image));
+        highlight.transform.SetParent(parent, false);
+        Image image = highlight.GetComponent<Image>();
+        image.sprite = GetRoundedButtonSprite();
+        image.type = Image.Type.Sliced;
+        image.color = new Color(1f, 1f, 1f, alpha);
+        image.raycastTarget = false;
+
+        RectTransform rect = highlight.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.52f);
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(5f, 4f);
+        rect.offsetMax = new Vector2(-5f, -5f);
+    }
+
+    private void ApplyTextVisualStyle(GameObject textObject, int fontSize)
+    {
+        Outline outline = textObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, fontSize >= 24 ? 0.86f : 0.70f);
+        outline.effectDistance = fontSize >= 28 ? new Vector2(2.6f, -2.6f) : new Vector2(1.7f, -1.7f);
+        outline.useGraphicAlpha = false;
+
+        Shadow shadow = textObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.42f);
+        shadow.effectDistance = new Vector2(0f, -2f);
+        shadow.useGraphicAlpha = false;
+    }
+
+    private Image CreateAnchoredIcon(string name, Transform parent, Sprite sprite, Vector2 anchoredPosition, Vector2 size)
+    {
+        GameObject iconObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+        iconObject.transform.SetParent(parent, false);
+        Image image = iconObject.GetComponent<Image>();
+        image.sprite = sprite;
+        image.raycastTarget = false;
+
+        RectTransform rect = iconObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.5f);
+        rect.anchorMax = new Vector2(0f, 0.5f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = anchoredPosition;
+        return image;
+    }
+
+    private void CreateHeaderResourceDisplay(
+        Transform parent,
+        string name,
+        Sprite iconSprite,
+        Vector2 iconPosition,
+        out Text valueText)
+    {
+        CreateAnchoredIcon(name + "Icon", parent, iconSprite, iconPosition, new Vector2(38f, 38f));
+
+        valueText = CreateText(name + "Text", parent, 25, FontStyle.Bold, TextAnchor.MiddleLeft);
+        RectTransform textRect = valueText.GetComponent<RectTransform>();
+        textRect.anchorMin = new Vector2(0f, 0.5f);
+        textRect.anchorMax = new Vector2(0f, 0.5f);
+        textRect.pivot = new Vector2(0f, 0.5f);
+        textRect.sizeDelta = new Vector2(132f, 46f);
+        textRect.anchoredPosition = new Vector2(iconPosition.x + 46f, iconPosition.y);
     }
 
     private GameObject CreatePanel(string name, Transform parent, Color color)
@@ -7090,6 +8852,7 @@ public sealed class GameHud : MonoBehaviour
         panel.transform.SetParent(parent, false);
         Image image = panel.AddComponent<Image>();
         image.color = color;
+        ApplyPanelVisualStyle(panel, image, name, color);
         return panel;
     }
 
@@ -7108,10 +8871,34 @@ public sealed class GameHud : MonoBehaviour
         return actor;
     }
 
+    private void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat = null)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        HoldRepeatButton repeatButton = button.GetComponent<HoldRepeatButton>();
+        if (repeatButton == null)
+        {
+            repeatButton = button.gameObject.AddComponent<HoldRepeatButton>();
+        }
+
+        repeatButton.Configure(action, canRepeat);
+    }
+
     private Button CreateButton(string label, Transform parent, int fontSize, Color color)
     {
         GameObject buttonObject = CreatePanel(label + "Button", parent, color);
         Button button = buttonObject.AddComponent<Button>();
+        Image buttonImage = buttonObject.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.sprite = GetRoundedButtonSprite();
+            buttonImage.type = Image.Type.Sliced;
+        }
+
+        AddInsetHighlight(buttonObject.transform, 0.18f);
         SetButtonColor(button, color);
 
         Text text = CreateText(label + "Text", buttonObject.transform, fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
@@ -7174,6 +8961,7 @@ public sealed class GameHud : MonoBehaviour
         text.supportRichText = true;
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
         text.verticalOverflow = VerticalWrapMode.Truncate;
+        ApplyTextVisualStyle(textObject, fontSize);
 
         RectTransform rect = text.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(0, fontSize + 22);

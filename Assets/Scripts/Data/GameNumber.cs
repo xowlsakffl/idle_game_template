@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using System.Text;
 
 [Serializable]
 public readonly struct GameNumber : IComparable<GameNumber>, IEquatable<GameNumber>
@@ -250,25 +249,6 @@ public readonly struct GameNumber : IComparable<GameNumber>, IEquatable<GameNumb
     public override string ToString()
     {
         return NumberFormatter.Format(this);
-    }
-
-    public static string BuildUnitLabel(int unitExponent)
-    {
-        if (unitExponent <= 0)
-        {
-            return string.Empty;
-        }
-
-        int index = unitExponent;
-        var builder = new StringBuilder();
-        while (index > 0)
-        {
-            index -= 1;
-            builder.Insert(0, (char)('A' + index % 26));
-            index /= 26;
-        }
-
-        return builder.ToString();
     }
 
     public static GameNumber operator +(GameNumber left, GameNumber right)

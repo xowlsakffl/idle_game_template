@@ -11,6 +11,8 @@ public sealed class CurrencyWallet : MonoBehaviour
     public long Ruby { get; private set; }
     public GameNumber HeroExpItem { get; private set; }
     public GameNumber EquipmentExpItem { get; private set; }
+    public long TotemEssence { get; private set; }
+    public long RuneDust { get; private set; }
     public long HeroTranscendStone { get; private set; }
     public long HeroSummonTicket { get; private set; }
     public long EquipmentSummonTicket { get; private set; }
@@ -18,13 +20,16 @@ public sealed class CurrencyWallet : MonoBehaviour
     public void Initialize(SaveManager save)
     {
         saveManager = save;
-        Gold = saveManager.LoadGameNumber(SaveKeys.Gold, GameNumber.Zero);
-        Ruby = saveManager.LoadLong(SaveKeys.Ruby, 150);
-        HeroExpItem = saveManager.LoadGameNumber(SaveKeys.HeroExpItem, 80);
-        EquipmentExpItem = saveManager.LoadGameNumber(SaveKeys.EquipmentExpItem, 80);
-        HeroTranscendStone = saveManager.LoadLong(SaveKeys.HeroTranscendStone, 0);
-        HeroSummonTicket = saveManager.LoadLong(SaveKeys.HeroSummonTicket, 3);
-        EquipmentSummonTicket = saveManager.LoadLong(SaveKeys.EquipmentSummonTicket, 3);
+        Gold = GameData.ClampNumber(saveManager.LoadGameNumber(SaveKeys.Gold, 120));
+        Ruby = GameData.ClampCount(saveManager.LoadLong(SaveKeys.Ruby, 100));
+        HeroExpItem = GameData.ClampNumber(saveManager.LoadGameNumber(SaveKeys.HeroExpItem, 30));
+        EquipmentExpItem = GameData.ClampNumber(saveManager.LoadGameNumber(SaveKeys.EquipmentExpItem, 30));
+        TotemEssence = GameData.ClampCount(saveManager.LoadLong(SaveKeys.TotemEssence, 120));
+        RuneDust = GameData.ClampCount(saveManager.LoadLong(SaveKeys.RuneDust, 120));
+        HeroTranscendStone = GameData.ClampCount(saveManager.LoadLong(SaveKeys.HeroTranscendStone, 0));
+        HeroSummonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.HeroSummonTicket, 3));
+        EquipmentSummonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.EquipmentSummonTicket, 3));
+        Save();
         NotifyChanged();
     }
 
@@ -35,7 +40,7 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        Gold += amount;
+        Gold = GameData.ClampNumber(Gold + amount);
         Save();
         NotifyChanged();
     }
@@ -47,7 +52,7 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        HeroExpItem += amount;
+        HeroExpItem = GameData.ClampNumber(HeroExpItem + amount);
         Save();
         NotifyChanged();
     }
@@ -59,7 +64,7 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        Ruby += amount;
+        Ruby = GameData.ClampCount(Ruby + amount);
         Save();
         NotifyChanged();
     }
@@ -71,7 +76,7 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        HeroSummonTicket += amount;
+        HeroSummonTicket = GameData.ClampCount(HeroSummonTicket + amount);
         Save();
         NotifyChanged();
     }
@@ -83,7 +88,7 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        EquipmentExpItem += amount;
+        EquipmentExpItem = GameData.ClampNumber(EquipmentExpItem + amount);
         Save();
         NotifyChanged();
     }
@@ -95,7 +100,31 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        HeroTranscendStone += amount;
+        HeroTranscendStone = GameData.ClampCount(HeroTranscendStone + amount);
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddTotemEssence(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        TotemEssence = GameData.ClampCount(TotemEssence + amount);
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddRuneDust(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        RuneDust = GameData.ClampCount(RuneDust + amount);
         Save();
         NotifyChanged();
     }
@@ -107,7 +136,7 @@ public sealed class CurrencyWallet : MonoBehaviour
             return;
         }
 
-        EquipmentSummonTicket += amount;
+        EquipmentSummonTicket = GameData.ClampCount(EquipmentSummonTicket + amount);
         Save();
         NotifyChanged();
     }
@@ -198,6 +227,42 @@ public sealed class CurrencyWallet : MonoBehaviour
         return true;
     }
 
+    public bool SpendTotemEssence(long amount)
+    {
+        if (amount <= 0)
+        {
+            return true;
+        }
+
+        if (TotemEssence < amount)
+        {
+            return false;
+        }
+
+        TotemEssence -= amount;
+        Save();
+        NotifyChanged();
+        return true;
+    }
+
+    public bool SpendRuneDust(long amount)
+    {
+        if (amount <= 0)
+        {
+            return true;
+        }
+
+        if (RuneDust < amount)
+        {
+            return false;
+        }
+
+        RuneDust -= amount;
+        Save();
+        NotifyChanged();
+        return true;
+    }
+
     public bool SpendEquipmentSummonCost(int count, int rubyPerMissingTicket)
     {
         if (!CanSpendSummonCost(count, rubyPerMissingTicket, EquipmentSummonTicket, out long ticketUse, out long rubyCost))
@@ -239,6 +304,8 @@ public sealed class CurrencyWallet : MonoBehaviour
         saveManager.SaveLong(SaveKeys.Ruby, Ruby);
         saveManager.SaveGameNumber(SaveKeys.HeroExpItem, HeroExpItem);
         saveManager.SaveGameNumber(SaveKeys.EquipmentExpItem, EquipmentExpItem);
+        saveManager.SaveLong(SaveKeys.TotemEssence, TotemEssence);
+        saveManager.SaveLong(SaveKeys.RuneDust, RuneDust);
         saveManager.SaveLong(SaveKeys.HeroTranscendStone, HeroTranscendStone);
         saveManager.SaveLong(SaveKeys.HeroSummonTicket, HeroSummonTicket);
         saveManager.SaveLong(SaveKeys.EquipmentSummonTicket, EquipmentSummonTicket);

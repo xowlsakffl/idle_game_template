@@ -165,7 +165,7 @@ public sealed class AbilityManager : MonoBehaviour
         double power = attackScore * criticalExpected * doubleCriticalExpected * FinalDamageMultiplier
             + hpScore * 0.03d
             + mobilityScore;
-        return Math.Max(1d, power);
+        return GameData.ClampCombatPower(power);
     }
 
     private double GetValue(AbilityKind kind)

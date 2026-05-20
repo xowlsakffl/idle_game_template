@@ -130,7 +130,7 @@ public sealed class HeroDefinition
         AttackPerLevel = attackPerLevel;
         HpPerLevel = hpPerLevel;
         PassiveStat = passiveStat;
-        PassiveValuePercent = Mathf.Max(0f, passiveValuePercent);
+        PassiveValuePercent = GetBalancedPassiveValue(rarity, passiveValuePercent);
         StartUnlocked = startUnlocked;
     }
 
@@ -160,23 +160,23 @@ public sealed class HeroDefinition
     public int GetAttackPower(int level, int stars)
     {
         int levelAttack = BaseAttack + Mathf.Max(0, level - 1) * AttackPerLevel;
-        float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.2f;
-        return Mathf.Max(1, Mathf.FloorToInt(levelAttack
+        float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.06f;
+        return Mathf.Clamp(Mathf.FloorToInt(levelAttack
             * starMultiplier
             * GetRarityStatMultiplier(Rarity)
             * GetPassiveMultiplier(HeroPassiveStat.AttackPower, stars)
-            * GetTenStarMultiplier(stars)));
+            * GetTenStarMultiplier(stars)), 1, GameData.MaxIntBalanceValue);
     }
 
     public int GetMaxHp(int level, int stars)
     {
         int levelHp = BaseHp + Mathf.Max(0, level - 1) * HpPerLevel;
-        float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.15f;
-        return Mathf.Max(1, Mathf.FloorToInt(levelHp
+        float starMultiplier = 1f + Mathf.Clamp(stars, 0, MaxStars) * 0.055f;
+        return Mathf.Clamp(Mathf.FloorToInt(levelHp
             * starMultiplier
             * GetRarityStatMultiplier(Rarity)
             * GetPassiveMultiplier(HeroPassiveStat.MaxHp, stars)
-            * GetTenStarMultiplier(stars)));
+            * GetTenStarMultiplier(stars)), 1, GameData.MaxIntBalanceValue);
     }
 
     public float GetAttackSpeed(int stars)
@@ -197,13 +197,18 @@ public sealed class HeroDefinition
 
     public int GetLevelUpCost(int level)
     {
-        double cost = 35d * Math.Pow(Mathf.Max(1, level), 1.35d) * GetRarityLevelCostMultiplier(Rarity);
+        double cost = 18d * Math.Pow(Mathf.Max(1, level), 1.22d) * GetRarityLevelCostMultiplier(Rarity);
         if (double.IsNaN(cost) || cost <= 1d)
         {
             return 1;
         }
 
-        return cost >= int.MaxValue ? int.MaxValue : Math.Max(1, (int)Math.Floor(cost));
+        if (cost >= GameData.MaxIntBalanceValue)
+        {
+            return GameData.MaxIntBalanceValue;
+        }
+
+        return Math.Max(1, (int)Math.Floor(cost));
     }
 
     public int GetMaxLevel(int stars)
@@ -254,6 +259,28 @@ public sealed class HeroDefinition
         return stars >= 10 ? TenStarAllStatMultiplier : 1f;
     }
 
+    private static float GetBalancedPassiveValue(HeroRarity rarity, float rawValue)
+    {
+        float scaledValue = Mathf.Max(0f, rawValue) * 0.25f;
+        switch (rarity)
+        {
+            case HeroRarity.Common:
+                return Mathf.Clamp(scaledValue, 0.5f, 1.5f);
+            case HeroRarity.Uncommon:
+                return Mathf.Clamp(scaledValue, 0.8f, 2.2f);
+            case HeroRarity.Rare:
+                return Mathf.Clamp(scaledValue, 1.2f, 3.0f);
+            case HeroRarity.Epic:
+                return Mathf.Clamp(scaledValue, 1.8f, 4.0f);
+            case HeroRarity.Legendary:
+                return Mathf.Clamp(scaledValue, 2.5f, 4.8f);
+            case HeroRarity.Mythic:
+                return Mathf.Clamp(scaledValue, 3.2f, 5.8f);
+            default:
+                return scaledValue;
+        }
+    }
+
     private static float GetRarityStatMultiplier(HeroRarity rarity)
     {
         switch (rarity)
@@ -261,15 +288,15 @@ public sealed class HeroDefinition
             case HeroRarity.Common:
                 return 1.00f;
             case HeroRarity.Uncommon:
-                return 1.12f;
+                return 1.06f;
             case HeroRarity.Rare:
-                return 1.28f;
+                return 1.14f;
             case HeroRarity.Epic:
-                return 1.50f;
+                return 1.26f;
             case HeroRarity.Legendary:
-                return 1.82f;
+                return 1.42f;
             case HeroRarity.Mythic:
-                return 2.20f;
+                return 1.62f;
             default:
                 return 1f;
         }
@@ -345,15 +372,15 @@ public sealed class HeroDefinition
             case HeroRarity.Common:
                 return 1.00d;
             case HeroRarity.Uncommon:
-                return 1.20d;
+                return 1.25d;
             case HeroRarity.Rare:
-                return 1.50d;
+                return 1.65d;
             case HeroRarity.Epic:
-                return 2.10d;
+                return 2.25d;
             case HeroRarity.Legendary:
-                return 3.00d;
+                return 3.05d;
             case HeroRarity.Mythic:
-                return 4.20d;
+                return 4.10d;
             default:
                 return 1.00d;
         }
@@ -405,9 +432,9 @@ public sealed class HeroState
     public HeroState(HeroDefinition definition, int level, int shards, int stars)
     {
         Definition = definition;
-        Level = Mathf.Max(1, level);
         Shards = Mathf.Max(0, shards);
         Stars = Mathf.Clamp(stars, 0, HeroDefinition.MaxStars);
+        Level = Mathf.Clamp(level, 1, Definition.GetMaxLevel(Stars));
 
         for (int i = 0; i < HeroDefinition.MaxTranscendSlots; i++)
         {

@@ -58,8 +58,8 @@ public sealed class EquipmentDefinition
     {
         int rarityMultiplier = GetRarityCostMultiplier(Rarity);
         int effectiveLevel = UnityEngine.Mathf.Max(1, level);
-        int effectiveStars = UnityEngine.Mathf.Clamp(stars, 0, MaxStars);
-        return UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(rarityMultiplier * 8f * UnityEngine.Mathf.Pow(effectiveLevel, 1.18f) * (1f + effectiveStars * 0.12f)));
+        int cost = UnityEngine.Mathf.FloorToInt(rarityMultiplier * 12f * UnityEngine.Mathf.Pow(effectiveLevel, 1.16f));
+        return UnityEngine.Mathf.Clamp(cost, 1, GameData.MaxIntBalanceValue);
     }
 
     public int GetStarUpCost(int currentStars)
@@ -79,9 +79,9 @@ public sealed class EquipmentDefinition
             return 0;
         }
 
-        float levelMultiplier = 1f + UnityEngine.Mathf.Max(0, level - 1) * 0.05f;
-        float starMultiplier = 1f + UnityEngine.Mathf.Clamp(stars, 0, MaxStars) * 0.15f;
-        return UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(baseBonus * levelMultiplier * starMultiplier));
+        float levelMultiplier = 1f + UnityEngine.Mathf.Max(0, level - 1) * 0.01f;
+        float starMultiplier = 1f + UnityEngine.Mathf.Clamp(stars, 0, MaxStars) * 0.055f;
+        return UnityEngine.Mathf.Clamp(UnityEngine.Mathf.FloorToInt(baseBonus * levelMultiplier * starMultiplier), 1, GameData.MaxIntBalanceValue);
     }
 
     private static int GetRarityCostMultiplier(HeroRarity rarity)
@@ -91,15 +91,15 @@ public sealed class EquipmentDefinition
             case HeroRarity.Common:
                 return 1;
             case HeroRarity.Uncommon:
-                return 2;
+                return 3;
             case HeroRarity.Rare:
-                return 4;
+                return 5;
             case HeroRarity.Epic:
                 return 8;
             case HeroRarity.Legendary:
-                return 16;
+                return 13;
             case HeroRarity.Mythic:
-                return 32;
+                return 20;
             default:
                 return 1;
         }
@@ -151,8 +151,8 @@ public sealed class EquipmentState
     public EquipmentState(EquipmentDefinition definition, int level, int stars, int count)
     {
         Definition = definition;
-        Level = UnityEngine.Mathf.Max(1, level);
         Stars = UnityEngine.Mathf.Clamp(stars, 0, EquipmentDefinition.MaxStars);
+        Level = UnityEngine.Mathf.Clamp(level, 1, Definition.GetMaxLevel(Stars));
         Count = UnityEngine.Mathf.Max(0, count);
     }
 
