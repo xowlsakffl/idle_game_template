@@ -1,3 +1,32 @@
+# 룬 슬롯 구현 메모
+
+- 슬롯 해금 기준은 `GameData.GetRuneSlotUnlockLevel`에서 관리한다.
+- UI는 잠긴 슬롯을 `잠금 / Lv.X`로 표시하고 클릭 시 해금 조건을 안내한다.
+- `BattleManager.GetActiveUsableRune`은 잠긴 슬롯을 무시하므로 예전 저장값이 있어도 전투 효과가 적용되지 않는다.
+- 룬은 `RuneGrade`와 `Copies`만 저장한다. 레벨 기반 강화는 사용하지 않는다.
+- 기존 `RuneLevel` 저장값은 최초 로드 시 등급 추정에만 사용한다.
+- `TryPromoteRune`, `TryPromoteAllRunes`, `DebugAddRuneCopies`가 룬 승급 흐름의 진입점이다.
+
+# 편성 장착 구현 메모
+
+- 편성 탭은 영웅 8슬롯과 룬 4슬롯을 한 화면에서 관리한다.
+- 토템 장착 슬롯은 폐기한다. 토템은 영웅 하단 `토템` 탭에서 강화하고 6종 효과가 항상 전체 적용된다.
+- 룬 2~4번 슬롯은 `GameData.GetRuneSlotUnlockLevel`의 계정 레벨 조건을 따른다.
+- 잠긴 슬롯은 `잠금 / Lv.X`를 표시하고, 클릭하면 해금 레벨 안내만 띄운다.
+- 룬 슬롯 클릭 시 현재 편성 화면 위에 룬 목록 모달을 띄운다.
+- 토템 탭은 강화/전체 진화/정보 확인용으로 유지하고 장착 버튼은 제거한다.
+- 영웅, 룬 변경은 `editingFormationHeroIds`, `editingFormationRuneIds`에 임시 보관한다.
+- 편성 탭을 나가거나 닫을 때 dirty 상태면 저장 확인 팝업을 띄운다.
+- 확인 시 `BattleManager.ApplyHeroFormationLoadout`으로 영웅/룬을 한 번에 저장하고 `StartStage()`로 현재 스테이지를 다시 시작한다.
+- 취소 시 임시 편성을 폐기하고 저장된 프리셋 데이터를 다시 로드한다.
+- 저장 전 임시 룬 변경은 전투 계산에 반영하지 않는다.
+
+# 메뉴 패널 구현 메모
+
+- `activeTab == Growth`일 때만 `contentRoot`가 레이아웃 높이를 차지한다.
+- 그 외 메뉴는 `contentLayoutElement.ignoreLayout = true`로 전환해 전투 화면 위에 오버레이한다.
+- 하단 탭은 유지해야 하므로 오버레이 패널의 하단 오프셋은 130px로 둔다.
+
 # Unity 구현 계획
 
 ## 개발 원칙
@@ -290,38 +319,116 @@ Assets/
 이벤트 뽑기와 룬 뽑기는 구조만 고려한다. 장비 뽑기는 장비 보유 수량/레벨/성급 저장과 영웅별 장착/해제 UI까지 구현하고, 강화 UI와 스탯 전투 반영은 별도 단계로 둔다.
 ## 현재 작업: 토템 강화
 
-구현 목표는 토템을 프리셋별 편성 장착물로 넣는 것이다. 토템은 새 공격력 성장축이 아니라 편성 스타일을 바꾸는 보조축으로 유지한다. 단순 6종 선택형이 아니라, 기본 5개 카테고리를 제공하고 각 카테고리가 등급별로 진화하는 구조로 간다.
+구현 목표는 토템을 프리셋 장착물에서 전역 장기 성장축으로 바꾸는 것이다. 룬/장비와 역할이 겹치지 않도록 장착 슬롯을 폐기하고, 기본 6개 카테고리 효과가 항상 모두 적용되게 한다. 진화는 개별 토템 승급이 아니라 같은 등급 6종을 모두 Lv.100까지 올린 뒤 전체가 다음 등급으로 넘어가는 구조로 간다.
 
 작업 범위:
 
 1. `TotemDefinition`, `TotemState` 추가
-2. `GameData`에 전투/수호/지원/비전/폭풍 5종 토템 등록
+2. `GameData`에 전투/수호/지원/비전/폭풍/지휘 6종 토템 등록
 3. `CurrencyWallet`에 `TotemEssence` 추가
-4. `SaveKeys`에 토템 레벨/등급/해금/프리셋 장착 슬롯 키 추가
-5. `BattleManager`에 토템 로드, 장착, 강화, 진화, 전투 계산 반영 추가
-6. `GameHud` 편성 슬롯 옆 토템 슬롯 2개 추가
-7. `GameHud` 히어로 하단 `토템` 탭 UI 추가
-8. 1번 슬롯 기본 해금, 2번 슬롯 잠금 처리
+4. `SaveKeys`에 토템 레벨/등급/해금 키 추가. 기존 프리셋 장착 슬롯 키는 호환용으로만 유지
+5. `BattleManager`에 토템 로드, 강화, 전체 진화, 전역 전투 계산 반영 추가
+6. `GameHud` 편성 슬롯의 토템 장착 동작 제거
+7. `GameHud` 영웅 하단 `토템` 탭 UI 추가
+8. 같은 등급 6종 Lv.100 달성 전에는 전체 진화 비활성 처리
 9. 디버그 버튼에 토템 정수 지급과 토템 기본 보유 처리 추가
 10. Unity 컴파일 확인
 
 후속 작업:
 
 - 토템 정수의 실제 획득처를 스테이지 첫 클리어, 반복 보상, 던전 중 어디에 둘지 결정
-- 토템 2번 슬롯 해금 조건 설계. 너무 빠르면 전투+지원 고정 조합이 되므로 계정 레벨/스테이지를 보수적으로 잡아야 함
 - 토템 성급 또는 중복 획득 구조는 뽑기 경제 설계 후 추가
 - 장기 운영 보상 곡선에서 토템 정수 공급량 검증
 ## 현재 작업: 룬 페이지 1차 구현
 
-룬은 히어로 탭 하단의 `룬` 페이지에서 관리한다. 프리셋마다 룬 슬롯 4개를 가로로 보여주고, 같은 룬은 한 프리셋 안에서 중복 장착할 수 없다.
+룬은 영웅 탭 하단의 `룬` 페이지에서 승급과 정보 확인을 관리한다. 실제 장착은 편성 탭의 룬 슬롯 4개와 목록 모달에서 처리하고, 같은 룬은 한 프리셋 안에서 중복 장착할 수 없다.
 
 1차 구현 범위는 다음과 같다.
 
 - 룬 데이터 10종 추가: 검격, 처형, 방벽, 수확, 비전, 질풍, 정밀, 생명, 지휘, 재생
-- 룬 레벨 1~50, 강화 재료 `RuneDust`
+- 룬 레벨 제거, `RuneGrade`와 `Copies` 기반 승급
 - 프리셋별 `heroFormation.{preset}.rune.{slot}` 저장
-- 룬 장착/해제 시 현재 프리셋이면 스테이지 재시작
+- 편성 탭의 저장 확인 후 룬 장착/해제를 영웅 변경과 함께 저장하고 스테이지 재시작
 - 전투 계산 반영: 공격력, 최종 피해, 체력, 피해 감소, 골드, 경험치책, 계정 경험치, 공속, 이속, 스킬 피해, 스킬 쿨타임, 치명타 확률
-- QA 디버그: 룬 가루 지급, 모든 기본 룬 보유 처리
+- QA 디버그: 모든 기본 룬 보유 처리, 룬 사본 지급
 
-아직 제외한 범위는 룬 뽑기, 룬 등급, 룬 합성, 세트 효과다. 지금 성장축이 이미 많기 때문에 룬은 먼저 4슬롯 보정 장치로 검증하고, 수급과 장착 메타가 안정된 뒤에 뽑기/합성을 붙이는 편이 낫다.
+아직 제외한 범위는 룬 뽑기와 세트 효과다. 룬 등급은 넣되 레벨은 빼서 성장축을 줄이고, 승급 요구량을 크게 잡아 장기 수집 축으로 둔다.
+
+## 보류: 성물 1차 구현
+
+이 작업은 현재 MVP에서 폐기/보류한다. 영웅 하단의 5번째 탭은 성물이 아니라 시설 파견으로 교체되었다. 아래 내용은 재기획 참고용으로만 남긴다.
+
+성물은 속성별 영웅 강화 시스템으로 둔다. 장착 슬롯이나 랜덤 옵션을 붙이지 않고, 각 속성 성물 레벨이 같은 속성 영웅의 공격력과 체력만 올린다.
+
+구현 범위:
+
+- `HeroElement` 추가: 화염, 냉기, 번개, 암흑, 신성, 자연
+- 기존 영웅에 기본 속성 자동 배정
+- `ElementRelicDefinition`, `ElementRelicState` 추가
+- `GameData`에 성물 6종 등록
+- `CurrencyWallet`에 `ElementRelicFragment` 추가
+- `SaveKeys`에 성물 파편과 성물 레벨 저장 키 추가
+- `BattleManager`에 성물 로드, 강화, 전투력/공격력/체력 계산 반영
+- 영웅 탭 하단 `성물` 페이지에 성물 목록, 효과, 강화 버튼 추가
+- 디버그 패널에 성물 파편 지급 추가
+
+제외 범위:
+
+- 성물 장착 슬롯
+- 성물 뽑기
+- 성물 등급/성급
+- 속성 상성
+- 속성 피해나 상태 이상
+- 성물 세트 효과
+
+다음에 성물을 확장한다면 먼저 속성별 영웅 풀이 충분한지 확인해야 한다. 속성 영웅 수가 적은 상태에서 성물 효과를 크게 주면 특정 속성만 정답이 되거나, 반대로 투자처가 의미 없어질 가능성이 높다.
+## ACTIVE IMPLEMENTATION - Facility Dispatch
+
+Current scope replaces the old Relic/Seongmul page with Facility Dispatch.
+
+Completed implementation targets:
+
+1. Data
+   - Add `FacilityDefinition`, `FacilityRewardKind`, `FacilityUpgradeCost`, and `FacilityState`.
+   - Register six facilities in `GameData`.
+   - Remove active Element Relic data from runtime logic.
+
+2. Economy and save data
+   - Add Wood, Brick, and Iron to `CurrencyWallet`.
+   - Add save keys for facility level, stored production, last update ticks, assigned heroes, and hunting materials.
+   - Keep upgrade costs independent from Gold.
+
+3. Production logic
+   - Refresh production from elapsed realtime/offline time.
+   - Cap accumulated production at 12 hours.
+   - Apply level multiplier `1 + (level - 1) * 0.08`.
+   - Apply assigned hero bonus capped at +50%.
+   - Provide per-facility collect and collect all.
+
+4. Assignment logic
+   - Allow battle-deployed heroes to be assigned.
+   - Prevent the same hero from being assigned to more than one facility.
+   - Add per-facility auto assignment, global recommended assignment, and clear all.
+   - Sort candidates by production score from combat power, level, stars, and rarity.
+
+5. Hunting rewards
+   - Add Wood/Brick/Iron rewards to battle drops.
+   - Normal kills can grant Wood.
+   - Boss kills grant facility materials, with Brick/Iron scaling by stage.
+
+6. UI
+   - Rename the old hero bottom Relic tab display to Facility.
+   - Facility page uses a vertical card list.
+   - Facility cards show facility name, level, produced resource, accumulated reward, accumulated time progress, assigned hero count, collect state, collect, upgrade, and MAX state.
+   - Assignment modal shows every facility row with assigned heroes, locked slots, recommended assignment, and clear all.
+   - Recommended assignment preserves existing valid assignments and fills empty unlocked slots only.
+
+7. Debug
+   - Add Wood +5000, Brick +5000, Iron +5000.
+   - Add simulate all facility production by 12h.
+   - Add all facilities level +1.
+
+Validation:
+
+- Run Unity C# compile after implementation.
+- If Unity Library still references deleted `ElementRelicDefinition.cs`, refresh the Unity editor or regenerate Bee response files. The runtime source no longer depends on that file.

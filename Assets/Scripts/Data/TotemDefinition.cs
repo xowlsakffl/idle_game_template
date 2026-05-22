@@ -8,7 +8,8 @@ public enum TotemArchetype
     Guardian,
     Support,
     Arcane,
-    Storm
+    Storm,
+    Command
 }
 
 public enum TotemGrade
@@ -116,6 +117,10 @@ public sealed class TotemDefinition
                 return "공속 +" + GetAttackSpeedPercent(effectiveLevel, grade, null).ToString("0.##") + "%"
                     + "\n이속 +" + GetMoveSpeedPercent(effectiveLevel, grade).ToString("0.##") + "%"
                     + "\n원거리 영웅 추가 공속 +" + GetTraitAttackSpeedBonusPercent(effectiveLevel, grade, HeroTrait.Ranged).ToString("0.##") + "%";
+            case TotemArchetype.Command:
+                return "파티 공격력 +" + GetAttackPercent(effectiveLevel, grade, formationHeroes, false).ToString("0.##") + "%"
+                    + "\n파티 체력 +" + GetHpPercent(effectiveLevel, grade, formationHeroes).ToString("0.##") + "%"
+                    + "\n스킬 피해 +" + GetSkillDamagePercent(effectiveLevel, grade).ToString("0.##") + "%";
             default:
                 return string.Empty;
         }
@@ -128,6 +133,8 @@ public sealed class TotemDefinition
         {
             case TotemArchetype.Combat:
                 return level * 0.025d * GetGradeEffectMultiplier(grade) + (boss ? GetBossAttackPercent(level, grade) : 0d);
+            case TotemArchetype.Command:
+                return level * 0.012d * GetGradeEffectMultiplier(grade);
             default:
                 return 0d;
         }
@@ -164,9 +171,15 @@ public sealed class TotemDefinition
     public double GetHpPercent(int level, TotemGrade grade, IReadOnlyList<HeroState> formationHeroes)
     {
         level = Mathf.Clamp(level, 1, MaxLevel);
-        return Archetype == TotemArchetype.Guardian
-            ? level * 0.035d * GetGradeEffectMultiplier(grade)
-            : 0d;
+        switch (Archetype)
+        {
+            case TotemArchetype.Guardian:
+                return level * 0.035d * GetGradeEffectMultiplier(grade);
+            case TotemArchetype.Command:
+                return level * 0.012d * GetGradeEffectMultiplier(grade);
+            default:
+                return 0d;
+        }
     }
 
     public double GetTraitHpPercent(int level, TotemGrade grade, HeroTrait trait)
@@ -245,9 +258,15 @@ public sealed class TotemDefinition
     public double GetSkillDamagePercent(int level, TotemGrade grade)
     {
         level = Mathf.Clamp(level, 1, MaxLevel);
-        return Archetype == TotemArchetype.Arcane
-            ? level * 0.032d * GetGradeEffectMultiplier(grade)
-            : 0d;
+        switch (Archetype)
+        {
+            case TotemArchetype.Arcane:
+                return level * 0.032d * GetGradeEffectMultiplier(grade);
+            case TotemArchetype.Command:
+                return level * 0.010d * GetGradeEffectMultiplier(grade);
+            default:
+                return 0d;
+        }
     }
 
     public double GetSkillCooldownReductionPercent(int level, TotemGrade grade)
@@ -386,10 +405,21 @@ public enum RuneEffectKind
     Regeneration
 }
 
+public enum RuneGrade
+{
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
+    Legendary,
+    Mythic
+}
+
 [Serializable]
 public sealed class RuneDefinition
 {
     public const int MaxLevel = 50;
+    public const RuneGrade MaxGrade = RuneGrade.Mythic;
 
     public RuneDefinition(
         string id,
@@ -413,6 +443,188 @@ public sealed class RuneDefinition
     public string Role { get; }
     public RuneEffectKind EffectKind { get; }
     public bool StartUnlocked { get; }
+
+    public int GetPromoteRequirement(RuneGrade grade)
+    {
+        if (grade >= MaxGrade)
+        {
+            return 0;
+        }
+
+        switch (grade)
+        {
+            case RuneGrade.Common:
+                return 10;
+            case RuneGrade.Uncommon:
+                return 30;
+            case RuneGrade.Rare:
+                return 80;
+            case RuneGrade.Epic:
+                return 200;
+            case RuneGrade.Legendary:
+                return 500;
+            default:
+                return 0;
+        }
+    }
+
+    public static string GetGradeLabel(RuneGrade grade)
+    {
+        switch (grade)
+        {
+            case RuneGrade.Common:
+                return "커먼";
+            case RuneGrade.Uncommon:
+                return "언커먼";
+            case RuneGrade.Rare:
+                return "레어";
+            case RuneGrade.Epic:
+                return "에픽";
+            case RuneGrade.Legendary:
+                return "전설";
+            case RuneGrade.Mythic:
+                return "신화";
+            default:
+                return grade.ToString();
+        }
+    }
+
+    public static float GetGradePower(RuneGrade grade)
+    {
+        switch (grade)
+        {
+            case RuneGrade.Common:
+                return 1.0f;
+            case RuneGrade.Uncommon:
+                return 1.6f;
+            case RuneGrade.Rare:
+                return 2.4f;
+            case RuneGrade.Epic:
+                return 3.4f;
+            case RuneGrade.Legendary:
+                return 4.6f;
+            case RuneGrade.Mythic:
+                return 6.0f;
+            default:
+                return 1.0f;
+        }
+    }
+
+    public string GetEffectSummary(RuneGrade grade)
+    {
+        switch (EffectKind)
+        {
+            case RuneEffectKind.Strike:
+                return "공격력 +" + GetAttackPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Execute:
+                return "최종 피해 +" + GetFinalDamagePercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Barrier:
+                return "체력 +" + GetHpPercent(grade).ToString("0.##") + "%\n받는 피해 -" + GetDamageReductionPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Harvest:
+                return "골드 +" + GetGoldGainPercent(grade).ToString("0.##") + "%\n경험치책 +" + GetHeroExpGainPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Arcane:
+                return "스킬 피해 +" + GetSkillDamagePercent(grade).ToString("0.##") + "%\n스킬 쿨타임 -" + GetSkillCooldownReductionPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Storm:
+                return "공속 +" + GetAttackSpeedPercent(grade).ToString("0.##") + "%\n이속 +" + GetMoveSpeedPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Focus:
+                return "치명타 확률 +" + GetCriticalChancePercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Vitality:
+                return "체력 +" + GetHpPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Command:
+                return "공격력 +" + GetAttackPercent(grade).ToString("0.##") + "%\n계정 경험치 +" + GetAccountExpGainPercent(grade).ToString("0.##") + "%";
+            case RuneEffectKind.Regeneration:
+                return "받는 피해 -" + GetDamageReductionPercent(grade).ToString("0.##") + "%";
+            default:
+                return Role;
+        }
+    }
+
+    public double GetAttackPercent(RuneGrade grade)
+    {
+        double power = GetGradePower(grade);
+        switch (EffectKind)
+        {
+            case RuneEffectKind.Strike:
+                return power * 0.35d;
+            case RuneEffectKind.Command:
+                return power * 0.20d;
+            default:
+                return 0d;
+        }
+    }
+
+    public double GetFinalDamagePercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Execute ? GetGradePower(grade) * 0.22d : 0d;
+    }
+
+    public double GetHpPercent(RuneGrade grade)
+    {
+        double power = GetGradePower(grade);
+        switch (EffectKind)
+        {
+            case RuneEffectKind.Barrier:
+                return power * 0.32d;
+            case RuneEffectKind.Vitality:
+                return power * 0.45d;
+            default:
+                return 0d;
+        }
+    }
+
+    public double GetDamageReductionPercent(RuneGrade grade)
+    {
+        double power = GetGradePower(grade);
+        switch (EffectKind)
+        {
+            case RuneEffectKind.Barrier:
+                return power * 0.08d;
+            case RuneEffectKind.Regeneration:
+                return power * 0.07d;
+            default:
+                return 0d;
+        }
+    }
+
+    public double GetGoldGainPercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Harvest ? GetGradePower(grade) * 0.40d : 0d;
+    }
+
+    public double GetHeroExpGainPercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Harvest ? GetGradePower(grade) * 0.25d : 0d;
+    }
+
+    public double GetAccountExpGainPercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Command ? GetGradePower(grade) * 0.28d : 0d;
+    }
+
+    public double GetAttackSpeedPercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Storm ? GetGradePower(grade) * 0.22d : 0d;
+    }
+
+    public double GetMoveSpeedPercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Storm ? GetGradePower(grade) * 0.18d : 0d;
+    }
+
+    public double GetSkillDamagePercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Arcane ? GetGradePower(grade) * 0.35d : 0d;
+    }
+
+    public double GetSkillCooldownReductionPercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Arcane ? Math.Min(4d, GetGradePower(grade) * 0.08d) : 0d;
+    }
+
+    public double GetCriticalChancePercent(RuneGrade grade)
+    {
+        return EffectKind == RuneEffectKind.Focus ? Math.Min(2d, GetGradePower(grade) * 0.10d) : 0d;
+    }
 
     public int GetLevelUpCost(int level)
     {
@@ -562,16 +774,23 @@ public sealed class RuneDefinition
 [Serializable]
 public sealed class RuneState
 {
-    public RuneState(RuneDefinition definition, int level, bool unlocked)
+    public RuneState(RuneDefinition definition, RuneGrade grade, int copies, bool unlocked)
     {
         Definition = definition;
-        Level = Mathf.Clamp(level, 1, RuneDefinition.MaxLevel);
+        Grade = (RuneGrade)Mathf.Clamp((int)grade, 0, (int)RuneDefinition.MaxGrade);
+        Copies = Mathf.Max(0, copies);
         Unlocked = unlocked || definition.StartUnlocked;
     }
 
     public RuneDefinition Definition { get; }
-    public int Level { get; set; }
+    public RuneGrade Grade { get; set; }
+    public int Copies { get; set; }
     public bool Unlocked { get; set; }
-    public bool IsMaxed => Level >= RuneDefinition.MaxLevel;
-    public int LevelUpCost => Definition.GetLevelUpCost(Level);
+    public int Level => 1 + (int)Grade * 20;
+    public bool IsMaxed => IsMaxGrade;
+    public int LevelUpCost => PromoteCost;
+    public bool IsMaxGrade => Grade >= RuneDefinition.MaxGrade;
+    public bool CanPromote => Unlocked && !IsMaxGrade && Copies >= PromoteCost;
+    public int PromoteCost => Definition.GetPromoteRequirement(Grade);
+    public string GradeLabel => RuneDefinition.GetGradeLabel(Grade);
 }

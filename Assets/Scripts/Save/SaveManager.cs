@@ -4,6 +4,16 @@ using UnityEngine;
 
 public sealed class SaveManager : MonoBehaviour
 {
+    private const float FlushIntervalSeconds = 5f;
+
+    private bool flushPending;
+    private float nextFlushTime;
+
+    private void Awake()
+    {
+        nextFlushTime = Time.unscaledTime + FlushIntervalSeconds;
+    }
+
     public string LoadString(string key, string fallback)
     {
         return PlayerPrefs.GetString(key, fallback);
@@ -167,12 +177,62 @@ public sealed class SaveManager : MonoBehaviour
 
     public void Flush()
     {
+        flushPending = true;
+        if (nextFlushTime <= 0f)
+        {
+            nextFlushTime = Time.unscaledTime + FlushIntervalSeconds;
+        }
+
+        TryFlush();
+    }
+
+    public void FlushImmediate()
+    {
         PlayerPrefs.Save();
+        flushPending = false;
+        nextFlushTime = Time.unscaledTime + FlushIntervalSeconds;
     }
 
     public void ResetAll()
     {
+        flushPending = false;
         PlayerPrefs.DeleteAll();
         PlayerPrefs.Save();
+    }
+
+    private void Update()
+    {
+        TryFlush();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused && flushPending)
+        {
+            FlushImmediate();
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        if (flushPending)
+        {
+            FlushImmediate();
+        }
+    }
+
+    private void TryFlush()
+    {
+        if (!flushPending)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime < nextFlushTime)
+        {
+            return;
+        }
+
+        FlushImmediate();
     }
 }

@@ -13,6 +13,9 @@ public sealed class CurrencyWallet : MonoBehaviour
     public GameNumber EquipmentExpItem { get; private set; }
     public long TotemEssence { get; private set; }
     public long RuneDust { get; private set; }
+    public long Wood { get; private set; }
+    public long Brick { get; private set; }
+    public long Iron { get; private set; }
     public long HeroTranscendStone { get; private set; }
     public long HeroSummonTicket { get; private set; }
     public long EquipmentSummonTicket { get; private set; }
@@ -26,6 +29,9 @@ public sealed class CurrencyWallet : MonoBehaviour
         EquipmentExpItem = GameData.ClampNumber(saveManager.LoadGameNumber(SaveKeys.EquipmentExpItem, 30));
         TotemEssence = GameData.ClampCount(saveManager.LoadLong(SaveKeys.TotemEssence, 120));
         RuneDust = GameData.ClampCount(saveManager.LoadLong(SaveKeys.RuneDust, 120));
+        Wood = GameData.ClampCount(saveManager.LoadLong(SaveKeys.Wood, 80));
+        Brick = GameData.ClampCount(saveManager.LoadLong(SaveKeys.Brick, 0));
+        Iron = GameData.ClampCount(saveManager.LoadLong(SaveKeys.Iron, 0));
         HeroTranscendStone = GameData.ClampCount(saveManager.LoadLong(SaveKeys.HeroTranscendStone, 0));
         HeroSummonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.HeroSummonTicket, 3));
         EquipmentSummonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.EquipmentSummonTicket, 3));
@@ -125,6 +131,72 @@ public sealed class CurrencyWallet : MonoBehaviour
         }
 
         RuneDust = GameData.ClampCount(RuneDust + amount);
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddWood(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        Wood = GameData.ClampCount(Wood + amount);
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddBrick(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        Brick = GameData.ClampCount(Brick + amount);
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddIron(long amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        Iron = GameData.ClampCount(Iron + amount);
+        Save();
+        NotifyChanged();
+    }
+
+    public void AddFacilityMaterials(long wood, long brick, long iron)
+    {
+        bool changed = false;
+        if (wood > 0)
+        {
+            Wood = GameData.ClampCount(Wood + wood);
+            changed = true;
+        }
+
+        if (brick > 0)
+        {
+            Brick = GameData.ClampCount(Brick + brick);
+            changed = true;
+        }
+
+        if (iron > 0)
+        {
+            Iron = GameData.ClampCount(Iron + iron);
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
         Save();
         NotifyChanged();
     }
@@ -263,6 +335,26 @@ public sealed class CurrencyWallet : MonoBehaviour
         return true;
     }
 
+    public bool SpendFacilityMaterials(FacilityUpgradeCost cost)
+    {
+        if (cost.IsFree)
+        {
+            return true;
+        }
+
+        if (Wood < cost.Wood || Brick < cost.Brick || Iron < cost.Iron)
+        {
+            return false;
+        }
+
+        Wood -= cost.Wood;
+        Brick -= cost.Brick;
+        Iron -= cost.Iron;
+        Save();
+        NotifyChanged();
+        return true;
+    }
+
     public bool SpendEquipmentSummonCost(int count, int rubyPerMissingTicket)
     {
         if (!CanSpendSummonCost(count, rubyPerMissingTicket, EquipmentSummonTicket, out long ticketUse, out long rubyCost))
@@ -306,6 +398,9 @@ public sealed class CurrencyWallet : MonoBehaviour
         saveManager.SaveGameNumber(SaveKeys.EquipmentExpItem, EquipmentExpItem);
         saveManager.SaveLong(SaveKeys.TotemEssence, TotemEssence);
         saveManager.SaveLong(SaveKeys.RuneDust, RuneDust);
+        saveManager.SaveLong(SaveKeys.Wood, Wood);
+        saveManager.SaveLong(SaveKeys.Brick, Brick);
+        saveManager.SaveLong(SaveKeys.Iron, Iron);
         saveManager.SaveLong(SaveKeys.HeroTranscendStone, HeroTranscendStone);
         saveManager.SaveLong(SaveKeys.HeroSummonTicket, HeroSummonTicket);
         saveManager.SaveLong(SaveKeys.EquipmentSummonTicket, EquipmentSummonTicket);

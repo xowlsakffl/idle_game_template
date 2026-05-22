@@ -6,6 +6,9 @@ public static class SaveKeys
     public const string EquipmentExpItem = "equipmentExpItem";
     public const string TotemEssence = "totemEssence";
     public const string RuneDust = "runeDust";
+    public const string Wood = "wood";
+    public const string Brick = "brick";
+    public const string Iron = "iron";
     public const string HeroTranscendStone = "heroTranscendStone";
     public const string HeroSummonTicket = "heroSummonTicket";
     public const string EquipmentSummonTicket = "equipmentSummonTicket";
@@ -97,9 +100,39 @@ public static class SaveKeys
         return "rune." + runeId + ".level";
     }
 
+    public static string RuneGrade(string runeId)
+    {
+        return "rune." + runeId + ".grade";
+    }
+
+    public static string RuneCopies(string runeId)
+    {
+        return "rune." + runeId + ".copies";
+    }
+
     public static string RuneUnlocked(string runeId)
     {
         return "rune." + runeId + ".unlocked";
+    }
+
+    public static string FacilityLevel(string facilityId)
+    {
+        return "facility." + facilityId + ".level";
+    }
+
+    public static string FacilityAssignedHero(string facilityId, int slot)
+    {
+        return "facility." + facilityId + ".hero." + slot;
+    }
+
+    public static string FacilityStoredAmount(string facilityId)
+    {
+        return "facility." + facilityId + ".stored";
+    }
+
+    public static string FacilityLastUpdateUtcTicks(string facilityId)
+    {
+        return "facility." + facilityId + ".lastUpdateUtcTicks";
     }
 
     public static string EquipmentCount(string equipmentId)

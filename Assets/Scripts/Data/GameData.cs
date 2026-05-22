@@ -133,7 +133,8 @@ public static class GameData
         new TotemDefinition("TOTEM_GUARDIAN", "수호 토템", "◆", "체력, 피해 감소, 방어형 보너스", TotemArchetype.Guardian),
         new TotemDefinition("TOTEM_SUPPORT", "지원 토템", "✦", "골드, 경험치책, 계정 경험치", TotemArchetype.Support),
         new TotemDefinition("TOTEM_ARCANE", "비전 토템", "✹", "스킬 피해, 스킬 쿨타임, 자동 스킬", TotemArchetype.Arcane),
-        new TotemDefinition("TOTEM_STORM", "폭풍 토템", "↯", "공속, 이속, 원거리 보너스", TotemArchetype.Storm)
+        new TotemDefinition("TOTEM_STORM", "폭풍 토템", "↯", "공속, 이속, 원거리 보너스", TotemArchetype.Storm),
+        new TotemDefinition("TOTEM_COMMAND", "지휘 토템", "⚑", "파티 공격력, 체력, 스킬 피해", TotemArchetype.Command)
     };
 
     private static readonly RuneDefinition[] runes =
@@ -178,10 +179,12 @@ public static class GameData
     };
 
     private static readonly HeroTranscendOptionDefinition[] heroTranscendOptions = BuildHeroTranscendOptions();
+    private static readonly FacilityDefinition[] facilities = BuildFacilities();
     private static readonly Dictionary<string, HeroDefinition> heroesById = BuildHeroMap();
     private static readonly Dictionary<string, EquipmentDefinition> equipmentsById = BuildEquipmentMap();
     private static readonly Dictionary<string, TotemDefinition> totemsById = BuildTotemMap();
     private static readonly Dictionary<string, RuneDefinition> runesById = BuildRuneMap();
+    private static readonly Dictionary<string, FacilityDefinition> facilitiesById = BuildFacilityMap();
     private static readonly Dictionary<string, HeroTranscendOptionDefinition> heroTranscendOptionsById = BuildHeroTranscendOptionMap();
     private static readonly Dictionary<string, EnemyDefinition> enemiesById = BuildEnemyMap();
     private static readonly Dictionary<string, BossDefinition> bossesById = BuildBossMap();
@@ -195,6 +198,7 @@ public static class GameData
     public static IReadOnlyList<PetDefinition> Pets => pets;
     public static IReadOnlyList<TotemDefinition> Totems => totems;
     public static IReadOnlyList<RuneDefinition> Runes => runes;
+    public static IReadOnlyList<FacilityDefinition> Facilities => facilities;
     public static IReadOnlyList<EquipmentDefinition> Equipments => equipments;
     public static IReadOnlyList<HeroTranscendOptionDefinition> HeroTranscendOptions => heroTranscendOptions;
 
@@ -216,6 +220,43 @@ public static class GameData
     public static RuneDefinition GetRune(string id)
     {
         return !string.IsNullOrEmpty(id) && runesById.TryGetValue(id, out RuneDefinition rune) ? rune : runes[0];
+    }
+
+    public static FacilityDefinition GetFacility(string id)
+    {
+        return !string.IsNullOrEmpty(id) && facilitiesById.TryGetValue(id, out FacilityDefinition facility)
+            ? facility
+            : facilities[0];
+    }
+
+    public static int GetRuneSlotUnlockLevel(int slot)
+    {
+        switch (Mathf.Clamp(slot, 1, MaxRuneSlots))
+        {
+            case 1:
+                return 1;
+            case 2:
+                return 20;
+            case 3:
+                return 50;
+            case 4:
+                return 100;
+            default:
+                return int.MaxValue;
+        }
+    }
+
+    public static int GetTotemSlotUnlockLevel(int slot)
+    {
+        switch (Mathf.Clamp(slot, 1, MaxTotemSlots))
+        {
+            case 1:
+                return 1;
+            case 2:
+                return 80;
+            default:
+                return int.MaxValue;
+        }
     }
 
     public static HeroTranscendOptionDefinition GetHeroTranscendOption(string id)
@@ -622,6 +663,30 @@ public static class GameData
         foreach (RuneDefinition rune in runes)
         {
             map[rune.Id] = rune;
+        }
+
+        return map;
+    }
+
+    private static FacilityDefinition[] BuildFacilities()
+    {
+        return new[]
+        {
+            new FacilityDefinition("FAC_REQUEST", "의뢰소", "G", FacilityRewardKind.Gold, "골드", GameNumber.FromDouble(1200d)),
+            new FacilityDefinition("FAC_TRAINING", "훈련소", "EXP", FacilityRewardKind.HeroExpItem, "영웅 경험치책", GameNumber.FromDouble(240d)),
+            new FacilityDefinition("FAC_FORGE", "대장간", "EQ", FacilityRewardKind.EquipmentExpItem, "장비책", GameNumber.FromDouble(180d)),
+            new FacilityDefinition("FAC_TOTEM", "토템 제단", "T", FacilityRewardKind.TotemEssence, "토템 정수", GameNumber.FromDouble(40d)),
+            new FacilityDefinition("FAC_RUNE", "룬 공방", "R", FacilityRewardKind.RuneCopyBox, "룬 사본 상자", GameNumber.FromDouble(4d)),
+            new FacilityDefinition("FAC_TRANSCEND", "초월 연구소", "TR", FacilityRewardKind.HeroTranscendStone, "초월석", GameNumber.FromDouble(12d))
+        };
+    }
+
+    private static Dictionary<string, FacilityDefinition> BuildFacilityMap()
+    {
+        var map = new Dictionary<string, FacilityDefinition>();
+        foreach (FacilityDefinition facility in facilities)
+        {
+            map[facility.Id] = facility;
         }
 
         return map;

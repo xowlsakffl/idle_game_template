@@ -35,6 +35,8 @@ public sealed class BattleManager : MonoBehaviour
     private readonly Dictionary<string, TotemState> totemsById = new Dictionary<string, TotemState>();
     private readonly List<RuneState> runes = new List<RuneState>();
     private readonly Dictionary<string, RuneState> runesById = new Dictionary<string, RuneState>();
+    private readonly List<FacilityState> facilities = new List<FacilityState>();
+    private readonly Dictionary<string, FacilityState> facilitiesById = new Dictionary<string, FacilityState>();
     private readonly Dictionary<string, GameNumber> heroDamageMeter = new Dictionary<string, GameNumber>();
     private readonly Dictionary<string, int> heroTargetSpawnSequences = new Dictionary<string, int>();
     private readonly Dictionary<string, int> skillTargetSpawnSequences = new Dictionary<string, int>();
@@ -66,6 +68,7 @@ public sealed class BattleManager : MonoBehaviour
     public IReadOnlyList<PetState> Pets => pets;
     public IReadOnlyList<TotemState> Totems => totems;
     public IReadOnlyList<RuneState> Runes => runes;
+    public IReadOnlyList<FacilityState> Facilities => facilities;
     public TotemState ActiveTotem => GetTotemState(GetEquippedTotemId(activeHeroPreset, 1));
     public string TargetName { get; private set; } = string.Empty;
     public GameNumber TargetHp { get; private set; }
@@ -256,6 +259,7 @@ public sealed class BattleManager : MonoBehaviour
         feverAutoEnabled = saveManager.LoadBool(SaveKeys.FeverAutoEnabled, true);
         LoadTotems();
         LoadRunes();
+        LoadFacilities();
         RefreshDeployedHeroes();
         skills.Clear();
         pets.Clear();
@@ -379,6 +383,57 @@ public sealed class BattleManager : MonoBehaviour
         activeHeroPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
         PlayerPrefs.SetInt(SaveKeys.HeroFormationPreset, activeHeroPreset);
         SaveFormationHeroIds(activeHeroPreset, normalizedIds);
+        RefreshDeployedHeroes();
+        LastBattleLog = "프리셋 " + activeHeroPreset + " 편성 저장";
+        StartStage();
+        return true;
+    }
+
+    public bool ApplyHeroFormationLoadout(
+        int preset,
+        IReadOnlyList<string> heroIds,
+        IReadOnlyList<string> totemIds,
+        IReadOnlyList<string> runeIds)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        List<string> normalizedHeroIds = NormalizeFormationHeroIds(heroIds);
+        if (GetFilledFormationCount(normalizedHeroIds) <= 0)
+        {
+            LastBattleLog = "편성 실패: 최소 1명이 필요";
+            NotifyChanged();
+            return false;
+        }
+
+        int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
+        activeHeroPreset = normalizedPreset;
+        PlayerPrefs.SetInt(SaveKeys.HeroFormationPreset, activeHeroPreset);
+        SaveFormationHeroIds(activeHeroPreset, normalizedHeroIds);
+
+        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        {
+            saveManager.SaveString(SaveKeys.HeroFormationTotem(activeHeroPreset, slot), UnequippedTotemId);
+        }
+
+        HashSet<string> usedRunes = new HashSet<string>();
+        for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
+        {
+            string runeId = runeIds != null && slot - 1 < runeIds.Count ? runeIds[slot - 1] : string.Empty;
+            RuneState state = GetRuneState(runeId);
+            bool valid = IsRuneSlotUnlocked(slot) && state != null && state.Unlocked && !usedRunes.Contains(state.Definition.Id);
+            string savedId = valid ? state.Definition.Id : UnequippedRuneId;
+            if (valid)
+            {
+                usedRunes.Add(state.Definition.Id);
+            }
+
+            saveManager.SaveString(SaveKeys.HeroFormationRune(activeHeroPreset, slot), savedId);
+        }
+
+        saveManager.Flush();
         RefreshDeployedHeroes();
         LastBattleLog = "프리셋 " + activeHeroPreset + " 편성 저장";
         StartStage();
@@ -638,7 +693,7 @@ public sealed class BattleManager : MonoBehaviour
 
     public string GetEquippedTotemId(int preset, int slot)
     {
-        string fallbackId = slot <= 1 && GameData.Totems.Count > 0 ? GameData.Totems[0].Id : string.Empty;
+        string fallbackId = string.Empty;
         int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
         int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxTotemSlots);
         if (saveManager == null)
@@ -663,7 +718,14 @@ public sealed class BattleManager : MonoBehaviour
 
     public bool IsTotemSlotUnlocked(int slot)
     {
-        return slot >= 1 && slot <= GameData.InitialUnlockedTotemSlots;
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxTotemSlots);
+        int accountLevel = accountProgressManager != null ? accountProgressManager.Level : 1;
+        return accountLevel >= GameData.GetTotemSlotUnlockLevel(normalizedSlot);
+    }
+
+    public int GetTotemSlotUnlockLevel(int slot)
+    {
+        return GameData.GetTotemSlotUnlockLevel(slot);
     }
 
     public bool SetTotemForPreset(int preset, string totemId)
@@ -794,17 +856,46 @@ public sealed class BattleManager : MonoBehaviour
         saveManager.SaveBool(SaveKeys.TotemUnlocked(state.Definition.Id), true);
         saveManager.Flush();
         LastBattleLog = state.DisplayName + " Lv." + state.Level;
-
-        if (IsTotemEquipped(activeHeroPreset, state.Definition.Id))
-        {
-            StartStage();
-        }
-        else
-        {
-            NotifyChanged();
-        }
+        StartStage();
 
         return true;
+    }
+
+    public bool CanPromoteTotemTier(string totemId)
+    {
+        TotemState state = GetTotemState(totemId);
+        return state != null
+            && state.Unlocked
+            && state.CanPromote
+            && AreTotemsReadyToAdvanceGrade(state.Grade);
+    }
+
+    private bool AreTotemsReadyToAdvanceGrade(TotemGrade grade)
+    {
+        bool hasCurrentGrade = false;
+        foreach (TotemState state in totems)
+        {
+            if (state == null || !state.Unlocked)
+            {
+                return false;
+            }
+
+            if (state.Grade < grade)
+            {
+                return false;
+            }
+
+            if (state.Grade == grade)
+            {
+                hasCurrentGrade = true;
+                if (!state.IsMaxed)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return hasCurrentGrade;
     }
 
     public bool TryPromoteTotem(string totemId)
@@ -829,6 +920,15 @@ public sealed class BattleManager : MonoBehaviour
             return false;
         }
 
+        if (!AreTotemsReadyToAdvanceGrade(state.Grade))
+        {
+            LastBattleLog = "토템 진화 실패: 같은 등급 토템을 모두 Lv." + TotemDefinition.MaxLevel + "까지 강화해야 함";
+            NotifyChanged();
+            return false;
+        }
+
+        TotemGrade currentGrade = state.Grade;
+        TotemGrade nextGrade = TotemDefinition.GetNextGrade(currentGrade);
         int cost = state.PromoteCost;
         if (!wallet.SpendTotemEssence(cost))
         {
@@ -837,23 +937,24 @@ public sealed class BattleManager : MonoBehaviour
             return false;
         }
 
-        state.Grade = TotemDefinition.GetNextGrade(state.Grade);
-        state.Level = 1;
-        state.Unlocked = true;
-        PlayerPrefs.SetInt(SaveKeys.TotemLevel(state.Definition.Id), state.Level);
-        PlayerPrefs.SetInt(SaveKeys.TotemGrade(state.Definition.Id), (int)state.Grade);
-        saveManager.SaveBool(SaveKeys.TotemUnlocked(state.Definition.Id), true);
-        saveManager.Flush();
-        LastBattleLog = state.DisplayName + " 진화 완료";
+        foreach (TotemState totemState in totems)
+        {
+            if (totemState == null || totemState.Grade != currentGrade)
+            {
+                continue;
+            }
 
-        if (IsTotemEquipped(activeHeroPreset, state.Definition.Id))
-        {
-            StartStage();
+            totemState.Grade = nextGrade;
+            totemState.Level = 1;
+            totemState.Unlocked = true;
+            PlayerPrefs.SetInt(SaveKeys.TotemLevel(totemState.Definition.Id), totemState.Level);
+            PlayerPrefs.SetInt(SaveKeys.TotemGrade(totemState.Definition.Id), (int)totemState.Grade);
+            saveManager.SaveBool(SaveKeys.TotemUnlocked(totemState.Definition.Id), true);
         }
-        else
-        {
-            NotifyChanged();
-        }
+
+        saveManager.Flush();
+        LastBattleLog = TotemDefinition.GetGradeLabel(currentGrade) + " 토템 전체 진화 완료";
+        StartStage();
 
         return true;
     }
@@ -881,6 +982,18 @@ public sealed class BattleManager : MonoBehaviour
         return !string.IsNullOrEmpty(runeId) && runesById.TryGetValue(runeId, out RuneState state)
             ? state
             : null;
+    }
+
+    public int GetRuneSlotUnlockLevel(int slot)
+    {
+        return GameData.GetRuneSlotUnlockLevel(slot);
+    }
+
+    public bool IsRuneSlotUnlocked(int slot)
+    {
+        int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxRuneSlots);
+        int accountLevel = accountProgressManager != null ? accountProgressManager.Level : 1;
+        return accountLevel >= GameData.GetRuneSlotUnlockLevel(normalizedSlot);
     }
 
     public string GetEquippedRuneId(int preset, int slot)
@@ -918,6 +1031,13 @@ public sealed class BattleManager : MonoBehaviour
 
         int normalizedPreset = Mathf.Clamp(preset, 1, GameData.MaxHeroPresets);
         int normalizedSlot = Mathf.Clamp(slot, 1, GameData.MaxRuneSlots);
+        if (!IsRuneSlotUnlocked(normalizedSlot))
+        {
+            LastBattleLog = normalizedSlot + "번 룬 슬롯은 계정 Lv." + GetRuneSlotUnlockLevel(normalizedSlot) + "에 해금됩니다.";
+            NotifyChanged();
+            return false;
+        }
+
         for (int i = 1; i <= GameData.MaxRuneSlots; i++)
         {
             if (i != normalizedSlot && GetEquippedRuneId(normalizedPreset, i) == state.Definition.Id)
@@ -969,7 +1089,7 @@ public sealed class BattleManager : MonoBehaviour
         return true;
     }
 
-    public bool TryLevelUpRune(string runeId)
+    public bool TryPromoteRune(string runeId)
     {
         if (!IsReady())
         {
@@ -979,32 +1099,31 @@ public sealed class BattleManager : MonoBehaviour
         RuneState state = GetRuneState(runeId);
         if (state == null || !state.Unlocked)
         {
-            LastBattleLog = "룬 강화 실패: 보유하지 않은 룬";
+            LastBattleLog = "룬 승급 실패: 보유하지 않은 룬";
             NotifyChanged();
             return false;
         }
 
-        if (state.IsMaxed)
+        if (state.IsMaxGrade)
         {
             LastBattleLog = state.Definition.DisplayName + " MAX";
             NotifyChanged();
             return false;
         }
 
-        int cost = state.LevelUpCost;
-        if (!wallet.SpendRuneDust(cost))
+        int cost = state.PromoteCost;
+        if (state.Copies < cost)
         {
-            LastBattleLog = state.Definition.DisplayName + " 강화 실패: 룬 가루 부족";
+            LastBattleLog = state.Definition.DisplayName + " 승급 실패: 같은 룬 부족";
             NotifyChanged();
             return false;
         }
 
-        state.Level += 1;
+        state.Copies -= cost;
+        state.Grade = (RuneGrade)Mathf.Clamp((int)state.Grade + 1, 0, (int)RuneDefinition.MaxGrade);
         state.Unlocked = true;
-        PlayerPrefs.SetInt(SaveKeys.RuneLevel(state.Definition.Id), state.Level);
-        saveManager.SaveBool(SaveKeys.RuneUnlocked(state.Definition.Id), true);
-        saveManager.Flush();
-        LastBattleLog = state.Definition.DisplayName + " Lv." + state.Level;
+        SaveRuneState(state);
+        LastBattleLog = state.Definition.DisplayName + " " + state.GradeLabel + " 승급";
 
         if (IsRuneEquipped(activeHeroPreset, state.Definition.Id))
         {
@@ -1018,6 +1137,50 @@ public sealed class BattleManager : MonoBehaviour
         return true;
     }
 
+    public bool TryLevelUpRune(string runeId)
+    {
+        return TryPromoteRune(runeId);
+    }
+
+    public int TryPromoteAllRunes()
+    {
+        if (!IsReady())
+        {
+            return 0;
+        }
+
+        int promotedCount = 0;
+        bool activePresetChanged = false;
+        foreach (RuneState state in runes)
+        {
+            while (state.CanPromote)
+            {
+                state.Copies -= state.PromoteCost;
+                state.Grade = (RuneGrade)Mathf.Clamp((int)state.Grade + 1, 0, (int)RuneDefinition.MaxGrade);
+                state.Unlocked = true;
+                SaveRuneState(state, false);
+                promotedCount += 1;
+                activePresetChanged |= IsRuneEquipped(activeHeroPreset, state.Definition.Id);
+            }
+        }
+
+        saveManager.Flush();
+        LastBattleLog = promotedCount > 0
+            ? "룬 일괄 승급 " + promotedCount + "회"
+            : "승급 가능한 룬이 없습니다.";
+
+        if (activePresetChanged)
+        {
+            StartStage();
+        }
+        else
+        {
+            NotifyChanged();
+        }
+
+        return promotedCount;
+    }
+
     public void DebugUnlockAllRunes()
     {
         if (!IsReady())
@@ -1028,11 +1191,285 @@ public sealed class BattleManager : MonoBehaviour
         foreach (RuneState state in runes)
         {
             state.Unlocked = true;
-            saveManager.SaveBool(SaveKeys.RuneUnlocked(state.Definition.Id), true);
+            SaveRuneState(state, false);
         }
 
         saveManager.Flush();
         LastBattleLog = "QA: 모든 기본 룬 보유";
+        NotifyChanged();
+    }
+
+    public void DebugAddRuneCopies(int copiesPerRune)
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        int amount = Mathf.Max(0, copiesPerRune);
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        foreach (RuneState state in runes)
+        {
+            state.Unlocked = true;
+            state.Copies = Mathf.Clamp(state.Copies + amount, 0, GameData.MaxIntBalanceValue);
+            SaveRuneState(state, false);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "QA: 모든 룬 중복 +" + amount;
+        NotifyChanged();
+    }
+
+    public FacilityState GetFacilityState(string facilityId)
+    {
+        return !string.IsNullOrEmpty(facilityId) && facilitiesById.TryGetValue(facilityId, out FacilityState state)
+            ? state
+            : null;
+    }
+
+    public GameNumber GetFacilityProductionPerHour(string facilityId)
+    {
+        FacilityState state = GetFacilityState(facilityId);
+        if (state == null)
+        {
+            return GameNumber.Zero;
+        }
+
+        RefreshFacilityProduction(state, false);
+        return GetFacilityProductionPerHour(state);
+    }
+
+    public GameNumber GetFacilityMaxStoredAmount(string facilityId)
+    {
+        GameNumber perHour = GetFacilityProductionPerHour(facilityId);
+        return perHour * (FacilityDefinition.MaxAccumulatedSeconds / FacilityDefinition.ProductionCycleSeconds);
+    }
+
+    public double GetFacilityHeroBonusPercent(string facilityId)
+    {
+        FacilityState state = GetFacilityState(facilityId);
+        return state != null ? GetFacilityHeroBonusPercent(state) : 0d;
+    }
+
+    public bool TryUpgradeFacility(string facilityId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        FacilityState state = GetFacilityState(facilityId);
+        if (state == null)
+        {
+            return false;
+        }
+
+        RefreshFacilityProduction(state, false);
+        if (state.IsMaxed)
+        {
+            LastBattleLog = state.Definition.DisplayName + " MAX";
+            NotifyChanged();
+            return false;
+        }
+
+        FacilityUpgradeCost cost = state.UpgradeCost;
+        if (!wallet.SpendFacilityMaterials(cost))
+        {
+            LastBattleLog = state.Definition.DisplayName + " 업그레이드 실패: 자재 부족";
+            NotifyChanged();
+            return false;
+        }
+
+        state.Level += 1;
+        SaveFacilityState(state, true);
+        LastBattleLog = state.Definition.DisplayName + " Lv." + state.Level;
+        NotifyChanged();
+        return true;
+    }
+
+    public bool CollectFacility(string facilityId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        FacilityState state = GetFacilityState(facilityId);
+        if (state == null)
+        {
+            return false;
+        }
+
+        RefreshFacilityProduction(state, false);
+        if (GameNumber.Floor(state.StoredAmount) <= GameNumber.Zero)
+        {
+            LastBattleLog = state.Definition.DisplayName + " 수령할 보상 없음";
+            NotifyChanged();
+            return false;
+        }
+
+        string rewardText = GrantFacilityReward(state, state.StoredAmount);
+        state.StoredAmount = GameNumber.Zero;
+        state.LastUpdateUtcTicks = DateTime.UtcNow.Ticks;
+        SaveFacilityState(state, true);
+        LastRewardLog = rewardText;
+        LastBattleLog = state.Definition.DisplayName + " 보상 수령";
+        NotifyChanged();
+        return true;
+    }
+
+    public int CollectAllFacilities()
+    {
+        if (!IsReady())
+        {
+            return 0;
+        }
+
+        int collected = 0;
+        var rewardParts = new List<string>();
+        foreach (FacilityState state in facilities)
+        {
+            RefreshFacilityProduction(state, false);
+            if (GameNumber.Floor(state.StoredAmount) <= GameNumber.Zero)
+            {
+                continue;
+            }
+
+            rewardParts.Add(GrantFacilityReward(state, state.StoredAmount));
+            state.StoredAmount = GameNumber.Zero;
+            state.LastUpdateUtcTicks = DateTime.UtcNow.Ticks;
+            SaveFacilityState(state, false);
+            collected += 1;
+        }
+
+        saveManager.Flush();
+        LastRewardLog = rewardParts.Count > 0 ? string.Join(" / ", rewardParts) : "시설 보상 없음";
+        LastBattleLog = collected > 0 ? "시설 보상 모두 획득" : "수령할 시설 보상 없음";
+        NotifyChanged();
+        return collected;
+    }
+
+    public bool AutoAssignFacility(string facilityId)
+    {
+        if (!IsReady())
+        {
+            return false;
+        }
+
+        FacilityState state = GetFacilityState(facilityId);
+        if (state == null)
+        {
+            return false;
+        }
+
+        RefreshFacilityProduction(state, false);
+        HashSet<string> usedHeroIds = GetAssignedFacilityHeroIdsExcept(state.Definition.Id);
+        FillFacilityEmptyAssignments(state, usedHeroIds);
+
+        SaveFacilityState(state, true);
+        LastBattleLog = state.Definition.DisplayName + " 추천 배치";
+        NotifyChanged();
+        return true;
+    }
+
+    public void AutoAssignAllFacilities()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        HashSet<string> usedHeroIds = new HashSet<string>();
+        foreach (FacilityState state in facilities)
+        {
+            RefreshFacilityProduction(state, false);
+            FillFacilityEmptyAssignments(state, usedHeroIds);
+            SaveFacilityState(state, false);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "시설 전체 추천 배치";
+        NotifyChanged();
+    }
+
+    public void ClearFacilityAssignments(string facilityId)
+    {
+        FacilityState state = GetFacilityState(facilityId);
+        if (state == null)
+        {
+            return;
+        }
+
+        RefreshFacilityProduction(state, false);
+        state.ClearAssignments();
+        SaveFacilityState(state, true);
+        LastBattleLog = state.Definition.DisplayName + " 배치 해제";
+        NotifyChanged();
+    }
+
+    public void ClearAllFacilityAssignments()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        foreach (FacilityState state in facilities)
+        {
+            RefreshFacilityProduction(state, false);
+            state.ClearAssignments();
+            SaveFacilityState(state, false);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "시설 배치 모두 해제";
+        NotifyChanged();
+    }
+
+    public void DebugSimulateFacilityHours(float hours)
+    {
+        if (!IsReady() || hours <= 0f)
+        {
+            return;
+        }
+
+        long ticks = TimeSpan.FromHours(hours).Ticks;
+        foreach (FacilityState state in facilities)
+        {
+            state.LastUpdateUtcTicks = Math.Max(0L, state.LastUpdateUtcTicks - ticks);
+            RefreshFacilityProduction(state, false);
+            SaveFacilityState(state, false);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "QA: 시설 생산 " + hours.ToString("0.#") + "시간";
+        NotifyChanged();
+    }
+
+    public void DebugLevelUpAllFacilities()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        foreach (FacilityState state in facilities)
+        {
+            RefreshFacilityProduction(state, false);
+            if (!state.IsMaxed)
+            {
+                state.Level += 1;
+            }
+
+            SaveFacilityState(state, false);
+        }
+
+        saveManager.Flush();
+        LastBattleLog = "QA: 모든 시설 Lv.+1";
         NotifyChanged();
     }
 
@@ -1251,7 +1688,26 @@ public sealed class BattleManager : MonoBehaviour
                 continue;
             }
 
-            int targetIndex = FindNearestVisibleEnemyIndex(heroState.Position, false);
+            int targetIndex = -1;
+            if (heroTargetSpawnSequences.TryGetValue(hero.Definition.Id, out int lockedSpawnSequence))
+            {
+                targetIndex = FindVisibleEnemyIndexBySpawnSequence(lockedSpawnSequence);
+                if (targetIndex < 0 || visibleEnemies[targetIndex].Hp <= GameNumber.Zero)
+                {
+                    RemoveHeroTargetLock(hero.Definition.Id);
+                    targetIndex = -1;
+                }
+            }
+
+            if (targetIndex < 0)
+            {
+                targetIndex = FindNearestVisibleEnemyIndex(heroState.Position, false);
+                if (targetIndex >= 0)
+                {
+                    heroTargetSpawnSequences[hero.Definition.Id] = visibleEnemies[targetIndex].SpawnSequence;
+                }
+            }
+
             if (targetIndex < 0)
             {
                 heroState.Position = Vector2.MoveTowards(
@@ -1262,7 +1718,6 @@ public sealed class BattleManager : MonoBehaviour
             }
 
             VisibleEnemyState enemy = visibleEnemies[targetIndex];
-            heroTargetSpawnSequences[hero.Definition.Id] = enemy.SpawnSequence;
             float attackRange = GetHeroAttackRange(hero);
             heroState.Position = MoveTowardCombatRange(
                 heroState.Position,
@@ -1326,8 +1781,9 @@ public sealed class BattleManager : MonoBehaviour
                 continue;
             }
 
-            float distance = Vector2.Distance(enemy.Position, targetHero.Position);
-            if (distance > EnemyAttackRange)
+            float attackRangeSqr = EnemyAttackRange * EnemyAttackRange;
+            float distanceSqr = (enemy.Position - targetHero.Position).sqrMagnitude;
+            if (distanceSqr > attackRangeSqr)
             {
                 enemy.AttackCooldown = Mathf.Min(enemy.AttackCooldown, 0.18f);
                 continue;
@@ -1648,12 +2104,15 @@ public sealed class BattleManager : MonoBehaviour
         if (heroTargetSpawnSequences.TryGetValue(heroId, out int spawnSequence))
         {
             int lockedIndex = FindVisibleEnemyIndexBySpawnSequence(spawnSequence);
-            if (lockedIndex >= 0
-                && visibleEnemies[lockedIndex].IsAttackable
-                && Vector2.Distance(heroState.Position, visibleEnemies[lockedIndex].Position) <= attackRange)
+            if (lockedIndex >= 0 && visibleEnemies[lockedIndex].IsAttackable)
             {
-                return lockedIndex;
+                float attackRangeSqr = attackRange * attackRange;
+                return (heroState.Position - visibleEnemies[lockedIndex].Position).sqrMagnitude <= attackRangeSqr
+                    ? lockedIndex
+                    : -1;
             }
+
+            RemoveHeroTargetLock(heroId);
         }
 
         int targetIndex = FindNearestAttackableEnemyInRange(heroState.Position, attackRange);
@@ -1761,7 +2220,6 @@ public sealed class BattleManager : MonoBehaviour
         if (enemyIndex < 0 || enemyIndex >= visibleEnemies.Count)
         {
             SyncTargetFromVisibleEnemies();
-            NotifyChanged();
             return;
         }
 
@@ -1784,7 +2242,6 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         SyncTargetFromVisibleEnemies();
-        NotifyChanged();
     }
 
     private void ApplyDamage(GameNumber damage, string sourceName, bool isCritical, string heroId = null)
@@ -1803,10 +2260,6 @@ public sealed class BattleManager : MonoBehaviour
         {
             HandleTargetDefeated();
         }
-        else
-        {
-            NotifyChanged();
-        }
     }
 
     private void HandleTargetDefeated()
@@ -1824,6 +2277,7 @@ public sealed class BattleManager : MonoBehaviour
             wallet.AddGold(bossGold);
             LastRewardLog += ", +" + NumberFormatter.Format(bossAccountExp) + " Account EXP";
             accountProgressManager?.AddExperience(bossAccountExp);
+            LastRewardLog += GrantHuntingFacilityMaterials(stage, true);
             ApplyStageFirstClearReward(firstClearReward);
             AppendStageFirstClearRewardLog(firstClearReward);
             progressManager.HandleStageCleared();
@@ -1840,6 +2294,7 @@ public sealed class BattleManager : MonoBehaviour
         wallet.AddHeroExpItem(heroExp);
         LastRewardLog += ", +" + NumberFormatter.Format(accountExp) + " Account EXP";
         accountProgressManager?.AddExperience(accountExp);
+        LastRewardLog += GrantHuntingFacilityMaterials(stage, false);
         KillsThisStage += 1;
 
         if (KillsThisStage >= RequiredKills)
@@ -1870,6 +2325,7 @@ public sealed class BattleManager : MonoBehaviour
         wallet.AddHeroExpItem(heroExp);
         LastRewardLog += ", +" + NumberFormatter.Format(accountExp) + " Account EXP";
         accountProgressManager?.AddExperience(accountExp);
+        LastRewardLog += GrantHuntingFacilityMaterials(stage, false);
         KillsThisStage += 1;
         RemoveTargetLocksForSpawn(defeatedSpawnSequence);
         if (enemyIndex >= 0 && enemyIndex < visibleEnemies.Count)
@@ -2374,6 +2830,58 @@ public sealed class BattleManager : MonoBehaviour
         return GameNumber.Floor(GameNumber.FromDouble(Math.Max(1d, baseReward)));
     }
 
+    private string GrantHuntingFacilityMaterials(StageDefinition stage, bool boss)
+    {
+        if (stage == null || wallet == null)
+        {
+            return string.Empty;
+        }
+
+        int stageIndex = GameData.GetStageIndex(stage.Id) + 1;
+        long wood = 0L;
+        long brick = 0L;
+        long iron = 0L;
+
+        if (boss)
+        {
+            wood = 8L + stageIndex;
+            brick = stageIndex >= 8 ? 2L + stageIndex / 5L : 1L;
+            iron = stageIndex >= 18 ? 1L + stageIndex / 12L : 0L;
+        }
+        else
+        {
+            double woodChance = Math.Min(0.18d, 0.04d + stageIndex * 0.002d);
+            if (random.NextDouble() < woodChance)
+            {
+                wood = 1L + stageIndex / 25L;
+            }
+        }
+
+        if (wood <= 0L && brick <= 0L && iron <= 0L)
+        {
+            return string.Empty;
+        }
+
+        wallet.AddFacilityMaterials(wood, brick, iron);
+        var parts = new List<string>();
+        if (wood > 0L)
+        {
+            parts.Add("목재 +" + wood);
+        }
+
+        if (brick > 0L)
+        {
+            parts.Add("벽돌 +" + brick);
+        }
+
+        if (iron > 0L)
+        {
+            parts.Add("철재 +" + iron);
+        }
+
+        return " / " + string.Join(", ", parts);
+    }
+
     private double GetTalentMultiplier(TalentEffectKind kind)
     {
         return accountProgressManager != null ? accountProgressManager.GetMultiplier(kind) : 1d;
@@ -2445,11 +2953,114 @@ public sealed class BattleManager : MonoBehaviour
         runesById.Clear();
         foreach (RuneDefinition definition in GameData.Runes)
         {
-            int level = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.RuneLevel(definition.Id), 1), 1, RuneDefinition.MaxLevel);
+            int savedGrade = PlayerPrefs.GetInt(SaveKeys.RuneGrade(definition.Id), -1);
+            if (savedGrade < 0)
+            {
+                int legacyLevel = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.RuneLevel(definition.Id), 1), 1, RuneDefinition.MaxLevel);
+                savedGrade = Mathf.Clamp((legacyLevel - 1) / 10, 0, (int)RuneDefinition.MaxGrade);
+            }
+
+            RuneGrade grade = (RuneGrade)Mathf.Clamp(savedGrade, 0, (int)RuneDefinition.MaxGrade);
+            int copies = Mathf.Max(0, PlayerPrefs.GetInt(SaveKeys.RuneCopies(definition.Id), 0));
             bool unlocked = saveManager.LoadBool(SaveKeys.RuneUnlocked(definition.Id), definition.StartUnlocked);
-            var state = new RuneState(definition, level, unlocked);
+            var state = new RuneState(definition, grade, copies, unlocked);
             runes.Add(state);
             runesById[definition.Id] = state;
+        }
+    }
+
+    private void LoadFacilities()
+    {
+        facilities.Clear();
+        facilitiesById.Clear();
+        long nowTicks = DateTime.UtcNow.Ticks;
+        foreach (FacilityDefinition definition in GameData.Facilities)
+        {
+            int level = Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.FacilityLevel(definition.Id), 1), 1, FacilityDefinition.MaxLevel);
+            GameNumber storedAmount = saveManager.LoadGameNumber(SaveKeys.FacilityStoredAmount(definition.Id), GameNumber.Zero);
+            long lastUpdateTicks = saveManager.LoadLong(SaveKeys.FacilityLastUpdateUtcTicks(definition.Id), nowTicks);
+            var state = new FacilityState(definition, level, storedAmount, lastUpdateTicks);
+            for (int slot = 0; slot < FacilityDefinition.MaxAssignedHeroSlots; slot++)
+            {
+                state.SetAssignedHeroId(slot, saveManager.LoadString(SaveKeys.FacilityAssignedHero(definition.Id, slot), string.Empty));
+            }
+
+            facilities.Add(state);
+            facilitiesById[definition.Id] = state;
+            RefreshFacilityProduction(state, false);
+            SaveFacilityState(state, false);
+        }
+
+        NormalizeFacilityAssignments();
+        saveManager.Flush();
+    }
+
+    private void NormalizeFacilityAssignments()
+    {
+        var usedHeroIds = new HashSet<string>();
+        foreach (FacilityState state in facilities)
+        {
+            if (state == null)
+            {
+                continue;
+            }
+
+            for (int slot = 0; slot < FacilityDefinition.MaxAssignedHeroSlots; slot++)
+            {
+                string heroId = state.GetAssignedHeroId(slot);
+                bool unlocked = slot < state.UnlockedSlotCount;
+                HeroState hero = FindHero(heroId);
+                if (!unlocked
+                    || string.IsNullOrEmpty(heroId)
+                    || hero == null
+                    || !hero.IsOwned
+                    || usedHeroIds.Contains(heroId))
+                {
+                    state.SetAssignedHeroId(slot, string.Empty);
+                    continue;
+                }
+
+                usedHeroIds.Add(heroId);
+            }
+
+            SaveFacilityState(state, false);
+        }
+    }
+
+    private void SaveFacilityState(FacilityState state, bool flush)
+    {
+        if (state == null || saveManager == null)
+        {
+            return;
+        }
+
+        PlayerPrefs.SetInt(SaveKeys.FacilityLevel(state.Definition.Id), state.Level);
+        saveManager.SaveGameNumber(SaveKeys.FacilityStoredAmount(state.Definition.Id), state.StoredAmount);
+        saveManager.SaveLong(SaveKeys.FacilityLastUpdateUtcTicks(state.Definition.Id), state.LastUpdateUtcTicks);
+        for (int slot = 0; slot < FacilityDefinition.MaxAssignedHeroSlots; slot++)
+        {
+            saveManager.SaveString(SaveKeys.FacilityAssignedHero(state.Definition.Id, slot), state.GetAssignedHeroId(slot));
+        }
+
+        if (flush)
+        {
+            saveManager.Flush();
+        }
+    }
+
+    private void SaveRuneState(RuneState state, bool flush = true)
+    {
+        if (state == null || saveManager == null)
+        {
+            return;
+        }
+
+        PlayerPrefs.SetInt(SaveKeys.RuneGrade(state.Definition.Id), (int)state.Grade);
+        PlayerPrefs.SetInt(SaveKeys.RuneCopies(state.Definition.Id), Mathf.Max(0, state.Copies));
+        saveManager.SaveBool(SaveKeys.RuneUnlocked(state.Definition.Id), state.Unlocked);
+        if (flush)
+        {
+            saveManager.Flush();
         }
     }
 
@@ -2489,28 +3100,22 @@ public sealed class BattleManager : MonoBehaviour
         return false;
     }
 
-    private TotemState GetActiveUsableTotem(int slot)
+    private IEnumerable<TotemState> GetActiveUsableTotems()
     {
-        if (!IsTotemSlotUnlocked(slot))
+        foreach (TotemState state in totems)
         {
-            return null;
+            if (state != null && state.Unlocked)
+            {
+                yield return state;
+            }
         }
-
-        TotemState state = GetTotemState(GetEquippedTotemId(activeHeroPreset, slot));
-        return state != null && state.Unlocked ? state : null;
     }
 
     private double GetTotemAttackMultiplier(HeroState hero)
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state == null)
-            {
-                continue;
-            }
-
             percent += state.Definition.GetAttackPercent(state.Level, state.Grade, deployedHeroes, IsBossFight);
             if (hero != null)
             {
@@ -2524,14 +3129,8 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemHpMultiplier(HeroState hero)
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state == null)
-            {
-                continue;
-            }
-
             percent += state.Definition.GetHpPercent(state.Level, state.Grade, deployedHeroes);
             if (hero != null)
             {
@@ -2545,13 +3144,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemGoldMultiplier()
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetGoldGainPercent(state.Level, state.Grade);
-            }
+            percent += state.Definition.GetGoldGainPercent(state.Level, state.Grade);
         }
 
         return 1d + Math.Max(0d, percent) / 100d;
@@ -2560,13 +3155,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemHeroExpMultiplier()
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetHeroExpGainPercent(state.Level, state.Grade);
-            }
+            percent += state.Definition.GetHeroExpGainPercent(state.Level, state.Grade);
         }
 
         return 1d + Math.Max(0d, percent) / 100d;
@@ -2575,13 +3166,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemAccountExpMultiplier()
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetAccountExpGainPercent(state.Level, state.Grade);
-            }
+            percent += state.Definition.GetAccountExpGainPercent(state.Level, state.Grade);
         }
 
         return 1d + Math.Max(0d, percent) / 100d;
@@ -2590,13 +3177,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemAttackSpeedMultiplier(HeroState hero)
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetAttackSpeedPercent(state.Level, state.Grade, hero);
-            }
+            percent += state.Definition.GetAttackSpeedPercent(state.Level, state.Grade, hero);
         }
 
         return 1d + Math.Max(0d, percent) / 100d;
@@ -2605,13 +3188,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemMoveSpeedMultiplier()
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetMoveSpeedPercent(state.Level, state.Grade);
-            }
+            percent += state.Definition.GetMoveSpeedPercent(state.Level, state.Grade);
         }
 
         return 1d + Math.Max(0d, percent) / 100d;
@@ -2620,13 +3199,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemSkillDamageMultiplier()
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetSkillDamagePercent(state.Level, state.Grade);
-            }
+            percent += state.Definition.GetSkillDamagePercent(state.Level, state.Grade);
         }
 
         return 1d + Math.Max(0d, percent) / 100d;
@@ -2635,13 +3210,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemSkillCooldownMultiplier()
     {
         double reduction = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                reduction += state.Definition.GetSkillCooldownReductionPercent(state.Level, state.Grade);
-            }
+            reduction += state.Definition.GetSkillCooldownReductionPercent(state.Level, state.Grade);
         }
 
         return Math.Max(0.65d, 1d - Math.Min(35d, reduction) / 100d);
@@ -2650,13 +3221,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemCriticalChanceBonus()
     {
         double percent = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                percent += state.Definition.GetCriticalChancePercent(state.Level, state.Grade);
-            }
+            percent += state.Definition.GetCriticalChancePercent(state.Level, state.Grade);
         }
 
         return Math.Max(0d, percent);
@@ -2665,13 +3232,9 @@ public sealed class BattleManager : MonoBehaviour
     private double GetTotemDamageTakenMultiplier()
     {
         double reduction = 0d;
-        for (int slot = 1; slot <= GameData.MaxTotemSlots; slot++)
+        foreach (TotemState state in GetActiveUsableTotems())
         {
-            TotemState state = GetActiveUsableTotem(slot);
-            if (state != null)
-            {
-                reduction += state.Definition.GetDamageReductionPercent(state.Level, state.Grade);
-            }
+            reduction += state.Definition.GetDamageReductionPercent(state.Level, state.Grade);
         }
 
         reduction = Math.Min(90d, Math.Max(0d, reduction));
@@ -2680,6 +3243,11 @@ public sealed class BattleManager : MonoBehaviour
 
     private RuneState GetActiveUsableRune(int slot)
     {
+        if (!IsRuneSlotUnlocked(slot))
+        {
+            return null;
+        }
+
         RuneState state = GetRuneState(GetEquippedRuneId(activeHeroPreset, slot));
         return state != null && state.Unlocked ? state : null;
     }
@@ -2692,7 +3260,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetAttackPercent(state.Level);
+                percent += state.Definition.GetAttackPercent(state.Grade);
             }
         }
 
@@ -2707,7 +3275,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetFinalDamagePercent(state.Level);
+                percent += state.Definition.GetFinalDamagePercent(state.Grade);
             }
         }
 
@@ -2722,7 +3290,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetHpPercent(state.Level);
+                percent += state.Definition.GetHpPercent(state.Grade);
             }
         }
 
@@ -2737,7 +3305,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetGoldGainPercent(state.Level);
+                percent += state.Definition.GetGoldGainPercent(state.Grade);
             }
         }
 
@@ -2752,7 +3320,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetHeroExpGainPercent(state.Level);
+                percent += state.Definition.GetHeroExpGainPercent(state.Grade);
             }
         }
 
@@ -2767,7 +3335,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetAccountExpGainPercent(state.Level);
+                percent += state.Definition.GetAccountExpGainPercent(state.Grade);
             }
         }
 
@@ -2782,7 +3350,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetAttackSpeedPercent(state.Level);
+                percent += state.Definition.GetAttackSpeedPercent(state.Grade);
             }
         }
 
@@ -2797,7 +3365,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetMoveSpeedPercent(state.Level);
+                percent += state.Definition.GetMoveSpeedPercent(state.Grade);
             }
         }
 
@@ -2812,7 +3380,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetSkillDamagePercent(state.Level);
+                percent += state.Definition.GetSkillDamagePercent(state.Grade);
             }
         }
 
@@ -2827,7 +3395,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                reduction += state.Definition.GetSkillCooldownReductionPercent(state.Level);
+                reduction += state.Definition.GetSkillCooldownReductionPercent(state.Grade);
             }
         }
 
@@ -2842,7 +3410,7 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                percent += state.Definition.GetCriticalChancePercent(state.Level);
+                percent += state.Definition.GetCriticalChancePercent(state.Grade);
             }
         }
 
@@ -2857,12 +3425,282 @@ public sealed class BattleManager : MonoBehaviour
             RuneState state = GetActiveUsableRune(slot);
             if (state != null)
             {
-                reduction += state.Definition.GetDamageReductionPercent(state.Level);
+                reduction += state.Definition.GetDamageReductionPercent(state.Grade);
             }
         }
 
         reduction = Math.Min(80d, Math.Max(0d, reduction));
         return Math.Max(0.2d, 1d - reduction / 100d);
+    }
+
+    private void RefreshFacilityProduction(FacilityState state, bool save)
+    {
+        if (state == null)
+        {
+            return;
+        }
+
+        long nowTicks = DateTime.UtcNow.Ticks;
+        if (state.LastUpdateUtcTicks <= 0L)
+        {
+            state.LastUpdateUtcTicks = nowTicks;
+            if (save)
+            {
+                SaveFacilityState(state, true);
+            }
+
+            return;
+        }
+
+        double elapsedSeconds = TimeSpan.FromTicks(Math.Max(0L, nowTicks - state.LastUpdateUtcTicks)).TotalSeconds;
+        if (elapsedSeconds <= 0d)
+        {
+            return;
+        }
+
+        GameNumber productionPerHour = GetFacilityProductionPerHour(state);
+        GameNumber maxStored = productionPerHour * (FacilityDefinition.MaxAccumulatedSeconds / FacilityDefinition.ProductionCycleSeconds);
+        GameNumber produced = productionPerHour * (elapsedSeconds / FacilityDefinition.ProductionCycleSeconds);
+        state.StoredAmount = GameNumber.Min(maxStored, GameNumber.Max(GameNumber.Zero, state.StoredAmount + produced));
+        state.LastUpdateUtcTicks = nowTicks;
+        if (save)
+        {
+            SaveFacilityState(state, true);
+        }
+    }
+
+    private GameNumber GetFacilityProductionPerHour(FacilityState state)
+    {
+        return state != null
+            ? state.Definition.GetProductionPerHour(state.Level, GetFacilityHeroBonusPercent(state))
+            : GameNumber.Zero;
+    }
+
+    private double GetFacilityHeroBonusPercent(FacilityState state)
+    {
+        if (state == null)
+        {
+            return 0d;
+        }
+
+        double total = 0d;
+        for (int i = 0; i < state.UnlockedSlotCount; i++)
+        {
+            HeroState hero = FindHero(state.GetAssignedHeroId(i));
+            if (hero != null && hero.IsOwned)
+            {
+                total += GetFacilityHeroProductionBonusPercent(hero);
+            }
+        }
+
+        return Math.Min(FacilityDefinition.MaxHeroProductionBonusPercent, total);
+    }
+
+    private double GetFacilityHeroProductionBonusPercent(HeroState hero)
+    {
+        if (hero == null)
+        {
+            return 0d;
+        }
+
+        double rarity = Math.Max(0, (int)hero.Definition.Rarity);
+        double score = hero.AttackPower * 0.018d
+            + hero.MaxHp * 0.006d
+            + hero.Level * 0.025d
+            + hero.Stars * 0.35d
+            + rarity * 0.85d;
+        return Math.Max(1d, Math.Min(10d, score));
+    }
+
+    private List<HeroState> GetFacilityAssignmentCandidates(HashSet<string> usedHeroIds)
+    {
+        var candidates = new List<HeroState>();
+        foreach (HeroState hero in Heroes)
+        {
+            if (hero != null
+                && hero.IsOwned
+                && (usedHeroIds == null || !usedHeroIds.Contains(hero.Definition.Id)))
+            {
+                candidates.Add(hero);
+            }
+        }
+
+        candidates.Sort((left, right) => GetFacilityHeroSortScore(right).CompareTo(GetFacilityHeroSortScore(left)));
+        return candidates;
+    }
+
+    private int FillFacilityEmptyAssignments(FacilityState state, HashSet<string> usedHeroIds)
+    {
+        if (state == null)
+        {
+            return 0;
+        }
+
+        if (usedHeroIds == null)
+        {
+            usedHeroIds = new HashSet<string>();
+        }
+
+        var localUsedHeroIds = new HashSet<string>();
+        for (int slot = 0; slot < FacilityDefinition.MaxAssignedHeroSlots; slot++)
+        {
+            string heroId = state.GetAssignedHeroId(slot);
+            bool unlocked = slot < state.UnlockedSlotCount;
+            HeroState hero = FindHero(heroId);
+            if (!unlocked
+                || string.IsNullOrEmpty(heroId)
+                || hero == null
+                || !hero.IsOwned
+                || localUsedHeroIds.Contains(heroId)
+                || usedHeroIds.Contains(heroId))
+            {
+                state.SetAssignedHeroId(slot, string.Empty);
+                continue;
+            }
+
+            localUsedHeroIds.Add(heroId);
+            usedHeroIds.Add(heroId);
+        }
+
+        List<HeroState> candidates = GetFacilityAssignmentCandidates(usedHeroIds);
+        int candidateIndex = 0;
+        int assigned = 0;
+        for (int slot = 0; slot < state.UnlockedSlotCount; slot++)
+        {
+            if (!string.IsNullOrEmpty(state.GetAssignedHeroId(slot)))
+            {
+                continue;
+            }
+
+            while (candidateIndex < candidates.Count && usedHeroIds.Contains(candidates[candidateIndex].Definition.Id))
+            {
+                candidateIndex += 1;
+            }
+
+            if (candidateIndex >= candidates.Count)
+            {
+                break;
+            }
+
+            string heroId = candidates[candidateIndex].Definition.Id;
+            state.SetAssignedHeroId(slot, heroId);
+            usedHeroIds.Add(heroId);
+            assigned += 1;
+            candidateIndex += 1;
+        }
+
+        return assigned;
+    }
+
+    private double GetFacilityHeroSortScore(HeroState hero)
+    {
+        if (hero == null)
+        {
+            return 0d;
+        }
+
+        return hero.AttackPower
+            + hero.MaxHp * 0.25d
+            + hero.Level * 6d
+            + hero.Stars * 120d
+            + Math.Max(0, (int)hero.Definition.Rarity) * 220d;
+    }
+
+    private HashSet<string> GetAssignedFacilityHeroIdsExcept(string excludedFacilityId)
+    {
+        var used = new HashSet<string>();
+        foreach (FacilityState facility in facilities)
+        {
+            if (facility == null || facility.Definition.Id == excludedFacilityId)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < facility.UnlockedSlotCount; i++)
+            {
+                string heroId = facility.GetAssignedHeroId(i);
+                if (!string.IsNullOrEmpty(heroId))
+                {
+                    used.Add(heroId);
+                }
+            }
+        }
+
+        return used;
+    }
+
+    private string GrantFacilityReward(FacilityState state, GameNumber amount)
+    {
+        if (state == null || amount <= GameNumber.Zero)
+        {
+            return string.Empty;
+        }
+
+        GameNumber reward = GameNumber.Floor(amount);
+        switch (state.Definition.RewardKind)
+        {
+            case FacilityRewardKind.Gold:
+                wallet.AddGold(reward);
+                return state.Definition.DisplayName + " +" + NumberFormatter.Format(reward) + " 골드";
+            case FacilityRewardKind.HeroExpItem:
+                wallet.AddHeroExpItem(reward);
+                return state.Definition.DisplayName + " +" + NumberFormatter.Format(reward) + " 영웅 경험치책";
+            case FacilityRewardKind.EquipmentExpItem:
+                wallet.AddEquipmentExpItem(reward);
+                return state.Definition.DisplayName + " +" + NumberFormatter.Format(reward) + " 장비책";
+            case FacilityRewardKind.TotemEssence:
+                {
+                    long count = GameNumberToLong(reward);
+                    wallet.AddTotemEssence(count);
+                    return state.Definition.DisplayName + " +" + count + " 토템 정수";
+                }
+            case FacilityRewardKind.RuneCopyBox:
+                {
+                    long boxes = GameNumberToLong(reward);
+                    GrantRuneCopiesFromBoxes(boxes);
+                    return state.Definition.DisplayName + " +" + boxes + " 룬 사본 상자";
+                }
+            case FacilityRewardKind.HeroTranscendStone:
+                {
+                    long count = GameNumberToLong(reward);
+                    wallet.AddHeroTranscendStone(count);
+                    return state.Definition.DisplayName + " +" + count + " 초월석";
+                }
+            default:
+                return string.Empty;
+        }
+    }
+
+    private long GameNumberToLong(GameNumber value)
+    {
+        double clamped = GameData.ClampVisibleNumber(value.ToDoubleClamped());
+        if (clamped <= 0d)
+        {
+            return 0L;
+        }
+
+        if (clamped >= long.MaxValue)
+        {
+            return long.MaxValue;
+        }
+
+        return GameData.ClampCount((long)Math.Floor(clamped));
+    }
+
+    private void GrantRuneCopiesFromBoxes(long boxes)
+    {
+        if (boxes <= 0 || runes.Count <= 0)
+        {
+            return;
+        }
+
+        for (long i = 0; i < boxes; i++)
+        {
+            RuneState state = runes[random.Next(runes.Count)];
+            state.Unlocked = true;
+            state.Copies = Mathf.Clamp(state.Copies + 1, 0, GameData.MaxIntBalanceValue);
+            SaveRuneState(state, false);
+        }
     }
 
     private void RefreshDeployedHeroes()

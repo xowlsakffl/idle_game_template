@@ -1,3 +1,22 @@
+# 룬 슬롯 해금표
+
+| 슬롯 | 해금 조건 |
+| ---: | --- |
+| 1 | 계정 Lv.1 |
+| 2 | 계정 Lv.20 |
+| 3 | 계정 Lv.50 |
+| 4 | 계정 Lv.100 |
+
+# 룬 승급표
+
+| 현재 등급 | 다음 등급 | 같은 룬 필요 수 |
+| --- | --- | ---: |
+| 커먼 | 언커먼 | 10 |
+| 언커먼 | 레어 | 30 |
+| 레어 | 에픽 | 80 |
+| 에픽 | 전설 | 200 |
+| 전설 | 신화 | 500 |
+
 # 초기 데이터표
 
 이 문서는 1차 MVP에서 사용할 임시 밸런스 데이터다.
@@ -109,10 +128,10 @@
 | 영웅 데이터 수 | 38명 |
 | 최대 출전 영웅 | 8명 |
 | 프리셋 수 | 3개 |
-| 하위 탭 | 편성, 특성, 토템, 룬, 성물 |
+| 하위 탭 | 편성, 특성, 토템, 룬, 시설 |
 
-1차 구현에서는 편성 탭과 특성 탭을 실제 UI로 구현한다. 사이드킥과 좌측 토템 슬롯은 제외한다.
-영웅 목록은 한 줄에 6명씩 배치하고, 낮은 등급부터 표시하며, 같은 등급 안에서는 이름 가나다순으로 정렬한다. 미출전 영웅 카드의 `+` 버튼을 누른 뒤 원하는 출전 슬롯을 클릭하면 해당 슬롯에 배치한다. 대상 슬롯에 이미 영웅이 있으면 새 영웅으로 교체한다. 출전 중인 목록 카드는 중앙에 `배치됨` 오버레이를 띄우고 어둡게 처리한다. 출전 슬롯과 출전 중인 목록 카드의 `-` 버튼을 누르면 편성에서 제외한다. `자동 배치` 버튼은 전투력 높은 순서로 영웅을 정렬해 최대 8명까지 편성 초안에 채운다. `일괄 승급` 버튼은 조각이 충분한 모든 영웅을 가능한 성급까지 즉시 승급하고 저장한다. 신규 계정의 1번 프리셋은 시작 전투용 기본 편성으로 취급하고, 저장 이력이 없는 다른 프리셋은 빈 슬롯으로 표시한다. 편성 변경은 화면 안에서 임시 반영하고, 영웅 화면 이탈 시 저장 확인 팝업에서 확인을 누를 때 프리셋별 슬롯을 로컬 저장한다. 저장이 확정되면 현재 스테이지를 다시 시작한다.
+1차 구현에서는 편성 탭, 특성 탭, 토템 탭, 룬 탭을 실제 UI로 구현한다. 사이드킥은 제외한다.
+영웅 목록은 한 줄에 6명씩 배치하고, 낮은 등급부터 표시하며, 같은 등급 안에서는 이름 가나다순으로 정렬한다. 미출전 영웅 카드의 `+` 버튼을 누른 뒤 원하는 출전 슬롯을 클릭하면 해당 슬롯에 배치한다. 대상 슬롯에 이미 영웅이 있으면 새 영웅으로 교체한다. 출전 중인 목록 카드는 중앙에 `배치됨` 오버레이를 띄우고 어둡게 처리한다. 출전 슬롯과 출전 중인 목록 카드의 `-` 버튼을 누르면 편성에서 제외한다. `자동 배치` 버튼은 전투력 높은 순서로 영웅을 정렬해 최대 8명까지 편성 초안에 채운다. `일괄 승급` 버튼은 조각이 충분한 모든 영웅을 가능한 성급까지 즉시 승급하고 저장한다. 신규 계정의 1번 프리셋은 시작 전투용 기본 편성으로 취급하고, 저장 이력이 없는 다른 프리셋은 빈 슬롯으로 표시한다. 편성 탭에는 룬 4칸을 표시하고, 룬 슬롯을 누르면 편성 화면 위에 목록 모달을 띄운다. 토템은 장착 슬롯을 쓰지 않고 6종 효과가 전역 적용된다. 편성 변경은 영웅/룬만 화면 안에서 임시 반영하고, 영웅 화면 이탈 시 저장 확인 팝업에서 확인을 누를 때 프리셋별 슬롯을 로컬 저장한다. 저장이 확정되면 현재 스테이지를 다시 시작한다.
 영웅 카드 또는 편성 슬롯의 영웅을 클릭하면 상세 정보 화면을 연다. 상세 정보 화면은 전투력, 보유 경험치책, 스킬 정보, 공격력, 체력, 공속, 이속, 5성/10성 해금 효과를 표시한다. 기본 정보 탭 하단에는 `제외`, `레벨업`, `승급` 버튼을 두고, 각각 편성 초안 제거, 경험치책 소모 레벨업, 영웅 조각 소모 승급을 처리한다. 장비 슬롯은 무기, 모자, 갑옷, 장신구, 포션 5개만 UI로 표시하고, 6번째 슬롯과 장비 스탯 전투 반영은 보류한다.
 
 ## 영웅 특성 데이터
@@ -441,9 +460,9 @@
 | hasFourTimesSpeedEntitlement | bool | 4배속 권한 보유 여부 |
 ## 토템 데이터
 
-토템은 편성 프리셋에 장착하는 카테고리형 장착물이다. 기본 제공 토템은 5종이며, 각 토템은 `커먼 -> 언커먼 -> 레어 -> 에픽 -> 전설 -> 신화`로 진화한다. 각 등급은 `Lv.1~100`을 가진다. `Lv.100` 달성 후 토템 정수를 사용하면 다음 등급으로 진화하고 레벨은 다시 `Lv.1`이 된다.
+토템은 장착물이 아니라 전역 적용되는 계정 성장축이다. 기본 제공 토템은 6종이며, 각 토템은 `커먼 -> 언커먼 -> 레어 -> 에픽 -> 전설 -> 신화`로 진화한다. 각 등급은 `Lv.1~100`을 가진다. 같은 등급의 6개 토템이 모두 `Lv.100`이 되어야 토템 정수를 사용해 다음 등급으로 전체 진화한다. 전체 진화 후 해당 등급의 토템들은 모두 다음 등급 `Lv.1`이 된다.
 
-토템 슬롯은 최대 2개다. 1번 슬롯은 기본 해금, 2번 슬롯은 추후 계정 레벨 또는 스테이지 조건으로 해금한다. 같은 토템 카테고리는 한 프리셋에 중복 장착할 수 없다.
+편성 프리셋별 토템 슬롯은 사용하지 않는다. 과거 저장 키는 세이브 호환용으로만 남기고 전투 계산에는 반영하지 않는다.
 
 레벨업 비용은 `ceil(6 * 등급비용계수 * 현재레벨^1.22)`이다. 진화 비용은 커먼 300, 언커먼 900, 레어 2700, 에픽 8100, 전설 24000 토템 정수다.
 
@@ -454,6 +473,7 @@
 | TOTEM_SUPPORT | 지원 토템 | 파밍 편성 | 골드, 경험치책, 계정 경험치 |
 | TOTEM_ARCANE | 비전 토템 | 스킬 편성 | 스킬 피해, 스킬 쿨타임 감소 |
 | TOTEM_STORM | 폭풍 토템 | 속도 편성 | 공격속도, 이동속도, 원거리 영웅 공속 |
+| TOTEM_COMMAND | 지휘 토템 | 파티 보조 | 파티 공격력, 파티 체력, 스킬 피해 |
 
 등급 효과 계수:
 
@@ -466,7 +486,7 @@
 | 전설 | 2.65 |
 | 신화 | 3.40 |
 
-밸런스 원칙: 토템은 “무조건 강해지는 보유 효과”가 아니라 프리셋의 목적을 정하는 장착물이다. 기본 5종을 모두 제공하지만, 선택의 무게는 슬롯 제한과 진화 재화 병목에서 만든다. 2번 슬롯을 너무 빨리 열면 전투/지원 조합이 고정 정답이 되므로 해금 시점은 보수적으로 잡는다.
+밸런스 원칙: 토템은 룬/장비와 장착 역할이 겹치지 않게 전역 장기 성장축으로 둔다. 선택의 무게는 슬롯 제한이 아니라 6종 동시 강화와 전체 진화 병목에서 만든다. 한 토템만 몰아서 다음 등급으로 보내는 방식은 금지한다.
 
 저장 키:
 
@@ -476,11 +496,12 @@
 | `totem.{totemId}.level` | 토템 레벨 |
 | `totem.{totemId}.grade` | 토템 현재 등급 |
 | `totem.{totemId}.unlocked` | 토템 보유 여부 |
-| `heroFormation.{preset}.totem` | 프리셋별 1번 장착 토템 |
-| `heroFormation.{preset}.totem.2` | 프리셋별 2번 장착 토템 |
+| `heroFormation.{preset}.totem` | 폐기된 프리셋별 토템 슬롯 호환 키 |
+| `heroFormation.{preset}.totem.2` | 폐기된 프리셋별 토템 슬롯 호환 키 |
+
 ## 룬 데이터
 
-룬은 히어로 프리셋별 전투 보정 장치다. 한 프리셋에 4개까지 장착하며, 같은 룬은 같은 프리셋 안에서 중복 장착할 수 없다. 1차 버전은 모든 기본 룬을 제공하고, 등급/합성/뽑기는 넣지 않는다.
+룬은 영웅 프리셋별 전투 보정 장치다. 한 프리셋에 4개까지 장착하며, 같은 룬은 같은 프리셋 안에서 중복 장착할 수 없다. 룬에는 레벨이 없고, 같은 룬 사본을 대량으로 모아 등급을 승급한다.
 
 | ID | 이름 | 역할 | 1차 효과 |
 | --- | --- | --- | --- |
@@ -498,11 +519,150 @@
 | 항목 | 값 |
 | --- | ---: |
 | 최대 장착 수 | 4 |
-| 최대 레벨 | 50 |
-| 강화 재료 | `runeDust` |
-| 레벨업 비용 | `ceil(10 * 현재레벨^1.20)` |
+| 레벨 | 없음 |
+| 성장 방식 | 같은 룬 사본으로 등급 승급 |
 | 저장 키 | `heroFormation.{preset}.rune.{slot}` |
-| 레벨 저장 키 | `rune.{runeId}.level` |
+| 등급 저장 키 | `rune.{runeId}.grade` |
+| 사본 저장 키 | `rune.{runeId}.copies` |
 | 보유 저장 키 | `rune.{runeId}.unlocked` |
 
-밸런스 원칙: 룬은 토템처럼 편성 방향을 바꾸는 보정축이지 공격력 폭증 장치가 아니다. 레벨당 증가는 0.01~0.055% 수준으로 묶고, 4슬롯을 모두 강화해도 기존 성장축을 압도하지 않게 둔다.
+룬 슬롯 해금:
+
+| 슬롯 | 해금 조건 |
+| ---: | --- |
+| 1 | 계정 Lv.1 |
+| 2 | 계정 Lv.20 |
+| 3 | 계정 Lv.50 |
+| 4 | 계정 Lv.100 |
+
+룬 승급 요구량:
+
+| 현재 등급 | 다음 등급 | 같은 룬 필요 수 |
+| --- | --- | ---: |
+| 커먼 | 언커먼 | 10 |
+| 언커먼 | 레어 | 30 |
+| 레어 | 에픽 | 80 |
+| 에픽 | 전설 | 200 |
+| 전설 | 신화 | 500 |
+
+밸런스 원칙: 룬은 토템처럼 편성 방향을 바꾸는 보정축이지 공격력 폭증 장치가 아니다. 등급별 효과 차이는 작게 두고, 4슬롯을 모두 승급해도 기존 성장축을 압도하지 않게 둔다.
+
+## 편성 장착 데이터
+
+편성 탭에서 바꾸는 영웅과 룬은 즉시 저장하지 않는다. 화면을 나가거나 탭을 닫을 때 저장 확인 팝업을 띄우고, 확인하면 두 종류의 편성을 한 번에 저장한 뒤 현재 스테이지를 다시 시작한다. 취소하면 임시 변경을 모두 버리고 저장된 편성으로 되돌린다. 토템은 편성 저장 로직을 타지 않는 전역 성장 요소다.
+
+| 대상 | 슬롯 수 | 선택 UI | 저장 시점 | 전투 반영 |
+| --- | ---: | --- | --- | --- |
+| 영웅 | 8 | 편성 슬롯/영웅 목록 | 저장 확인 후 | 저장 후 스테이지 재시작 |
+| 룬 | 4 | 편성 위 룬 목록 모달 | 저장 확인 후 | 저장 후 스테이지 재시작 |
+
+룬 목록 모달은 현재 프리셋의 임시 장착 상태를 기준으로 `장착됨` 오버레이를 표시한다. 저장 전 임시 변경은 전투 계산에 반영하지 않는다.
+
+## 성물 데이터 (폐기/보류)
+
+아래 성물 데이터는 현재 MVP 런타임에서 사용하지 않는다. 영웅 하단 탭의 활성 5번째 페이지는 시설이며, 성물형 장기 성장축은 재기획 전까지 보류한다.
+
+성물은 영웅 속성별 계정 성장축이다. 편성 슬롯에 장착하지 않고, 보유한 모든 성물 레벨이 같은 속성 영웅에게만 적용된다. 1차 구현에서는 속성 상성, 상태 이상, 속성 피해 증폭을 넣지 않는다. 효과는 해당 속성 영웅의 공격력과 체력 증가만 둔다.
+
+| ID | 속성 | 이름 | 적용 대상 | 효과 |
+| --- | --- | --- | --- | --- |
+| RELIC_FIRE | 화염 | 화염 성물 | 화염 영웅 | 공격력, 체력 |
+| RELIC_ICE | 냉기 | 냉기 성물 | 냉기 영웅 | 공격력, 체력 |
+| RELIC_LIGHTNING | 번개 | 번개 성물 | 번개 영웅 | 공격력, 체력 |
+| RELIC_DARK | 암흑 | 암흑 성물 | 암흑 영웅 | 공격력, 체력 |
+| RELIC_HOLY | 신성 | 신성 성물 | 신성 영웅 | 공격력, 체력 |
+| RELIC_NATURE | 자연 | 자연 성물 | 자연 영웅 | 공격력, 체력 |
+
+| 항목 | 값 |
+| --- | ---: |
+| 최대 레벨 | 1000 |
+| 레벨당 공격력 | +0.02% |
+| 레벨당 체력 | +0.02% |
+| Lv.1000 총 공격력 | +20.0% |
+| Lv.1000 총 체력 | +20.0% |
+| 강화 재료 | 성물 파편 |
+
+성물 강화 비용:
+
+```text
+cost = floor(10 * 1.035^currentLevel)
+```
+
+저장 키:
+
+| 키 | 용도 |
+| --- | --- |
+| `elementRelicFragment` | 성물 파편 보유량 |
+| `elementRelic.{relicId}.level` | 성물 레벨 |
+
+밸런스 메모: 성물은 영웅 전체 공격력 증가가 아니라 속성별 공격력/체력만 올린다. 따라서 특정 속성 편성을 밀어주는 장기 목표는 생기지만, 모든 성장축이 동시에 곱연산으로 터지는 문제를 줄인다.
+## ACTIVE DATA - Facility Dispatch
+
+The old Element Relic data table is deprecated. Active replacement data is Facility Dispatch.
+
+### Facilities
+
+| ID | Display | Reward | Base per hour | Cycle | Max stored |
+| --- | --- | --- | ---: | ---: | ---: |
+| `FAC_REQUEST` | 의뢰소 | Gold | 1200 | 1h | 12h |
+| `FAC_TRAINING` | 훈련소 | Hero EXP Book | 240 | 1h | 12h |
+| `FAC_FORGE` | 대장간 | Equipment EXP Book | 180 | 1h | 12h |
+| `FAC_TOTEM` | 토템 제단 | Totem Essence | 40 | 1h | 12h |
+| `FAC_RUNE` | 룬 공방 | Rune Copy Box | 4 | 1h | 12h |
+| `FAC_TRANSCEND` | 초월 연구소 | Transcend Stone | 12 | 1h | 12h |
+
+### Facility Upgrade
+
+| Target level | Materials |
+| ---: | --- |
+| 2-5 | Wood |
+| 6-10 | Wood + Brick |
+| 11-15 | Brick + Iron |
+| 16-20 | Wood + Brick + Iron |
+
+Slot unlocks:
+
+| Facility level | Assigned hero slots |
+| ---: | ---: |
+| 1 | 1 |
+| 5 | 2 |
+| 10 | 3 |
+| 15 | 4 |
+| 20 | 5 |
+
+Formula:
+
+```text
+facility_level_multiplier = 1 + (level - 1) * 0.08
+hero_assignment_bonus = clamp(sum(hero_production_score) / 120000, 0, 0.50)
+production_per_hour = base_per_hour * facility_level_multiplier * (1 + hero_assignment_bonus)
+```
+
+Hero production score uses combat power, level, stars, and rarity only. Facility preference traits are intentionally excluded.
+
+UI rules:
+
+- Facility page is a vertical card list.
+- Each card shows facility name, level, produced resource, accumulated reward, equivalent accumulated time, assigned hero count, collect state, and upgrade/MAX state.
+- Bottom actions are `배치 인력` and `모두 획득`.
+- Assignment modal rows show assigned heroes and locked slots.
+- `추천 배치` preserves valid assigned heroes and fills only empty unlocked slots with highest production-score heroes.
+- `모두 해제` clears every facility assignment.
+
+### New Wallet Keys
+
+| Key | Purpose |
+| --- | --- |
+| `wood` | Hunting material for facility upgrades |
+| `brick` | Hunting material for facility upgrades |
+| `iron` | Hunting material for facility upgrades |
+| `facility.{facilityId}.level` | Facility level |
+| `facility.{facilityId}.stored` | Accumulated reward amount |
+| `facility.{facilityId}.lastUpdateUtcTicks` | Last production refresh UTC ticks |
+| `facility.{facilityId}.assignedHero.{slot}` | Assigned hero id per slot |
+
+### Hunting Material Rewards
+
+- Normal monsters: low chance Wood drop.
+- Boss monsters: Wood always, Brick unlocks/scales at higher stages, Iron unlocks/scales later.
+- Wood/Brick/Iron are not produced by facilities.

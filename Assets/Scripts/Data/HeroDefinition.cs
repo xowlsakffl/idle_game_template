@@ -423,6 +423,7 @@ public sealed class HeroDefinition
                 return stat.ToString();
         }
     }
+
 }
 
 public sealed class HeroState

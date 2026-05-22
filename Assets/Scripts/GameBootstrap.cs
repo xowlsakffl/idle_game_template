@@ -138,7 +138,7 @@ public sealed class GameBootstrap : MonoBehaviour
         }
 
         saveManager.SaveLastOnlineUtc(DateTime.UtcNow);
-        saveManager.Flush();
+        saveManager.FlushImmediate();
     }
 
     private void DebugResetSaveAndReload()
