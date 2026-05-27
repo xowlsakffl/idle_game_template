@@ -1,18 +1,21 @@
 using System;
 
-[Serializable]
-public sealed class EnemyDefinition
+namespace IdleGame.Data
 {
-    public EnemyDefinition(string id, string displayName, int baseHp, int baseGold)
+    [Serializable]
+    public sealed class EnemyDefinition
     {
-        Id = id;
-        DisplayName = displayName;
-        BaseHp = baseHp;
-        BaseGold = baseGold;
-    }
+        public EnemyDefinition(string id, string displayName, int baseHp, int baseGold)
+        {
+            Id = id;
+            DisplayName = displayName;
+            BaseHp = baseHp;
+            BaseGold = baseGold;
+        }
 
-    public string Id { get; }
-    public string DisplayName { get; }
-    public int BaseHp { get; }
-    public int BaseGold { get; }
+        public string Id { get; }
+        public string DisplayName { get; }
+        public int BaseHp { get; }
+        public int BaseGold { get; }
+    }
 }

@@ -1,6 +1,10 @@
-public enum ProgressMode
+
+namespace IdleGame.Progression
 {
-    AutoProgress,
-    RepeatSelected,
-    BossBlocked
+    public enum ProgressMode
+    {
+        AutoProgress,
+        RepeatSelected,
+        BossBlocked
+    }
 }

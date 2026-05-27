@@ -1,26 +1,29 @@
 using System;
 
-public static class NumberFormatter
+namespace IdleGame.Data
 {
-    public static string Format(double value)
+    public static class NumberFormatter
     {
-        return Format(GameNumber.FromDouble(value));
-    }
-
-    public static string Format(GameNumber value)
-    {
-        if (value.IsZero)
+        public static string Format(double value)
         {
-            return "0";
+            return Format(GameNumber.FromDouble(value));
         }
 
-        double rawValue = GameData.ClampVisibleNumber(value.ToDoubleClamped());
-        double rawAbs = Math.Abs(rawValue);
-        if (rawAbs >= 1000d)
+        public static string Format(GameNumber value)
         {
-            return rawValue.ToString("#,0");
-        }
+            if (value.IsZero)
+            {
+                return "0";
+            }
 
-        return rawValue.ToString(rawValue % 1d == 0d ? "0" : rawAbs >= 100d ? "0.#" : "0.##");
+            double rawValue = GameData.ClampVisibleNumber(value.ToDoubleClamped());
+            double rawAbs = Math.Abs(rawValue);
+            if (rawAbs >= 1000d)
+            {
+                return rawValue.ToString("#,0");
+            }
+
+            return rawValue.ToString(rawValue % 1d == 0d ? "0" : rawAbs >= 100d ? "0.#" : "0.##");
+        }
     }
 }

@@ -1,0 +1,85 @@
+using System.Collections.Generic;
+using System;
+using UnityEngine.UI;
+using UnityEngine;
+using IdleGame.UI.Common;
+
+namespace IdleGame.UI.Hero
+{
+    public sealed class HeroPanelViewRefs
+    {
+        public Text PlaceholderText;
+    }
+
+    public sealed class HeroPanelViewBuildFooterArgs
+    {
+        public Transform Parent;
+        public Action<HeroPageTab> OnTabClick;
+        public Dictionary<HeroPageTab, Button> TabButtons;
+    }
+
+    public static class HeroPanelView
+    {
+        public static void BuildHeader(Transform parent)
+        {
+            if (parent == null)
+            {
+                return;
+            }
+
+            VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(24, 24, 22, 22);
+            layout.spacing = 8;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            Text heroTitle = HudUiFactory.CreateText("HeroGrowthTitle", parent, HudLayoutConfig.HeroTitleFontSize, FontStyle.Bold, TextAnchor.MiddleLeft);
+            heroTitle.text = "편성";
+            HudUiFactory.AddLayoutElement(heroTitle.gameObject, -1, HudLayoutConfig.HeroTitleHeight);
+        }
+
+        public static HeroPanelViewRefs BuildFooter(HeroPanelViewBuildFooterArgs args)
+        {
+            if (args == null || args.Parent == null)
+            {
+                return new HeroPanelViewRefs();
+            }
+
+            HeroPanelViewRefs refs = new HeroPanelViewRefs();
+            refs.PlaceholderText = HudUiFactory.CreateText("HeroPagePlaceholder", args.Parent, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
+            refs.PlaceholderText.text = "준비 중";
+            HudUiFactory.AddLayoutElement(refs.PlaceholderText.gameObject, -1, 594);
+            refs.PlaceholderText.gameObject.SetActive(false);
+
+            GameObject spacer = new GameObject("HeroPageTabSpacer", typeof(RectTransform));
+            spacer.transform.SetParent(args.Parent, false);
+            LayoutElement spacerLayout = HudUiFactory.AddLayoutElement(spacer, -1, 0);
+            spacerLayout.flexibleHeight = 0f;
+
+            GameObject tabs = new GameObject("HeroPageTabs", typeof(RectTransform));
+            tabs.transform.SetParent(args.Parent, false);
+            HorizontalLayoutGroup tabLayout = tabs.AddComponent<HorizontalLayoutGroup>();
+            tabLayout.spacing = 8;
+            tabLayout.childControlWidth = true;
+            tabLayout.childControlHeight = true;
+            tabLayout.childForceExpandWidth = true;
+            tabLayout.childForceExpandHeight = true;
+            HudUiFactory.AddLayoutElement(tabs, -1, HudLayoutConfig.HeroPageTabsHeight);
+
+            CreateTabButton(args, tabs.transform, HeroPageTab.Formation, "편성");
+            CreateTabButton(args, tabs.transform, HeroPageTab.Trait, "특성");
+            CreateTabButton(args, tabs.transform, HeroPageTab.Statue, "토템");
+            CreateTabButton(args, tabs.transform, HeroPageTab.Seal, "룬");
+            return refs;
+        }
+
+        private static void CreateTabButton(HeroPanelViewBuildFooterArgs args, Transform parent, HeroPageTab tab, string label)
+        {
+            Button button = HudUiFactory.CreateButton(label, parent, 20, new Color(0.18f, 0.24f, 0.38f, 1f));
+            button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
+            args.TabButtons[tab] = button;
+        }
+    }
+}

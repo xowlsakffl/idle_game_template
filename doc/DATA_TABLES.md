@@ -501,7 +501,7 @@
 
 ## 룬 데이터
 
-룬은 영웅 프리셋별 전투 보정 장치다. 한 프리셋에 4개까지 장착하며, 같은 룬은 같은 프리셋 안에서 중복 장착할 수 없다. 룬에는 레벨이 없고, 같은 룬 사본을 대량으로 모아 등급을 승급한다.
+룬은 영웅 프리셋별 전투 보정 장치다. 한 프리셋에 4개까지 장착하며, 같은 룬은 같은 프리셋 안에서 중복 장착할 수 없다. 룬에는 레벨과 조각 재화가 없고, 같은 룬 + 같은 등급의 개별 룬을 합성해 다음 등급 룬 1개를 만든다.
 
 | ID | 이름 | 역할 | 1차 효과 |
 | --- | --- | --- | --- |
@@ -520,10 +520,10 @@
 | --- | ---: |
 | 최대 장착 수 | 4 |
 | 레벨 | 없음 |
-| 성장 방식 | 같은 룬 사본으로 등급 승급 |
+| 성장 방식 | 같은 룬 + 같은 등급 개별 룬 합성 |
 | 저장 키 | `heroFormation.{preset}.rune.{slot}` |
 | 등급 저장 키 | `rune.{runeId}.grade` |
-| 사본 저장 키 | `rune.{runeId}.copies` |
+| 등급별 보유 저장 키 | `rune.{runeId}.count.{grade}` |
 | 보유 저장 키 | `rune.{runeId}.unlocked` |
 
 룬 슬롯 해금:
@@ -535,9 +535,9 @@
 | 3 | 계정 Lv.50 |
 | 4 | 계정 Lv.100 |
 
-룬 승급 요구량:
+룬 합성 요구량:
 
-| 현재 등급 | 다음 등급 | 같은 룬 필요 수 |
+| 재료 등급 | 결과 등급 | 같은 등급 룬 필요 수 |
 | --- | --- | ---: |
 | 커먼 | 언커먼 | 10 |
 | 언커먼 | 레어 | 30 |
@@ -608,7 +608,7 @@ The old Element Relic data table is deprecated. Active replacement data is Facil
 | `FAC_TRAINING` | 훈련소 | Hero EXP Book | 240 | 1h | 12h |
 | `FAC_FORGE` | 대장간 | Equipment EXP Book | 180 | 1h | 12h |
 | `FAC_TOTEM` | 토템 제단 | Totem Essence | 40 | 1h | 12h |
-| `FAC_RUNE` | 룬 공방 | Rune Copy Box | 4 | 1h | 12h |
+| `FAC_RUNE` | 룬 공방 | Rune Box | 4 | 1h | 12h |
 | `FAC_TRANSCEND` | 초월 연구소 | Transcend Stone | 12 | 1h | 12h |
 
 ### Facility Upgrade

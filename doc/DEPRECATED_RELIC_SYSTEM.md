@@ -13,6 +13,5 @@ Do not build new runtime work on the old Relic assumptions:
 Active replacement:
 
 - Facility Dispatch handles timed resource production.
-- Facilities produce Gold, Hero EXP Books, Equipment EXP Books, Totem Essence, Rune Copy Boxes, and Transcend Stones.
+- Facilities produce Gold, Hero EXP Books, Equipment EXP Books, Totem Essence, Rune Boxes, and Transcend Stones.
 - Facility upgrades use hunting materials: Wood, Brick, and Iron.
-

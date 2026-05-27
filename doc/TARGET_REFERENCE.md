@@ -1,11 +1,5 @@
 # 목표 게임 레퍼런스
 
-## 기준 이미지
-
-![target reference](references/target_reference_hero_assemble_style.jpg)
-
-이 이미지는 최종 게임의 화면 밀도, 버튼 배치, 전투/성장 동시 노출 방식, 재화 표시 방식을 기억하기 위한 기준이다.
-
 ## 핵심 감각
 
 - 접속하면 전투가 이미 진행 중이어야 한다.

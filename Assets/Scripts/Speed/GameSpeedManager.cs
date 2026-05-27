@@ -1,100 +1,104 @@
 using System;
 using UnityEngine;
+using IdleGame.Save;
 
-public sealed class GameSpeedManager : MonoBehaviour
+namespace IdleGame.Speed
 {
-    public const int NormalSpeed = 1;
-    public const int FreeSpeed = 2;
-    public const int PremiumSpeed = 4;
-
-    private SaveManager saveManager;
-
-    public event Action Changed;
-
-    public int CurrentMultiplier { get; private set; } = NormalSpeed;
-    public bool HasFourTimesSpeedEntitlement { get; private set; }
-
-    public void Initialize(SaveManager save)
+    public sealed class GameSpeedManager : MonoBehaviour
     {
-        saveManager = save;
-        CurrentMultiplier = (int)saveManager.LoadLong(SaveKeys.CombatSpeedMultiplier, NormalSpeed);
-        HasFourTimesSpeedEntitlement = saveManager.LoadBool(SaveKeys.HasFourTimesSpeedEntitlement, false);
+        public const int NormalSpeed = 1;
+        public const int FreeSpeed = 2;
+        public const int PremiumSpeed = 4;
 
-        if (!CanUseSpeed(CurrentMultiplier))
+        private SaveManager saveManager;
+
+        public event Action Changed;
+
+        public int CurrentMultiplier { get; private set; } = NormalSpeed;
+        public bool HasFourTimesSpeedEntitlement { get; private set; }
+
+        public void Initialize(SaveManager save)
         {
-            CurrentMultiplier = NormalSpeed;
+            saveManager = save;
+            CurrentMultiplier = (int)saveManager.LoadLong(SaveKeys.CombatSpeedMultiplier, NormalSpeed);
+            HasFourTimesSpeedEntitlement = saveManager.LoadBool(SaveKeys.HasFourTimesSpeedEntitlement, false);
+
+            if (!CanUseSpeed(CurrentMultiplier))
+            {
+                CurrentMultiplier = NormalSpeed;
+            }
+
+            Save();
+            NotifyChanged();
         }
 
-        Save();
-        NotifyChanged();
-    }
-
-    public bool TrySelectSpeed(int multiplier)
-    {
-        if (!CanUseSpeed(multiplier))
+        public bool TrySelectSpeed(int multiplier)
         {
-            return false;
-        }
+            if (!CanUseSpeed(multiplier))
+            {
+                return false;
+            }
 
-        CurrentMultiplier = multiplier;
-        Save();
-        NotifyChanged();
-        return true;
-    }
-
-    public void CycleSpeed()
-    {
-        CurrentMultiplier = GetNextCycleSpeed();
-        Save();
-        NotifyChanged();
-    }
-
-    public int GetNextCycleSpeed()
-    {
-        if (CurrentMultiplier == NormalSpeed)
-        {
-            return FreeSpeed;
-        }
-
-        if (CurrentMultiplier == FreeSpeed)
-        {
-            return CanUseSpeed(PremiumSpeed) ? PremiumSpeed : NormalSpeed;
-        }
-
-        return NormalSpeed;
-    }
-
-    public bool CanUseSpeed(int multiplier)
-    {
-        if (multiplier == NormalSpeed || multiplier == FreeSpeed)
-        {
+            CurrentMultiplier = multiplier;
+            Save();
+            NotifyChanged();
             return true;
         }
 
-        return multiplier == PremiumSpeed && HasFourTimesSpeedEntitlement;
-    }
-
-    public void DebugSetFourTimesEntitlement(bool enabled)
-    {
-        HasFourTimesSpeedEntitlement = enabled;
-        if (!CanUseSpeed(CurrentMultiplier))
+        public void CycleSpeed()
         {
-            CurrentMultiplier = NormalSpeed;
+            CurrentMultiplier = GetNextCycleSpeed();
+            Save();
+            NotifyChanged();
         }
 
-        Save();
-        NotifyChanged();
-    }
+        public int GetNextCycleSpeed()
+        {
+            if (CurrentMultiplier == NormalSpeed)
+            {
+                return FreeSpeed;
+            }
 
-    private void Save()
-    {
-        saveManager.SaveLong(SaveKeys.CombatSpeedMultiplier, CurrentMultiplier);
-        saveManager.SaveBool(SaveKeys.HasFourTimesSpeedEntitlement, HasFourTimesSpeedEntitlement);
-        saveManager.Flush();
-    }
+            if (CurrentMultiplier == FreeSpeed)
+            {
+                return CanUseSpeed(PremiumSpeed) ? PremiumSpeed : NormalSpeed;
+            }
 
-    private void NotifyChanged()
-    {
-        Changed?.Invoke();
+            return NormalSpeed;
+        }
+
+        public bool CanUseSpeed(int multiplier)
+        {
+            if (multiplier == NormalSpeed || multiplier == FreeSpeed)
+            {
+                return true;
+            }
+
+            return multiplier == PremiumSpeed && HasFourTimesSpeedEntitlement;
+        }
+
+        public void DebugSetFourTimesEntitlement(bool enabled)
+        {
+            HasFourTimesSpeedEntitlement = enabled;
+            if (!CanUseSpeed(CurrentMultiplier))
+            {
+                CurrentMultiplier = NormalSpeed;
+            }
+
+            Save();
+            NotifyChanged();
+        }
+
+        private void Save()
+        {
+            saveManager.SaveLong(SaveKeys.CombatSpeedMultiplier, CurrentMultiplier);
+            saveManager.SaveBool(SaveKeys.HasFourTimesSpeedEntitlement, HasFourTimesSpeedEntitlement);
+            saveManager.Flush();
+        }
+
+        private void NotifyChanged()
+        {
+            Changed?.Invoke();
+        }
     }
 }
