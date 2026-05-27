@@ -307,8 +307,6 @@ namespace IdleGame.UI.Hud
                 GetRarityColor = HeroUiText.GetRarityColor,
                 OnFormationSlotClick = TryPlaceSelectedHeroInSlot,
                 OnFormationSlotRemove = RemoveHeroFromEditingFormationSlot,
-                OnTotemSlotClick = HandleFormationTotemSlotClick,
-                OnTotemSlotRemove = RemoveTotemFromFormationSlot,
                 OnPresetClick = RequestHeroPresetChange,
                 OnRuneSlotClick = HandleFormationRuneSlotClick,
                 OnRuneSlotRemove = RemoveRuneFromFormationSlot,
@@ -332,12 +330,6 @@ namespace IdleGame.UI.Hud
 
             heroHud.FormationContent = formationRefs.Content;
             heroHud.FormationSummaryText = formationRefs.SummaryText;
-            heroHud.FormationTotemButton = formationRefs.TotemButton;
-            heroHud.FormationTotemSecondButton = formationRefs.TotemSecondButton;
-            heroHud.FormationTotemRemoveButton = formationRefs.TotemRemoveButton;
-            heroHud.FormationTotemSecondRemoveButton = formationRefs.TotemSecondRemoveButton;
-            heroHud.FormationTotemText = formationRefs.TotemText;
-            heroHud.FormationTotemSecondText = formationRefs.TotemSecondText;
             heroHud.OwnedEffectText = formationRefs.OwnedEffectText;
             heroHud.RosterGridRect = formationRefs.RosterGridRect;
             CreateHeroSubContent(parent);

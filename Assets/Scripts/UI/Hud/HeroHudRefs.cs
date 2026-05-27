@@ -32,8 +32,6 @@ namespace IdleGame.UI.Hud
         public Text TotemDetailText;
         public Text RuneSummaryText;
         public Text RuneDetailText;
-        public Text FormationTotemText;
-        public Text FormationTotemSecondText;
         public Text OwnedEffectText;
         public Text PlaceholderText;
         public Text DetailTranscendText;
@@ -82,10 +80,6 @@ namespace IdleGame.UI.Hud
         public Button DetailExcludeButton;
         public Button DetailLevelUpButton;
         public Button DetailStarUpButton;
-        public Button FormationTotemButton;
-        public Button FormationTotemSecondButton;
-        public Button FormationTotemRemoveButton;
-        public Button FormationTotemSecondRemoveButton;
         public Button TotemEquipButton;
         public Button TotemLevelUpButton;
         public Button RuneEquipButton;
@@ -118,8 +112,6 @@ namespace IdleGame.UI.Hud
             TotemDetailText = null;
             RuneSummaryText = null;
             RuneDetailText = null;
-            FormationTotemText = null;
-            FormationTotemSecondText = null;
             OwnedEffectText = null;
             PlaceholderText = null;
             DetailTranscendText = null;
@@ -168,10 +160,6 @@ namespace IdleGame.UI.Hud
             DetailExcludeButton = null;
             DetailLevelUpButton = null;
             DetailStarUpButton = null;
-            FormationTotemButton = null;
-            FormationTotemSecondButton = null;
-            FormationTotemRemoveButton = null;
-            FormationTotemSecondRemoveButton = null;
             TotemEquipButton = null;
             TotemLevelUpButton = null;
             RuneEquipButton = null;

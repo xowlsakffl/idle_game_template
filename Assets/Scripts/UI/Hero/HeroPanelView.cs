@@ -36,7 +36,7 @@ namespace IdleGame.UI.Hero
             layout.childForceExpandHeight = false;
 
             Text heroTitle = HudUiFactory.CreateText("HeroGrowthTitle", parent, HudLayoutConfig.HeroTitleFontSize, FontStyle.Bold, TextAnchor.MiddleLeft);
-            heroTitle.text = "편성";
+            heroTitle.text = "영웅";
             HudUiFactory.AddLayoutElement(heroTitle.gameObject, -1, HudLayoutConfig.HeroTitleHeight);
         }
 
@@ -50,13 +50,9 @@ namespace IdleGame.UI.Hero
             HeroPanelViewRefs refs = new HeroPanelViewRefs();
             refs.PlaceholderText = HudUiFactory.CreateText("HeroPagePlaceholder", args.Parent, 28, FontStyle.Bold, TextAnchor.MiddleCenter);
             refs.PlaceholderText.text = "준비 중";
-            HudUiFactory.AddLayoutElement(refs.PlaceholderText.gameObject, -1, 594);
+            LayoutElement placeholderLayout = HudUiFactory.AddLayoutElement(refs.PlaceholderText.gameObject, -1, 0);
+            placeholderLayout.flexibleHeight = 1f;
             refs.PlaceholderText.gameObject.SetActive(false);
-
-            GameObject spacer = new GameObject("HeroPageTabSpacer", typeof(RectTransform));
-            spacer.transform.SetParent(args.Parent, false);
-            LayoutElement spacerLayout = HudUiFactory.AddLayoutElement(spacer, -1, 0);
-            spacerLayout.flexibleHeight = 0f;
 
             GameObject tabs = new GameObject("HeroPageTabs", typeof(RectTransform));
             tabs.transform.SetParent(args.Parent, false);
@@ -77,7 +73,7 @@ namespace IdleGame.UI.Hero
 
         private static void CreateTabButton(HeroPanelViewBuildFooterArgs args, Transform parent, HeroPageTab tab, string label)
         {
-            Button button = HudUiFactory.CreateButton(label, parent, 20, new Color(0.18f, 0.24f, 0.38f, 1f));
+            Button button = HudUiFactory.CreateButton(label, parent, HudButtonStyle.Tab);
             button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
             args.TabButtons[tab] = button;
         }

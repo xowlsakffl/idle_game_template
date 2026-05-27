@@ -160,7 +160,7 @@ namespace IdleGame.UI.Battle
                 Image image = actor.GetComponent<Image>();
                 Text label = HudUiFactory.CreateText(hero.Id + "BattleLabel", actor.transform, 19, FontStyle.Bold, TextAnchor.MiddleCenter);
                 HudUiFactory.StretchToParent(label.gameObject);
-                label.text = HeroUiText.GetRarityBadge(hero.Rarity) + "\n" + GetShortHeroLabel(hero);
+                label.text = string.Empty;
                 args.HeroBattleRects[hero.Id] = actor.GetComponent<RectTransform>();
                 args.HeroBattleImages[hero.Id] = image;
                 args.HeroBattleTexts[hero.Id] = label;
@@ -175,7 +175,7 @@ namespace IdleGame.UI.Battle
                 Image image = enemy.GetComponent<Image>();
                 Text label = HudUiFactory.CreateText("Enemy" + i + "Text", enemy.transform, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
                 HudUiFactory.StretchToParent(label.gameObject);
-                label.text = "M";
+                label.text = string.Empty;
 
                 GameObject enemyHpBar = HudUiFactory.CreatePanel("EnemyHpBar" + i, enemy.transform, new Color(0.02f, 0.025f, 0.03f, 0.92f));
                 RectTransform enemyHpRect = enemyHpBar.GetComponent<RectTransform>();
@@ -259,14 +259,5 @@ namespace IdleGame.UI.Battle
             return dot.gameObject;
         }
 
-        private static string GetShortHeroLabel(HeroDefinition hero)
-        {
-            if (hero.DisplayName.Length <= 2)
-            {
-                return hero.DisplayName;
-            }
-
-            return hero.DisplayName.Substring(hero.DisplayName.Length - 2);
-        }
     }
 }

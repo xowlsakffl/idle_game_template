@@ -11,14 +11,8 @@ namespace IdleGame.UI.Hero.Formation
     {
         public GameObject Content;
         public Text SummaryText;
-        public Text TotemText;
-        public Text TotemSecondText;
         public Text OwnedEffectText;
         public RectTransform RosterGridRect;
-        public Button TotemButton;
-        public Button TotemSecondButton;
-        public Button TotemRemoveButton;
-        public Button TotemSecondRemoveButton;
     }
 
     public sealed class HeroRosterCardState
@@ -57,8 +51,6 @@ namespace IdleGame.UI.Hero.Formation
         public Func<HeroRarity, Color> GetRarityColor;
         public Action<int> OnFormationSlotClick;
         public Action<int> OnFormationSlotRemove;
-        public Action<int> OnTotemSlotClick;
-        public Action<int> OnTotemSlotRemove;
         public Action<int> OnPresetClick;
         public Action<int> OnRuneSlotClick;
         public Action<int> OnRuneSlotRemove;
@@ -96,12 +88,12 @@ namespace IdleGame.UI.Hero.Formation
             refs.Content = content;
 
             VerticalLayoutGroup formationLayout = content.AddComponent<VerticalLayoutGroup>();
-            formationLayout.spacing = 8;
+            formationLayout.spacing = 6;
             formationLayout.childControlWidth = true;
             formationLayout.childControlHeight = true;
             formationLayout.childForceExpandWidth = true;
             formationLayout.childForceExpandHeight = false;
-            LayoutElement contentLayout = HudUiFactory.AddLayoutElement(content, -1, 594);
+            LayoutElement contentLayout = HudUiFactory.AddLayoutElement(content, -1, 0);
             contentLayout.flexibleHeight = 1f;
 
             refs.SummaryText = HudUiFactory.CreateText(
@@ -115,15 +107,15 @@ namespace IdleGame.UI.Hero.Formation
             GameObject formationArea = HudUiFactory.CreatePanel("FormationArea", content.transform, new Color(0.33f, 0.42f, 0.58f, 1f));
             HudUiFactory.AddLayoutElement(formationArea, -1, HudLayoutConfig.HeroFormationAreaHeight);
             HorizontalLayoutGroup formationAreaLayout = formationArea.AddComponent<HorizontalLayoutGroup>();
-            formationAreaLayout.padding = new RectOffset(14, 14, 14, 14);
-            formationAreaLayout.spacing = 14;
+            formationAreaLayout.padding = new RectOffset(12, 12, 12, 12);
+            formationAreaLayout.spacing = 10;
+            formationAreaLayout.childAlignment = TextAnchor.MiddleCenter;
             formationAreaLayout.childControlWidth = true;
             formationAreaLayout.childControlHeight = true;
-            formationAreaLayout.childForceExpandWidth = true;
+            formationAreaLayout.childForceExpandWidth = false;
             formationAreaLayout.childForceExpandHeight = true;
 
             CreateFormationSlots(args, formationArea.transform);
-            CreateTotemColumn(args, refs, formationArea.transform);
             CreatePresetColumn(args, formationArea.transform);
             CreateRuneRow(args, content.transform);
             CreateRoster(args, refs, content.transform);
@@ -146,9 +138,9 @@ namespace IdleGame.UI.Hero.Formation
             actionLayout.childForceExpandHeight = true;
             HudUiFactory.AddLayoutElement(actionRow, -1, HudLayoutConfig.HeroFormationActionRowHeight);
 
-            Button autoArrangeButton = HudUiFactory.CreateButton("자동 배치", actionRow.transform, 20, new Color(0.72f, 0.56f, 0.15f, 1f));
+            Button autoArrangeButton = HudUiFactory.CreateButton("자동 배치", actionRow.transform, HudButtonStyle.Primary);
             autoArrangeButton.onClick.AddListener(() => args.OnAutoArrange?.Invoke());
-            Button bulkStarUpButton = HudUiFactory.CreateButton("일괄 승급", actionRow.transform, 20, new Color(0.34f, 0.35f, 0.37f, 1f));
+            Button bulkStarUpButton = HudUiFactory.CreateButton("일괄 승급", actionRow.transform, HudButtonStyle.Secondary);
             bulkStarUpButton.onClick.AddListener(() => args.OnBulkStarUp?.Invoke());
 
             return refs;
@@ -249,32 +241,6 @@ namespace IdleGame.UI.Hero.Formation
             }
         }
 
-        public static void ApplyTotemSlotState(
-            Button button,
-            Text text,
-            Button removeButton,
-            string displayText,
-            Color buttonColor,
-            bool interactable,
-            bool removeVisible)
-        {
-            if (text != null)
-            {
-                text.text = displayText ?? string.Empty;
-            }
-
-            if (button != null)
-            {
-                button.interactable = interactable;
-                HudUiFactory.SetButtonColor(button, buttonColor);
-            }
-
-            if (removeButton != null)
-            {
-                removeButton.gameObject.SetActive(removeVisible);
-            }
-        }
-
         public static void ApplyRuneSlotState(
             int slot,
             HeroFormationRuneSlotState state,
@@ -359,59 +325,32 @@ namespace IdleGame.UI.Hero.Formation
             GridLayoutGroup slotGridLayout = slotGrid.AddComponent<GridLayoutGroup>();
             slotGridLayout.cellSize = HudLayoutConfig.HeroFormationSlotCellSize;
             slotGridLayout.spacing = HudLayoutConfig.HeroFormationSlotSpacing;
+            slotGridLayout.childAlignment = TextAnchor.MiddleCenter;
             slotGridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             slotGridLayout.constraintCount = 4;
-            HudUiFactory.AddLayoutElement(slotGrid, -1, -1);
+            float gridWidth = HudLayoutConfig.HeroFormationSlotCellSize.x * 4f
+                + HudLayoutConfig.HeroFormationSlotSpacing.x * 3f;
+            float gridHeight = HudLayoutConfig.HeroFormationSlotCellSize.y * 2f
+                + HudLayoutConfig.HeroFormationSlotSpacing.y;
+            HudUiFactory.AddLayoutElement(slotGrid, gridWidth, gridHeight);
 
             for (int i = 0; i < GameData.MaxPartyHeroes; i++)
             {
                 int slotIndex = i;
-                Button slot = HudUiFactory.CreateButton(string.Empty, slotGrid.transform, 18, new Color(0.18f, 0.22f, 0.31f, 1f));
+                Button slot = HudUiFactory.CreateButton(string.Empty, slotGrid.transform, HudButtonStyle.Slot);
                 slot.onClick.AddListener(() => args.OnFormationSlotClick?.Invoke(slotIndex));
                 Text slotText = slot.GetComponentInChildren<Text>();
                 slotText.name = "FormationSlotText" + i;
-                slotText.fontSize = 18;
+                slotText.fontSize = 17;
                 slotText.alignment = TextAnchor.MiddleCenter;
                 HudUiFactory.StretchToParent(slotText.gameObject);
                 args.FormationSlotTexts.Add(slotText);
                 args.FormationSlotButtons[i] = slot;
 
-                Button removeButton = CreateCornerActionButton("-", slot.transform, new Color(0.58f, 0.12f, 0.12f, 1f));
+                Button removeButton = CreateCornerActionButton("-", slot.transform, HudButtonStyle.Danger);
                 removeButton.onClick.AddListener(() => args.OnFormationSlotRemove?.Invoke(slotIndex));
                 args.FormationSlotRemoveButtons[i] = removeButton;
             }
-        }
-
-        private static void CreateTotemColumn(HeroFormationViewBuildArgs args, HeroFormationViewRefs refs, Transform parent)
-        {
-            GameObject totemColumn = new GameObject("FormationTotemColumn", typeof(RectTransform));
-            totemColumn.transform.SetParent(parent, false);
-            VerticalLayoutGroup totemColumnLayout = totemColumn.AddComponent<VerticalLayoutGroup>();
-            totemColumnLayout.spacing = 10;
-            totemColumnLayout.childControlWidth = true;
-            totemColumnLayout.childControlHeight = true;
-            totemColumnLayout.childForceExpandWidth = true;
-            totemColumnLayout.childForceExpandHeight = true;
-            HudUiFactory.AddLayoutElement(totemColumn, 128, -1);
-
-            Text totemTitle = HudUiFactory.CreateText("FormationTotemTitle", totemColumn.transform, 21, FontStyle.Bold, TextAnchor.MiddleCenter);
-            totemTitle.text = "토템";
-            HudUiFactory.AddLayoutElement(totemTitle.gameObject, -1, 28);
-
-            refs.TotemButton = HudUiFactory.CreateButton(string.Empty, totemColumn.transform, 18, new Color(0.20f, 0.28f, 0.42f, 1f));
-            refs.TotemButton.onClick.AddListener(() => args.OnTotemSlotClick?.Invoke(1));
-            refs.TotemText = refs.TotemButton.GetComponentInChildren<Text>();
-            refs.TotemRemoveButton = CreateCornerActionButton("-", refs.TotemButton.transform, new Color(0.58f, 0.12f, 0.12f, 1f));
-            refs.TotemRemoveButton.onClick.AddListener(() => args.OnTotemSlotRemove?.Invoke(1));
-            refs.TotemRemoveButton.gameObject.SetActive(false);
-
-            refs.TotemSecondButton = HudUiFactory.CreateButton(string.Empty, totemColumn.transform, 18, new Color(0.18f, 0.20f, 0.26f, 1f));
-            refs.TotemSecondButton.onClick.AddListener(() => args.OnTotemSlotClick?.Invoke(2));
-            refs.TotemSecondText = refs.TotemSecondButton.GetComponentInChildren<Text>();
-            refs.TotemSecondRemoveButton = CreateCornerActionButton("-", refs.TotemSecondButton.transform, new Color(0.58f, 0.12f, 0.12f, 1f));
-            refs.TotemSecondRemoveButton.onClick.AddListener(() => args.OnTotemSlotRemove?.Invoke(2));
-            refs.TotemSecondRemoveButton.gameObject.SetActive(false);
-            totemColumn.SetActive(false);
         }
 
         private static void CreatePresetColumn(HeroFormationViewBuildArgs args, Transform parent)
@@ -419,7 +358,7 @@ namespace IdleGame.UI.Hero.Formation
             GameObject presetColumn = new GameObject("PresetColumn", typeof(RectTransform));
             presetColumn.transform.SetParent(parent, false);
             VerticalLayoutGroup presetLayout = presetColumn.AddComponent<VerticalLayoutGroup>();
-            presetLayout.spacing = 10;
+            presetLayout.spacing = 6;
             presetLayout.childControlWidth = true;
             presetLayout.childControlHeight = true;
             presetLayout.childForceExpandWidth = true;
@@ -427,12 +366,12 @@ namespace IdleGame.UI.Hero.Formation
             HudUiFactory.AddLayoutElement(presetColumn, HudLayoutConfig.HeroPresetColumnWidth, -1);
 
             Text presetTitle = HudUiFactory.CreateText("PresetTitle", presetColumn.transform, HudLayoutConfig.HeroPresetTitleFontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
-            presetTitle.text = "프리셋";
             HudUiFactory.AddLayoutElement(presetTitle.gameObject, -1, HudLayoutConfig.HeroPresetTitleHeight);
+            presetTitle.text = "프리셋";
 
             for (int preset = 1; preset <= GameData.MaxHeroPresets; preset++)
             {
-                Button presetButton = HudUiFactory.CreateButton(preset.ToString(), presetColumn.transform, HudLayoutConfig.HeroPresetButtonFontSize, new Color(0.21f, 0.29f, 0.45f, 1f));
+                Button presetButton = HudUiFactory.CreateButton(preset.ToString(), presetColumn.transform, HudButtonStyle.SmallPreset);
                 HudUiFactory.AddLayoutElement(presetButton.gameObject, -1, HudLayoutConfig.HeroPresetButtonHeight);
                 int capturedPreset = preset;
                 presetButton.onClick.AddListener(() => args.OnPresetClick?.Invoke(capturedPreset));
@@ -453,18 +392,18 @@ namespace IdleGame.UI.Hero.Formation
             HudUiFactory.AddLayoutElement(formationRuneRow, -1, HudLayoutConfig.HeroFormationRuneRowHeight);
 
             Text formationRuneTitle = HudUiFactory.CreateText("FormationRuneTitle", formationRuneRow.transform, 19, FontStyle.Bold, TextAnchor.MiddleCenter);
-            formationRuneTitle.text = "룬";
             HudUiFactory.AddLayoutElement(formationRuneTitle.gameObject, 60, -1);
+            formationRuneTitle.text = "룬";
 
             for (int slot = 1; slot <= GameData.MaxRuneSlots; slot++)
             {
                 int capturedSlot = slot;
-                Button runeSlotButton = HudUiFactory.CreateButton(string.Empty, formationRuneRow.transform, 16, new Color(0.17f, 0.21f, 0.31f, 1f));
+                Button runeSlotButton = HudUiFactory.CreateButton(string.Empty, formationRuneRow.transform, HudButtonStyle.RuneSlot);
                 runeSlotButton.onClick.AddListener(() => args.OnRuneSlotClick?.Invoke(capturedSlot));
                 args.RuneSlotButtons[capturedSlot] = runeSlotButton;
                 args.RuneSlotTexts[capturedSlot] = runeSlotButton.GetComponentInChildren<Text>();
 
-                Button removeButton = CreateCornerActionButton("-", runeSlotButton.transform, new Color(0.58f, 0.12f, 0.12f, 1f));
+                Button removeButton = CreateCornerActionButton("-", runeSlotButton.transform, HudButtonStyle.Danger);
                 removeButton.onClick.AddListener(() => args.OnRuneSlotRemove?.Invoke(capturedSlot));
                 removeButton.gameObject.SetActive(false);
                 args.RuneSlotRemoveButtons[capturedSlot] = removeButton;
@@ -482,7 +421,7 @@ namespace IdleGame.UI.Hero.Formation
             rosterScrollRect.horizontal = false;
             rosterScrollRect.vertical = true;
             rosterScrollRect.movementType = ScrollRect.MovementType.Clamped;
-            rosterScrollRect.inertia = true;
+            rosterScrollRect.inertia = false;
             rosterScrollRect.scrollSensitivity = 36f;
 
             GameObject rosterViewport = HudUiFactory.CreatePanel("HeroRosterViewport", rosterScroll.transform, new Color(0f, 0f, 0f, 0f));
@@ -520,8 +459,18 @@ namespace IdleGame.UI.Hero.Formation
             GridLayoutGroup rosterLayout = rosterGrid.AddComponent<GridLayoutGroup>();
             rosterLayout.cellSize = new Vector2(rosterCellWidth, rosterCellHeight);
             rosterLayout.spacing = new Vector2(rosterSpacingX, rosterSpacingY);
+            rosterLayout.childAlignment = TextAnchor.UpperLeft;
             rosterLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             rosterLayout.constraintCount = rosterColumns;
+
+            HeroRosterResponsiveGrid responsiveGrid = rosterGrid.AddComponent<HeroRosterResponsiveGrid>();
+            responsiveGrid.Initialize(
+                rosterScrollRect.viewport,
+                rosterGridRect,
+                rosterLayout,
+                rosterColumns,
+                rosterCellHeight / rosterCellWidth,
+                new Vector2(rosterSpacingX, rosterSpacingY));
 
             foreach (HeroDefinition hero in rosterHeroes)
             {
@@ -540,26 +489,25 @@ namespace IdleGame.UI.Hero.Formation
                     overlayImage.raycastTarget = false;
                 }
 
-                Text deployedText = HudUiFactory.CreateText(hero.Id + "DeployedOverlayText", deployedOverlay.transform, 29, FontStyle.Bold, TextAnchor.MiddleCenter);
-                deployedText.text = "배치됨";
+                Text deployedText = HudUiFactory.CreateText(hero.Id + "DeployedOverlayText", deployedOverlay.transform, 21, FontStyle.Bold, TextAnchor.MiddleCenter);
                 deployedText.color = new Color(1f, 0.92f, 0.42f, 1f);
+                deployedText.text = "배치됨";
                 deployedText.raycastTarget = false;
                 HudUiFactory.StretchToParent(deployedText.gameObject);
                 deployedOverlay.SetActive(false);
                 args.HeroRosterDeployedOverlays[hero.Id] = deployedOverlay;
 
-                Button actionButton = CreateCornerActionButton("+", button.transform, new Color(0.88f, 0.72f, 0.20f, 1f));
+                Button actionButton = CreateCornerActionButton("+", button.transform, HudButtonStyle.ActionAdd);
                 actionButton.onClick.AddListener(() => args.OnHeroRosterActionClick?.Invoke(heroId));
                 args.HeroRosterActionButtons[hero.Id] = actionButton;
                 args.HeroNotificationDots[hero.Id] = CreateNotificationDot(button.transform, 40f, new Vector2(-16f, -16f));
             }
 
-            LayoutRebuilder.ForceRebuildLayoutImmediate(rosterGridRect);
         }
 
-        private static Button CreateCornerActionButton(string label, Transform parent, Color color)
+        private static Button CreateCornerActionButton(string label, Transform parent, HudButtonVisualStyle style)
         {
-            Button button = HudUiFactory.CreateButton(label, parent, 20, color);
+            Button button = HudUiFactory.CreateButton(label, parent, style);
             RectTransform rect = button.GetComponent<RectTransform>();
             rect.anchorMin = Vector2.one;
             rect.anchorMax = Vector2.one;
@@ -572,8 +520,8 @@ namespace IdleGame.UI.Hero.Formation
         private static GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
         {
             Text dot = HudUiFactory.CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
-            dot.text = "●";
             dot.color = new Color(1f, 0.04f, 0.04f, 1f);
+            dot.text = "●";
             dot.raycastTarget = false;
 
             RectTransform rect = dot.GetComponent<RectTransform>();

@@ -17,7 +17,6 @@ namespace IdleGame.Battlefield
 
         private static Sprite circleSprite;
         private static Sprite squareSprite;
-        private static int nextActorPhaseSeed;
 
         private readonly Dictionary<string, WorldActor> heroActors = new Dictionary<string, WorldActor>();
         private readonly List<WorldActor> enemyActors = new List<WorldActor>();
@@ -385,11 +384,6 @@ namespace IdleGame.Battlefield
                 actor.Root.transform.position = ToWorld(renderPosition);
                 bool alive = battleManager.IsHeroBattleAlive(hero.Definition.Id);
                 bool hit = actor.HitPulse > 0f;
-            actor.Body.color = hit
-                ? Color.Lerp(WithAlpha(GetRarityColor(hero.Definition.Rarity), alive ? 1f : 0.42f), Color.white, 0.72f)
-                : isAttacking
-                ? Color.Lerp(GetRarityColor(hero.Definition.Rarity), new Color(1f, 0.92f, 0.25f, alive ? 1f : 0.45f), 0.62f)
-                : WithAlpha(GetRarityColor(hero.Definition.Rarity), alive ? 1f : 0.42f);
                 ConfigureHeroActorVisuals(actor, hero.Definition, alive, hit);
                 AnimateHeroActorParts(actor, hero.Definition, Vector2.Distance(currentPosition, targetPosition) > 0.035f, isAttacking, alive);
                 actor.Label.text = string.Empty;
@@ -487,10 +481,6 @@ namespace IdleGame.Battlefield
                 }
 
                 actor.Root.transform.localScale = new Vector3((scale + hitPulse) * spawnScale, (scale + hitPulse) * spawnScale, 1f);
-                Color enemyColor = battleManager.IsBossFight
-                    ? new Color(0.86f, 0.18f, 0.14f, 1f)
-                    : Color.Lerp(new Color(0.58f, 0.12f, 0.10f, 1f), new Color(0.95f, 0.38f, 0.12f, 1f), i / (float)Mathf.Max(1, GameData.MaxVisibleEnemies - 1));
-                actor.Body.color = actor.HitPulse > 0f ? Color.Lerp(enemyColor, Color.white, 0.82f) : enemyColor;
                 ConfigureEnemyActorVisuals(actor, i, battleManager.IsBossFight, actor.HitPulse > 0f);
                 AnimateEnemyActorParts(actor, Vector2.Distance(actor.LocalPosition, desiredPosition) > 0.035f, actor.AttackPulse > 0f, battleManager.IsBossFight);
                 actor.Label.text = string.Empty;
@@ -611,38 +601,14 @@ namespace IdleGame.Battlefield
             instance.name = actorName;
             instance.SetActive(false);
 
-            Transform back = instance.transform.Find("Back");
             Transform body = instance.transform.Find("Body");
-            Transform head = instance.transform.Find("Head");
-            Transform headwear = instance.transform.Find("Headwear");
-            Transform accent = instance.transform.Find("Accent");
-            Transform armLeft = instance.transform.Find("ArmLeft");
-            Transform armRight = instance.transform.Find("ArmRight");
-            Transform footLeft = instance.transform.Find("FootLeft");
-            Transform footRight = instance.transform.Find("FootRight");
-            Transform weapon = instance.transform.Find("Weapon");
-            Transform offhand = instance.transform.Find("Offhand");
-            Transform eyeLeft = instance.transform.Find("EyeLeft");
-            Transform eyeRight = instance.transform.Find("EyeRight");
             Transform label = instance.transform.Find("Label");
             Transform hpRoot = instance.transform.Find("HpRoot");
             Transform hpFill = hpRoot != null ? hpRoot.Find("HpFill") : null;
 
             return new WorldActor(
                 instance,
-                back.GetComponent<SpriteRenderer>(),
                 body.GetComponent<SpriteRenderer>(),
-                head.GetComponent<SpriteRenderer>(),
-                headwear.GetComponent<SpriteRenderer>(),
-                accent.GetComponent<SpriteRenderer>(),
-                armLeft.GetComponent<SpriteRenderer>(),
-                armRight.GetComponent<SpriteRenderer>(),
-                footLeft.GetComponent<SpriteRenderer>(),
-                footRight.GetComponent<SpriteRenderer>(),
-                weapon.GetComponent<SpriteRenderer>(),
-                offhand.GetComponent<SpriteRenderer>(),
-                eyeLeft.GetComponent<SpriteRenderer>(),
-                eyeRight.GetComponent<SpriteRenderer>(),
                 label.GetComponent<TextMesh>(),
                 hpRoot.gameObject,
                 hpFill.GetComponent<SpriteRenderer>());
@@ -654,68 +620,12 @@ namespace IdleGame.Battlefield
             root.transform.SetParent(templateRoot, false);
             root.SetActive(false);
 
-            SpriteRenderer shadow = CreateSpriteRenderer("Shadow", root.transform, circleSprite, new Color(0f, 0f, 0f, 0.28f), hero ? 0 : 10);
-            shadow.transform.localPosition = new Vector3(0f, -0.38f, 0f);
-            shadow.transform.localScale = new Vector3(0.78f, 0.25f, 1f);
-
-            SpriteRenderer back = CreateSpriteRenderer("Back", root.transform, hero ? circleSprite : squareSprite, hero ? new Color(0.08f, 0.10f, 0.16f, 0.92f) : new Color(0.20f, 0.06f, 0.04f, 1f), hero ? 2 : 12);
-            back.transform.localPosition = hero ? new Vector3(0f, -0.06f, 0f) : new Vector3(0f, 0.34f, 0f);
-            back.transform.localScale = hero ? new Vector3(0.82f, 0.70f, 1f) : new Vector3(0.62f, 0.18f, 1f);
-            back.transform.localRotation = Quaternion.Euler(0f, 0f, hero ? 0f : 0f);
-
-            SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, circleSprite, hero ? new Color(0.36f, 0.56f, 0.96f, 1f) : new Color(0.70f, 0.13f, 0.10f, 1f), hero ? 4 : 14);
-            body.transform.localPosition = hero ? new Vector3(0f, -0.16f, 0f) : new Vector3(0f, -0.04f, 0f);
-            body.transform.localScale = hero ? new Vector3(0.66f, 0.72f, 1f) : new Vector3(0.74f, 0.66f, 1f);
-
-            SpriteRenderer head = CreateSpriteRenderer("Head", root.transform, circleSprite, hero ? new Color(0.96f, 0.82f, 0.62f, 1f) : new Color(0.28f, 0.05f, 0.05f, 1f), hero ? 6 : 16);
-            head.transform.localPosition = hero ? new Vector3(0f, 0.28f, 0f) : new Vector3(0f, 0.16f, 0f);
-            head.transform.localScale = hero ? new Vector3(0.54f, 0.48f, 1f) : new Vector3(0.52f, 0.42f, 1f);
-
-            SpriteRenderer headwear = CreateSpriteRenderer("Headwear", root.transform, hero ? squareSprite : circleSprite, hero ? new Color(0.12f, 0.16f, 0.22f, 1f) : new Color(0.12f, 0.02f, 0.02f, 1f), hero ? 9 : 19);
-            headwear.transform.localPosition = hero ? new Vector3(0f, 0.52f, 0f) : new Vector3(0f, 0.37f, 0f);
-            headwear.transform.localScale = hero ? new Vector3(0.46f, 0.12f, 1f) : new Vector3(0.26f, 0.12f, 1f);
-
-            SpriteRenderer accent = CreateSpriteRenderer("Accent", root.transform, squareSprite, Color.white, hero ? 5 : 15);
-            accent.transform.localPosition = hero ? new Vector3(0f, -0.18f, 0f) : new Vector3(0f, -0.12f, 0f);
-            accent.transform.localScale = hero ? new Vector3(0.48f, 0.14f, 1f) : new Vector3(0.36f, 0.12f, 1f);
-            accent.transform.localRotation = Quaternion.identity;
-
-            SpriteRenderer armLeft = CreateSpriteRenderer("ArmLeft", root.transform, circleSprite, hero ? new Color(0.96f, 0.82f, 0.62f, 1f) : new Color(0.45f, 0.08f, 0.06f, 1f), hero ? 5 : 15);
-            armLeft.transform.localPosition = hero ? new Vector3(-0.35f, -0.11f, 0f) : new Vector3(-0.34f, -0.02f, 0f);
-            armLeft.transform.localScale = hero ? new Vector3(0.18f, 0.30f, 1f) : new Vector3(0.20f, 0.28f, 1f);
-
-            SpriteRenderer armRight = CreateSpriteRenderer("ArmRight", root.transform, circleSprite, hero ? new Color(0.96f, 0.82f, 0.62f, 1f) : new Color(0.45f, 0.08f, 0.06f, 1f), hero ? 5 : 15);
-            armRight.transform.localPosition = hero ? new Vector3(0.35f, -0.11f, 0f) : new Vector3(0.34f, -0.02f, 0f);
-            armRight.transform.localScale = hero ? new Vector3(0.18f, 0.30f, 1f) : new Vector3(0.20f, 0.28f, 1f);
-
-            SpriteRenderer footLeft = CreateSpriteRenderer("FootLeft", root.transform, circleSprite, hero ? new Color(0.08f, 0.10f, 0.14f, 1f) : new Color(0.18f, 0.03f, 0.025f, 1f), hero ? 3 : 13);
-            footLeft.transform.localPosition = hero ? new Vector3(-0.18f, -0.52f, 0f) : new Vector3(-0.18f, -0.38f, 0f);
-            footLeft.transform.localScale = hero ? new Vector3(0.18f, 0.12f, 1f) : new Vector3(0.20f, 0.12f, 1f);
-
-            SpriteRenderer footRight = CreateSpriteRenderer("FootRight", root.transform, circleSprite, hero ? new Color(0.08f, 0.10f, 0.14f, 1f) : new Color(0.18f, 0.03f, 0.025f, 1f), hero ? 3 : 13);
-            footRight.transform.localPosition = hero ? new Vector3(0.18f, -0.52f, 0f) : new Vector3(0.18f, -0.38f, 0f);
-            footRight.transform.localScale = hero ? new Vector3(0.18f, 0.12f, 1f) : new Vector3(0.20f, 0.12f, 1f);
-
-            SpriteRenderer weapon = CreateSpriteRenderer("Weapon", root.transform, squareSprite, hero ? new Color(0.96f, 0.98f, 1f, 1f) : new Color(0.12f, 0.03f, 0.03f, 1f), hero ? 7 : 17);
-            weapon.transform.localPosition = hero ? new Vector3(0.43f, 0f, 0f) : new Vector3(-0.30f, 0.18f, 0f);
-            weapon.transform.localScale = hero ? new Vector3(0.13f, 0.74f, 1f) : new Vector3(0.15f, 0.34f, 1f);
-            weapon.transform.localRotation = Quaternion.Euler(0f, 0f, hero ? -34f : 42f);
-
-            SpriteRenderer offhand = CreateSpriteRenderer("Offhand", root.transform, hero ? circleSprite : squareSprite, hero ? new Color(0.22f, 0.28f, 0.38f, 1f) : new Color(0.12f, 0.03f, 0.03f, 1f), hero ? 6 : 17);
-            offhand.transform.localPosition = hero ? new Vector3(-0.35f, -0.04f, 0f) : new Vector3(0.30f, 0.18f, 0f);
-            offhand.transform.localScale = hero ? new Vector3(0.30f, 0.36f, 1f) : new Vector3(0.15f, 0.34f, 1f);
-            offhand.transform.localRotation = Quaternion.Euler(0f, 0f, hero ? 0f : -42f);
-
-            SpriteRenderer eyeLeft = CreateSpriteRenderer("EyeLeft", root.transform, squareSprite, hero ? new Color(0.05f, 0.06f, 0.08f, 1f) : new Color(1f, 0.95f, 0.50f, 1f), hero ? 8 : 18);
-            eyeLeft.transform.localPosition = hero ? new Vector3(-0.085f, 0.31f, 0f) : new Vector3(-0.085f, 0.19f, 0f);
-            eyeLeft.transform.localScale = hero ? new Vector3(0.040f, 0.060f, 1f) : new Vector3(0.052f, 0.045f, 1f);
-
-            SpriteRenderer eyeRight = CreateSpriteRenderer("EyeRight", root.transform, squareSprite, hero ? new Color(0.05f, 0.06f, 0.08f, 1f) : new Color(1f, 0.95f, 0.50f, 1f), hero ? 8 : 18);
-            eyeRight.transform.localPosition = hero ? new Vector3(0.085f, 0.31f, 0f) : new Vector3(0.085f, 0.19f, 0f);
-            eyeRight.transform.localScale = hero ? new Vector3(0.040f, 0.060f, 1f) : new Vector3(0.052f, 0.045f, 1f);
+            SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, squareSprite, hero ? new Color(0.36f, 0.56f, 0.96f, 1f) : new Color(0.70f, 0.13f, 0.10f, 1f), hero ? 4 : 14);
+            body.transform.localPosition = Vector3.zero;
+            body.transform.localScale = hero ? Vector3.one * 0.58f : Vector3.one * 0.54f;
 
             TextMesh label = CreateTextMesh("Label", root.transform, string.Empty, 0.08f, Color.white, hero ? 8 : 18);
-            label.transform.localPosition = hero ? new Vector3(0f, -0.06f, 0f) : new Vector3(0f, -0.02f, 0f);
+            label.transform.localPosition = Vector3.zero;
 
             GameObject hpRoot = new GameObject("HpRoot");
             hpRoot.transform.SetParent(root.transform, false);
@@ -733,61 +643,13 @@ namespace IdleGame.Battlefield
         private void ConfigureHeroActorVisuals(WorldActor actor, HeroDefinition hero, bool alive, bool hit)
         {
             Color rarityColor = GetRarityColor(hero.Rarity);
-            Color traitColor = GetTraitColor(hero.Trait);
             float alpha = alive ? 1f : 0.42f;
+            Color bodyColor = hit ? Color.white : WithAlpha(rarityColor, alpha);
 
-            actor.Back.color = WithAlpha(Color.Lerp(rarityColor, new Color(0.04f, 0.06f, 0.10f, 1f), 0.45f), alpha * 0.94f);
-            actor.Head.color = hit
-                ? Color.white
-                : WithAlpha(new Color(0.96f, 0.82f, 0.62f, 1f), alpha);
-            actor.Headwear.color = WithAlpha(Color.Lerp(rarityColor, new Color(0.08f, 0.10f, 0.14f, 1f), 0.38f), alpha);
-            actor.Accent.color = WithAlpha(traitColor, alpha);
-            actor.ArmLeft.color = WithAlpha(new Color(0.96f, 0.82f, 0.62f, 1f), alpha);
-            actor.ArmRight.color = actor.ArmLeft.color;
-            actor.FootLeft.color = WithAlpha(new Color(0.08f, 0.10f, 0.14f, 1f), alpha);
-            actor.FootRight.color = actor.FootLeft.color;
-            actor.Weapon.color = WithAlpha(GetHeroWeaponColor(hero.Trait, hero.Rarity), alpha);
-            actor.Offhand.color = WithAlpha(GetHeroOffhandColor(hero.Trait), alpha);
-            actor.EyeLeft.color = WithAlpha(new Color(0.05f, 0.055f, 0.07f, 1f), alpha);
-            actor.EyeRight.color = actor.EyeLeft.color;
-
-            SetRendererPart(actor.Back, new Vector3(0f, -0.06f, 0f), new Vector3(0.82f, 0.70f, 1f), 0f);
-            SetRendererPart(actor.Body, new Vector3(0f, -0.16f, 0f), new Vector3(0.66f, 0.72f, 1f), 0f);
-            SetRendererPart(actor.Head, new Vector3(0f, 0.28f, 0f), new Vector3(0.54f, 0.48f, 1f), 0f);
-            SetRendererPart(actor.Headwear, new Vector3(0f, 0.52f, 0f), new Vector3(0.46f, 0.12f, 1f), 0f);
-            SetRendererPart(actor.EyeLeft, new Vector3(-0.085f, 0.31f, 0f), new Vector3(0.040f, 0.060f, 1f), 0f);
-            SetRendererPart(actor.EyeRight, new Vector3(0.085f, 0.31f, 0f), new Vector3(0.040f, 0.060f, 1f), 0f);
-            SetRendererPart(actor.ArmLeft, new Vector3(-0.35f, -0.11f, 0f), new Vector3(0.18f, 0.30f, 1f), -8f);
-            SetRendererPart(actor.ArmRight, new Vector3(0.35f, -0.11f, 0f), new Vector3(0.18f, 0.30f, 1f), 8f);
-            SetRendererPart(actor.FootLeft, new Vector3(-0.18f, -0.52f, 0f), new Vector3(0.18f, 0.12f, 1f), 0f);
-            SetRendererPart(actor.FootRight, new Vector3(0.18f, -0.52f, 0f), new Vector3(0.18f, 0.12f, 1f), 0f);
-
-            switch (hero.Trait)
-            {
-                case HeroTrait.Melee:
-                    SetRendererPart(actor.Weapon, new Vector3(0.43f, 0.00f, 0f), new Vector3(0.12f, 0.78f, 1f), -35f);
-                    SetRendererPart(actor.Offhand, new Vector3(-0.34f, -0.05f, 0f), new Vector3(0.24f, 0.30f, 1f), 0f);
-                    SetRendererPart(actor.Accent, new Vector3(0.00f, -0.18f, 0f), new Vector3(0.48f, 0.13f, 1f), 0f);
-                    break;
-                case HeroTrait.Ranged:
-                    SetRendererPart(actor.Headwear, new Vector3(0.02f, 0.50f, 0f), new Vector3(0.56f, 0.10f, 1f), -8f);
-                    SetRendererPart(actor.Weapon, new Vector3(0.43f, 0.03f, 0f), new Vector3(0.10f, 0.84f, 1f), 18f);
-                    SetRendererPart(actor.Offhand, new Vector3(0.33f, 0.03f, 0f), new Vector3(0.055f, 0.80f, 1f), 18f);
-                    SetRendererPart(actor.Accent, new Vector3(-0.12f, -0.19f, 0f), new Vector3(0.56f, 0.11f, 1f), 0f);
-                    break;
-                case HeroTrait.Support:
-                    SetRendererPart(actor.Headwear, new Vector3(0f, 0.53f, 0f), new Vector3(0.28f, 0.20f, 1f), 0f);
-                    SetRendererPart(actor.Weapon, new Vector3(0.42f, -0.02f, 0f), new Vector3(0.09f, 0.84f, 1f), -12f);
-                    SetRendererPart(actor.Offhand, new Vector3(0.35f, 0.40f, 0f), new Vector3(0.22f, 0.22f, 1f), 0f);
-                    SetRendererPart(actor.Accent, new Vector3(0.00f, -0.18f, 0f), new Vector3(0.40f, 0.12f, 1f), 0f);
-                    break;
-                case HeroTrait.Defense:
-                    SetRendererPart(actor.Headwear, new Vector3(0f, 0.50f, 0f), new Vector3(0.50f, 0.15f, 1f), 0f);
-                    SetRendererPart(actor.Weapon, new Vector3(0.42f, 0.00f, 0f), new Vector3(0.11f, 0.58f, 1f), -25f);
-                    SetRendererPart(actor.Offhand, new Vector3(-0.36f, -0.06f, 0f), new Vector3(0.40f, 0.48f, 1f), 0f);
-                    SetRendererPart(actor.Accent, new Vector3(0.00f, -0.16f, 0f), new Vector3(0.54f, 0.16f, 1f), 0f);
-                    break;
-            }
+            actor.Body.gameObject.SetActive(true);
+            actor.Body.sprite = squareSprite;
+            actor.Body.color = bodyColor;
+            SetRendererPart(actor.Body, Vector3.zero, Vector3.one * 0.58f, 0f);
         }
 
         private void ConfigureEnemyActorVisuals(WorldActor actor, int index, bool boss, bool hit)
@@ -795,35 +657,11 @@ namespace IdleGame.Battlefield
             Color baseColor = boss
                 ? new Color(0.86f, 0.18f, 0.14f, 1f)
                 : Color.Lerp(new Color(0.58f, 0.12f, 0.10f, 1f), new Color(0.95f, 0.38f, 0.12f, 1f), index / (float)Mathf.Max(1, GameData.MaxVisibleEnemies - 1));
-            Color dark = Color.Lerp(baseColor, Color.black, 0.55f);
 
-            actor.Back.color = boss ? new Color(0.30f, 0.02f, 0.02f, 1f) : dark;
-            actor.Head.color = hit ? Color.white : Color.Lerp(baseColor, Color.black, 0.18f);
-            actor.Headwear.color = boss ? new Color(0.12f, 0.01f, 0.01f, 1f) : dark;
-            actor.Accent.color = boss ? new Color(1f, 0.72f, 0.16f, 1f) : new Color(0.12f, 0.03f, 0.025f, 1f);
-            actor.ArmLeft.color = baseColor;
-            actor.ArmRight.color = baseColor;
-            actor.FootLeft.color = dark;
-            actor.FootRight.color = dark;
-            actor.Weapon.color = dark;
-            actor.Offhand.color = dark;
-            actor.EyeLeft.color = boss ? new Color(1f, 0.95f, 0.35f, 1f) : new Color(1f, 0.82f, 0.28f, 1f);
-            actor.EyeRight.color = actor.EyeLeft.color;
-
-            float hornTilt = boss ? 52f : 42f;
-            SetRendererPart(actor.Body, new Vector3(0f, -0.04f, 0f), boss ? new Vector3(0.82f, 0.74f, 1f) : new Vector3(0.74f, 0.66f, 1f), 0f);
-            SetRendererPart(actor.Head, new Vector3(0f, 0.16f, 0f), boss ? new Vector3(0.60f, 0.48f, 1f) : new Vector3(0.52f, 0.42f, 1f), 0f);
-            SetRendererPart(actor.Headwear, new Vector3(0f, 0.36f, 0f), boss ? new Vector3(0.32f, 0.14f, 1f) : new Vector3(0.24f, 0.10f, 1f), 0f);
-            SetRendererPart(actor.EyeLeft, boss ? new Vector3(-0.10f, 0.20f, 0f) : new Vector3(-0.085f, 0.19f, 0f), boss ? new Vector3(0.065f, 0.052f, 1f) : new Vector3(0.052f, 0.045f, 1f), 0f);
-            SetRendererPart(actor.EyeRight, boss ? new Vector3(0.10f, 0.20f, 0f) : new Vector3(0.085f, 0.19f, 0f), boss ? new Vector3(0.065f, 0.052f, 1f) : new Vector3(0.052f, 0.045f, 1f), 0f);
-            SetRendererPart(actor.ArmLeft, new Vector3(-0.38f, -0.04f, 0f), boss ? new Vector3(0.24f, 0.36f, 1f) : new Vector3(0.20f, 0.28f, 1f), 18f);
-            SetRendererPart(actor.ArmRight, new Vector3(0.38f, -0.04f, 0f), boss ? new Vector3(0.24f, 0.36f, 1f) : new Vector3(0.20f, 0.28f, 1f), -18f);
-            SetRendererPart(actor.FootLeft, new Vector3(-0.18f, -0.38f, 0f), boss ? new Vector3(0.23f, 0.14f, 1f) : new Vector3(0.20f, 0.12f, 1f), 0f);
-            SetRendererPart(actor.FootRight, new Vector3(0.18f, -0.38f, 0f), boss ? new Vector3(0.23f, 0.14f, 1f) : new Vector3(0.20f, 0.12f, 1f), 0f);
-            SetRendererPart(actor.Back, new Vector3(0f, 0.36f, 0f), boss ? new Vector3(0.78f, 0.20f, 1f) : new Vector3(0.62f, 0.16f, 1f), 0f);
-            SetRendererPart(actor.Weapon, new Vector3(-0.33f, 0.25f, 0f), boss ? new Vector3(0.18f, 0.52f, 1f) : new Vector3(0.13f, 0.35f, 1f), hornTilt);
-            SetRendererPart(actor.Offhand, new Vector3(0.33f, 0.25f, 0f), boss ? new Vector3(0.18f, 0.52f, 1f) : new Vector3(0.13f, 0.35f, 1f), -hornTilt);
-            SetRendererPart(actor.Accent, new Vector3(0f, -0.15f, 0f), boss ? new Vector3(0.44f, 0.15f, 1f) : new Vector3(0.36f, 0.10f, 1f), 0f);
+            actor.Body.gameObject.SetActive(true);
+            actor.Body.sprite = squareSprite;
+            actor.Body.color = hit ? Color.white : baseColor;
+            SetRendererPart(actor.Body, Vector3.zero, boss ? Vector3.one * 0.72f : Vector3.one * 0.54f, 0f);
         }
 
         private static void SetRendererPart(SpriteRenderer renderer, Vector3 localPosition, Vector3 localScale, float zRotation)
@@ -835,77 +673,12 @@ namespace IdleGame.Battlefield
 
         private void AnimateHeroActorParts(WorldActor actor, HeroDefinition hero, bool moving, bool attacking, bool alive)
         {
-            if (!alive)
-            {
-                actor.Body.transform.localRotation = Quaternion.Euler(0f, 0f, -18f);
-                actor.Head.transform.localPosition += new Vector3(0.05f, -0.08f, 0f);
-                actor.Headwear.transform.localPosition += new Vector3(0.05f, -0.08f, 0f);
-                actor.EyeLeft.transform.localPosition += new Vector3(0.05f, -0.08f, 0f);
-                actor.EyeRight.transform.localPosition += new Vector3(0.05f, -0.08f, 0f);
-                return;
-            }
-
-            float phase = GetActorPhase(actor);
-            float walk = moving ? Mathf.Sin(Time.time * 12.5f + phase) : Mathf.Sin(Time.time * 3.2f + phase) * 0.18f;
-            float bob = moving ? Mathf.Abs(walk) * 0.045f : Mathf.Sin(Time.time * 2.0f + phase) * 0.018f;
-            float attack = attacking ? Mathf.Sin(GetPulseRatio(actor.AttackPulse, 0.22f) * Mathf.PI) : 0f;
-
-            actor.Body.transform.localPosition += new Vector3(0f, bob, 0f);
-            actor.Head.transform.localPosition += new Vector3(0f, bob * 0.70f, 0f);
-            actor.Headwear.transform.localPosition += new Vector3(0f, bob * 0.70f, 0f);
-            actor.EyeLeft.transform.localPosition += new Vector3(0f, bob * 0.70f, 0f);
-            actor.EyeRight.transform.localPosition += new Vector3(0f, bob * 0.70f, 0f);
-
-            actor.FootLeft.transform.localPosition += new Vector3(walk * 0.08f, -Mathf.Abs(walk) * 0.035f, 0f);
-            actor.FootRight.transform.localPosition += new Vector3(-walk * 0.08f, -Mathf.Abs(walk) * 0.035f, 0f);
-            actor.ArmLeft.transform.localRotation = Quaternion.Euler(0f, 0f, -12f - walk * 18f);
-            actor.ArmRight.transform.localRotation = Quaternion.Euler(0f, 0f, 12f + walk * 18f);
-
-            switch (hero.Trait)
-            {
-                case HeroTrait.Melee:
-                    actor.Weapon.transform.localRotation = Quaternion.Euler(0f, 0f, -35f - attack * 58f);
-                    actor.Weapon.transform.localPosition += new Vector3(attack * 0.14f, attack * 0.06f, 0f);
-                    actor.ArmRight.transform.localRotation = Quaternion.Euler(0f, 0f, 20f - attack * 42f);
-                    break;
-                case HeroTrait.Ranged:
-                    actor.Weapon.transform.localScale += new Vector3(attack * 0.04f, attack * 0.07f, 0f);
-                    actor.Offhand.transform.localPosition += new Vector3(-attack * 0.10f, 0f, 0f);
-                    actor.ArmRight.transform.localRotation = Quaternion.Euler(0f, 0f, 22f + attack * 22f);
-                    break;
-                case HeroTrait.Support:
-                    actor.Offhand.transform.localScale += new Vector3(attack * 0.10f, attack * 0.10f, 0f);
-                    actor.Weapon.transform.localRotation = Quaternion.Euler(0f, 0f, -12f + attack * 18f);
-                    break;
-                case HeroTrait.Defense:
-                    actor.Offhand.transform.localPosition += new Vector3(-attack * 0.10f, attack * 0.03f, 0f);
-                    actor.Weapon.transform.localRotation = Quaternion.Euler(0f, 0f, -25f - attack * 26f);
-                    break;
-            }
+            actor.Body.transform.localRotation = Quaternion.identity;
         }
 
         private void AnimateEnemyActorParts(WorldActor actor, bool moving, bool attacking, bool boss)
         {
-            float phase = GetActorPhase(actor);
-            float walk = moving ? Mathf.Sin(Time.time * (boss ? 8.0f : 10.5f) + phase) : Mathf.Sin(Time.time * 2.8f + phase) * 0.18f;
-            float bob = moving ? Mathf.Abs(walk) * 0.035f : Mathf.Sin(Time.time * 2.2f + phase) * 0.018f;
-            float attack = attacking ? Mathf.Sin(GetPulseRatio(actor.AttackPulse, 0.18f) * Mathf.PI) : 0f;
-
-            actor.Body.transform.localPosition += new Vector3(0f, bob, 0f);
-            actor.Head.transform.localPosition += new Vector3(0f, bob * 0.60f, 0f);
-            actor.Headwear.transform.localPosition += new Vector3(0f, bob * 0.60f, 0f);
-            actor.EyeLeft.transform.localPosition += new Vector3(0f, bob * 0.60f, 0f);
-            actor.EyeRight.transform.localPosition += new Vector3(0f, bob * 0.60f, 0f);
-            actor.FootLeft.transform.localPosition += new Vector3(walk * 0.07f, -Mathf.Abs(walk) * 0.025f, 0f);
-            actor.FootRight.transform.localPosition += new Vector3(-walk * 0.07f, -Mathf.Abs(walk) * 0.025f, 0f);
-            actor.ArmLeft.transform.localRotation = Quaternion.Euler(0f, 0f, 18f + walk * 16f - attack * 24f);
-            actor.ArmRight.transform.localRotation = Quaternion.Euler(0f, 0f, -18f - walk * 16f + attack * 24f);
-            actor.Head.transform.localScale += new Vector3(attack * 0.05f, attack * 0.03f, 0f);
-        }
-
-        private static float GetActorPhase(WorldActor actor)
-        {
-            return actor.AnimationPhase;
+            actor.Body.transform.localRotation = Quaternion.identity;
         }
 
         private static SpriteRenderer CreateSpriteRenderer(string name, Transform parent, Sprite sprite, Color color, int sortingOrder)
@@ -1427,57 +1200,6 @@ namespace IdleGame.Battlefield
             }
         }
 
-        private static Color GetTraitColor(HeroTrait trait)
-        {
-            switch (trait)
-            {
-                case HeroTrait.Melee:
-                    return new Color(1f, 0.86f, 0.34f, 1f);
-                case HeroTrait.Ranged:
-                    return new Color(0.54f, 0.86f, 1f, 1f);
-                case HeroTrait.Support:
-                    return new Color(0.42f, 1f, 0.56f, 1f);
-                case HeroTrait.Defense:
-                    return new Color(0.72f, 0.78f, 0.86f, 1f);
-                default:
-                    return Color.white;
-            }
-        }
-
-        private static Color GetHeroWeaponColor(HeroTrait trait, HeroRarity rarity)
-        {
-            switch (trait)
-            {
-                case HeroTrait.Melee:
-                    return new Color(0.92f, 0.95f, 1f, 1f);
-                case HeroTrait.Ranged:
-                    return new Color(0.86f, 0.58f, 0.26f, 1f);
-                case HeroTrait.Support:
-                    return Color.Lerp(GetRarityColor(rarity), Color.white, 0.20f);
-                case HeroTrait.Defense:
-                    return new Color(0.78f, 0.82f, 0.88f, 1f);
-                default:
-                    return Color.white;
-            }
-        }
-
-        private static Color GetHeroOffhandColor(HeroTrait trait)
-        {
-            switch (trait)
-            {
-                case HeroTrait.Melee:
-                    return new Color(0.26f, 0.30f, 0.36f, 1f);
-                case HeroTrait.Ranged:
-                    return new Color(0.96f, 0.96f, 0.82f, 1f);
-                case HeroTrait.Support:
-                    return new Color(0.66f, 0.96f, 1f, 1f);
-                case HeroTrait.Defense:
-                    return new Color(0.34f, 0.42f, 0.54f, 1f);
-                default:
-                    return new Color(0.26f, 0.30f, 0.36f, 1f);
-            }
-        }
-
         private static Color WithAlpha(Color color, float alpha)
         {
             color.a = alpha;
@@ -1541,58 +1263,20 @@ namespace IdleGame.Battlefield
         {
             public WorldActor(
                 GameObject root,
-                SpriteRenderer back,
                 SpriteRenderer body,
-                SpriteRenderer head,
-                SpriteRenderer headwear,
-                SpriteRenderer accent,
-                SpriteRenderer armLeft,
-                SpriteRenderer armRight,
-                SpriteRenderer footLeft,
-                SpriteRenderer footRight,
-                SpriteRenderer weapon,
-                SpriteRenderer offhand,
-                SpriteRenderer eyeLeft,
-                SpriteRenderer eyeRight,
                 TextMesh label,
                 GameObject hpRoot,
                 SpriteRenderer hpFill)
             {
                 Root = root;
-                AnimationPhase = (nextActorPhaseSeed++ % 64) * 0.73f;
-                Back = back;
                 Body = body;
-                Head = head;
-                Headwear = headwear;
-                Accent = accent;
-                ArmLeft = armLeft;
-                ArmRight = armRight;
-                FootLeft = footLeft;
-                FootRight = footRight;
-                Weapon = weapon;
-                Offhand = offhand;
-                EyeLeft = eyeLeft;
-                EyeRight = eyeRight;
                 Label = label;
                 HpRoot = hpRoot;
                 HpFill = hpFill;
             }
 
             public GameObject Root { get; }
-            public float AnimationPhase { get; }
-            public SpriteRenderer Back { get; }
             public SpriteRenderer Body { get; }
-            public SpriteRenderer Head { get; }
-            public SpriteRenderer Headwear { get; }
-            public SpriteRenderer Accent { get; }
-            public SpriteRenderer ArmLeft { get; }
-            public SpriteRenderer ArmRight { get; }
-            public SpriteRenderer FootLeft { get; }
-            public SpriteRenderer FootRight { get; }
-            public SpriteRenderer Weapon { get; }
-            public SpriteRenderer Offhand { get; }
-            public SpriteRenderer EyeLeft { get; }
-            public SpriteRenderer EyeRight { get; }
             public TextMesh Label { get; }
             public GameObject HpRoot { get; }
             public SpriteRenderer HpFill { get; }

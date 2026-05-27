@@ -5,6 +5,7 @@ using UnityEngine;
 using IdleGame.Battle;
 using IdleGame.Data;
 using IdleGame.UI.Hero;
+using IdleGame.UI.Common;
 
 namespace IdleGame.UI.Hero.Formation
 {
@@ -23,12 +24,6 @@ namespace IdleGame.UI.Hero.Formation
         public Text PlaceholderText;
         public Text SummaryText;
         public Text OwnedEffectText;
-        public Button TotemButton;
-        public Button TotemSecondButton;
-        public Button TotemRemoveButton;
-        public Button TotemSecondRemoveButton;
-        public Text TotemText;
-        public Text TotemSecondText;
         public Dictionary<HeroPageTab, Button> PageTabButtons;
         public Dictionary<int, Button> PresetButtons;
         public IList<string> EditingFormationHeroIds;
@@ -54,12 +49,10 @@ namespace IdleGame.UI.Hero.Formation
 
     public static class HeroFormationPanelPresenter
     {
-        private static readonly Color SelectedPageTabColor = new Color(0.42f, 0.54f, 0.82f, 1f);
-        private static readonly Color NormalPageTabColor = new Color(0.18f, 0.24f, 0.38f, 1f);
-        private static readonly Color SelectedPresetColor = new Color(0.50f, 0.64f, 0.96f, 1f);
-        private static readonly Color NormalPresetColor = new Color(0.21f, 0.29f, 0.45f, 1f);
-        private static readonly Color TotemDisabledColor = new Color(0.20f, 0.28f, 0.42f, 1f);
-
+        private static readonly Color SelectedPageTabColor = HudButtonStyle.TabSelected.Color;
+        private static readonly Color NormalPageTabColor = HudButtonStyle.Tab.Color;
+        private static readonly Color SelectedPresetColor = HudButtonStyle.SmallPresetSelected.Color;
+        private static readonly Color NormalPresetColor = HudButtonStyle.SmallPreset.Color;
         public static HeroFormationPanelRefreshResult Refresh(HeroFormationPanelPresenterArgs args)
         {
             var result = new HeroFormationPanelRefreshResult();
@@ -78,7 +71,6 @@ namespace IdleGame.UI.Hero.Formation
             ApplySummary(args);
             ApplyFormationSlots(args);
             ApplyOwnedEffect(args);
-            ApplyTotemSlots(args);
             ApplyRuneSlots(args);
 
             return result;
@@ -174,29 +166,6 @@ namespace IdleGame.UI.Hero.Formation
 
             args.OwnedEffectText.text = "보유 효과 : 공격력+"
                 + args.BattleManager.HeroOwnedAttackBonusPercent.ToString("0.##") + "%";
-        }
-
-        private static void ApplyTotemSlots(HeroFormationPanelPresenterArgs args)
-        {
-            if (args.BattleManager == null)
-            {
-                return;
-            }
-
-            ApplyTotemSlot(args.TotemButton, args.TotemText, args.TotemRemoveButton, "토템\n전체 적용\n6종");
-            ApplyTotemSlot(args.TotemSecondButton, args.TotemSecondText, args.TotemSecondRemoveButton, "2번째 슬롯\n사용 안함");
-        }
-
-        private static void ApplyTotemSlot(Button button, Text text, Button removeButton, string displayText)
-        {
-            HeroFormationView.ApplyTotemSlotState(
-                button,
-                text,
-                removeButton,
-                displayText,
-                TotemDisabledColor,
-                false,
-                false);
         }
 
         private static void ApplyRuneSlots(HeroFormationPanelPresenterArgs args)

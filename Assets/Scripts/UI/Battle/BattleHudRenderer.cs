@@ -134,7 +134,7 @@ namespace IdleGame.UI.Battle
 
                 if (args.HeroBattleTexts.TryGetValue(hero.Definition.Id, out Text text))
                 {
-                    text.text = HeroUiText.GetRarityBadge(hero.Definition.Rarity) + "\n" + GetShortHeroLabel(hero.Definition);
+                    text.text = string.Empty;
                 }
 
                 heroIndex += 1;
@@ -237,7 +237,7 @@ namespace IdleGame.UI.Battle
                         ? new Color(1f, 0.34f, 0.22f, 1f)
                         : new Color(0.62f, 0.12f, 0.10f, 1f);
                     text.color = Color.white;
-                    text.text = "BOSS";
+                    text.text = string.Empty;
                     SetEnemyHpBar(args, shiftedIndex, true, args.BattleManager.GetVisibleEnemyHpRatio(i), true);
                 }
                 else
@@ -246,7 +246,7 @@ namespace IdleGame.UI.Battle
                         ? new Color(1f, 0.48f, 0.24f, 1f)
                         : new Color(0.52f, 0.16f + 0.03f * (i % 3), 0.12f, 1f);
                     text.color = Color.white;
-                    text.text = "M" + args.BattleManager.GetVisibleEnemyDisplayNumber(i);
+                    text.text = string.Empty;
                     SetEnemyHpBar(args, shiftedIndex, true, args.BattleManager.GetVisibleEnemyHpRatio(i), false);
                 }
             }
@@ -419,14 +419,5 @@ namespace IdleGame.UI.Battle
                 : Color.Lerp(new Color(0.95f, 0.23f, 0.16f, 1f), new Color(0.35f, 0.93f, 0.28f, 1f), clampedRatio);
         }
 
-        private static string GetShortHeroLabel(HeroDefinition hero)
-        {
-            if (hero.DisplayName.Length <= 2)
-            {
-                return hero.DisplayName;
-            }
-
-            return hero.DisplayName.Substring(hero.DisplayName.Length - 2);
-        }
     }
 }

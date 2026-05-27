@@ -101,21 +101,6 @@ namespace IdleGame.UI.Hud
             ApplyTotemRuneUiAction(totemRuneState.EquipSelectedTotem());
         }
 
-        private void HandleFormationTotemSlotClick(int slot)
-        {
-            ApplyTotemRuneUiAction(totemRuneState.HandleTotemSlotClick());
-        }
-
-        private void TryEquipPendingTotemInSlot(int slot)
-        {
-            ApplyTotemRuneUiAction(totemRuneState.TryEquipPendingTotem());
-        }
-
-        private void RemoveTotemFromFormationSlot(int slot)
-        {
-            ApplyTotemRuneUiAction(totemRuneState.RemoveTotem());
-        }
-
         private void RefreshPendingRuneSlotGlow()
         {
             if (battleManager == null
