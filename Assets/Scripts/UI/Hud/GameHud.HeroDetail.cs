@@ -3,6 +3,7 @@ using UnityEngine;
 using IdleGame.Battle;
 using IdleGame.Data;
 using IdleGame.Economy;
+using IdleGame.UI.Common;
 using IdleGame.UI.Hero;
 using IdleGame.UI.Hero.Detail;
 using IdleGame.UI.Hero.Detail.Equipment;
@@ -287,7 +288,7 @@ namespace IdleGame.UI.Hud
                 DismantleCardButtons = heroHud.EquipmentDismantleCardButtons,
                 DismantleCardTexts = heroHud.EquipmentDismantleCardTexts,
                 CreateButton = CreateButton,
-                CreateCornerActionButton = CreateCornerActionButton,
+                CreateCornerActionButton = (label, parent, color) => HudUiFactory.CreateCornerActionButton(label, parent, 18, color),
                 OpenEquipmentDetail = OpenEquipmentDetailPopup,
                 ToggleEquipment = SelectOrRemoveHeroDetailEquipment,
                 SelectDismantleEquipment = SelectDismantleEquipment,

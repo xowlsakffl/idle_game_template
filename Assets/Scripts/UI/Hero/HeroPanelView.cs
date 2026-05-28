@@ -28,8 +28,8 @@ namespace IdleGame.UI.Hero
             }
 
             VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(24, 24, 22, 22);
-            layout.spacing = 8;
+            layout.padding = new RectOffset(20, 20, 14, 14);
+            layout.spacing = 6;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -57,7 +57,7 @@ namespace IdleGame.UI.Hero
             GameObject tabs = new GameObject("HeroPageTabs", typeof(RectTransform));
             tabs.transform.SetParent(args.Parent, false);
             HorizontalLayoutGroup tabLayout = tabs.AddComponent<HorizontalLayoutGroup>();
-            tabLayout.spacing = 8;
+            tabLayout.spacing = 4;
             tabLayout.childControlWidth = true;
             tabLayout.childControlHeight = true;
             tabLayout.childForceExpandWidth = true;

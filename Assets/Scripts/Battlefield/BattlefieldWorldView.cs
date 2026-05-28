@@ -13,14 +13,11 @@ namespace IdleGame.Battlefield
         private const float FieldHalfWidth = 3.85f;
         private const float FieldHalfHeight = 5.15f;
         private const float OriginX = 1000f;
-        private const float EnemyDeathBurstSeconds = 0.18f;
 
-        private static Sprite circleSprite;
         private static Sprite squareSprite;
 
         private readonly Dictionary<string, WorldActor> heroActors = new Dictionary<string, WorldActor>();
         private readonly List<WorldActor> enemyActors = new List<WorldActor>();
-        private readonly List<ParticleSystem> burstPool = new List<ParticleSystem>();
         private readonly List<DamageFloater> damageFloaters = new List<DamageFloater>();
         private readonly List<ProjectileVisual> projectiles = new List<ProjectileVisual>();
         private readonly Dictionary<string, Vector2> heroLocalPositions = new Dictionary<string, Vector2>();
@@ -37,17 +34,11 @@ namespace IdleGame.Battlefield
         private GameObject enemyTemplate;
         private Transform fortressRoot;
         private SpriteRenderer fortressBaseRenderer;
-        private SpriteRenderer fortressKeepRenderer;
         private SpriteRenderer fortressHpFillRenderer;
-        private TextMesh fortressLabel;
-        private SpriteRenderer portalRenderer;
-        private SpriteRenderer backgroundRenderer;
-        private TextMesh portalText;
         private int observedHitSequence = -1;
         private int observedHeroAttackBatchSequence = -1;
         private int observedMonsterHitSequence = -1;
         private int observedEnemyDefeatSequence = -1;
-        private float deathBurstRemaining;
         private bool sceneCreated;
 
         public Texture OutputTexture
@@ -82,10 +73,8 @@ namespace IdleGame.Battlefield
             float speedMultiplier = speedManager != null ? Mathf.Max(1, speedManager.CurrentMultiplier) : 1f;
             float rawDeltaTime = Time.deltaTime > 0f ? Time.deltaTime : 1f / 60f;
             float deltaTime = Mathf.Min(rawDeltaTime * speedMultiplier, 0.08f);
-            deathBurstRemaining = Mathf.Max(0f, deathBurstRemaining - deltaTime);
-
             TickActorAnimationState(deltaTime);
-            UpdatePortal();
+            UpdateFortressVisual();
             UpdateHeroes(deltaTime);
             UpdateEnemies(deltaTime);
             PlayHitBursts();
@@ -131,17 +120,10 @@ namespace IdleGame.Battlefield
             templateRoot = new GameObject("Templates").transform;
             templateRoot.SetParent(sceneRoot, false);
 
-            backgroundRenderer = CreateSpriteRenderer("Background", sceneRoot, squareSprite, new Color(0.13f, 0.16f, 0.20f, 1f), -50);
+            SpriteRenderer backgroundRenderer = CreateSpriteRenderer("Background", sceneRoot, squareSprite, new Color(0.13f, 0.16f, 0.20f, 1f), -50);
             backgroundRenderer.transform.localScale = new Vector3(FieldHalfWidth * 2.2f, FieldHalfHeight * 2.2f, 1f);
 
-            CreateBackdropDetails(sceneRoot);
             CreateFortressVisual(sceneRoot);
-
-            portalRenderer = CreateSpriteRenderer("SpawnPortal", sceneRoot, circleSprite, new Color(0.18f, 0.62f, 1f, 0.28f), -5);
-            portalRenderer.transform.localScale = new Vector3(1.15f, 1.15f, 1f);
-
-            portalText = CreateTextMesh("PortalLabel", sceneRoot, "●", 0.18f, new Color(0.74f, 0.92f, 1f, 0.52f), 15);
-            portalText.transform.localPosition = new Vector3(0f, -0.08f, 0f);
 
             heroTemplate = CreateActorTemplate("HeroActorTemplate", true);
             enemyTemplate = CreateActorTemplate("EnemyActorTemplate", false);
@@ -166,41 +148,12 @@ namespace IdleGame.Battlefield
 
         private static void EnsureSprites()
         {
-            if (circleSprite != null && squareSprite != null)
+            if (squareSprite != null)
             {
                 return;
             }
 
-            circleSprite = CreateCircleSprite();
             squareSprite = CreateSquareSprite();
-        }
-
-        private static Sprite CreateCircleSprite()
-        {
-            const int size = 64;
-            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                name = "RuntimeCircleSprite",
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp
-            };
-
-            Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
-            float radius = size * 0.46f;
-            float borderRadius = size * 0.50f;
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float distance = Vector2.Distance(new Vector2(x, y), center);
-                    float alpha = Mathf.Clamp01(borderRadius - distance);
-                    float inner = Mathf.Clamp01(radius - distance);
-                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(Mathf.Max(alpha * 0.75f, inner))));
-                }
-            }
-
-            texture.Apply();
-            return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
         }
 
         private static Sprite CreateSquareSprite()
@@ -224,51 +177,15 @@ namespace IdleGame.Battlefield
             return Sprite.Create(texture, new Rect(0f, 0f, 8f, 8f), new Vector2(0.5f, 0.5f), 8f);
         }
 
-        private void CreateBackdropDetails(Transform parent)
-        {
-            for (int i = 0; i < 28; i++)
-            {
-                float x = Mathf.Lerp(-FieldHalfWidth, FieldHalfWidth, PseudoRandom01(i * 17 + 3));
-                float y = Mathf.Lerp(-FieldHalfHeight, FieldHalfHeight, PseudoRandom01(i * 23 + 11));
-                float scale = Mathf.Lerp(0.04f, 0.12f, PseudoRandom01(i * 31 + 7));
-                Color color = i % 3 == 0
-                    ? new Color(0.30f, 0.45f, 0.62f, 0.22f)
-                    : new Color(0.06f, 0.07f, 0.10f, 0.24f);
-                SpriteRenderer detail = CreateSpriteRenderer("BackdropDetail" + i, parent, circleSprite, color, -45);
-                detail.transform.localPosition = new Vector3(x, y, 0f);
-                detail.transform.localScale = new Vector3(scale, scale * 0.55f, 1f);
-            }
-        }
-
         private void CreateFortressVisual(Transform parent)
         {
             fortressRoot = new GameObject("Fortress").transform;
             fortressRoot.SetParent(parent, false);
             fortressRoot.localPosition = Vector3.zero;
 
-            SpriteRenderer shadow = CreateSpriteRenderer("FortressShadow", fortressRoot, circleSprite, new Color(0f, 0f, 0f, 0.26f), 0);
-            shadow.transform.localPosition = new Vector3(0f, -0.62f, 0f);
-            shadow.transform.localScale = new Vector3(1.92f, 0.46f, 1f);
-
-            fortressBaseRenderer = CreateSpriteRenderer("FortressBase", fortressRoot, squareSprite, new Color(0.25f, 0.30f, 0.38f, 1f), 1);
-            fortressBaseRenderer.transform.localPosition = new Vector3(0f, -0.20f, 0f);
-            fortressBaseRenderer.transform.localScale = new Vector3(1.42f, 0.82f, 1f);
-
-            SpriteRenderer leftTower = CreateSpriteRenderer("FortressLeftTower", fortressRoot, squareSprite, new Color(0.30f, 0.36f, 0.45f, 1f), 2);
-            leftTower.transform.localPosition = new Vector3(-0.72f, 0.06f, 0f);
-            leftTower.transform.localScale = new Vector3(0.34f, 1.18f, 1f);
-
-            SpriteRenderer rightTower = CreateSpriteRenderer("FortressRightTower", fortressRoot, squareSprite, new Color(0.30f, 0.36f, 0.45f, 1f), 2);
-            rightTower.transform.localPosition = new Vector3(0.72f, 0.06f, 0f);
-            rightTower.transform.localScale = new Vector3(0.34f, 1.18f, 1f);
-
-            fortressKeepRenderer = CreateSpriteRenderer("FortressKeep", fortressRoot, squareSprite, new Color(0.38f, 0.48f, 0.62f, 1f), 3);
-            fortressKeepRenderer.transform.localPosition = new Vector3(0f, 0.18f, 0f);
-            fortressKeepRenderer.transform.localScale = new Vector3(0.68f, 1.22f, 1f);
-
-            SpriteRenderer core = CreateSpriteRenderer("FortressCore", fortressRoot, circleSprite, new Color(0.36f, 0.76f, 1f, 0.82f), 4);
-            core.transform.localPosition = new Vector3(0f, 0.24f, 0f);
-            core.transform.localScale = new Vector3(0.32f, 0.32f, 1f);
+            fortressBaseRenderer = CreateSpriteRenderer("FortressBody", fortressRoot, squareSprite, new Color(0.25f, 0.30f, 0.38f, 1f), 1);
+            fortressBaseRenderer.transform.localPosition = Vector3.zero;
+            fortressBaseRenderer.transform.localScale = new Vector3(1.20f, 0.82f, 1f);
 
             SpriteRenderer hpBack = CreateSpriteRenderer("FortressHpBack", fortressRoot, squareSprite, new Color(0.02f, 0.025f, 0.03f, 0.95f), 5);
             hpBack.transform.localPosition = new Vector3(0f, 0.98f, 0f);
@@ -277,29 +194,6 @@ namespace IdleGame.Battlefield
             fortressHpFillRenderer = CreateSpriteRenderer("FortressHpFill", fortressRoot, squareSprite, new Color(0.40f, 0.95f, 0.72f, 1f), 6);
             fortressHpFillRenderer.transform.localPosition = new Vector3(0f, 0.98f, 0f);
             fortressHpFillRenderer.transform.localScale = new Vector3(1.04f, 0.052f, 1f);
-
-            fortressLabel = CreateTextMesh("FortressLabel", fortressRoot, string.Empty, 0.09f, Color.white, 7);
-            fortressLabel.transform.localPosition = new Vector3(0f, 1.18f, 0f);
-        }
-
-        private void UpdatePortal()
-        {
-            UpdateFortressVisual();
-
-            float pulse = 1f + Mathf.Sin(Time.time * 3.8f) * 0.08f;
-            if (portalRenderer != null)
-            {
-                Color color = battleManager.IsBossFight
-                    ? new Color(1f, 0.48f, 0.16f, 0.34f)
-                    : new Color(0.18f, 0.62f, 1f, 0.24f + Mathf.Sin(Time.time * 2.4f) * 0.08f);
-                portalRenderer.color = color;
-                portalRenderer.transform.localScale = new Vector3(1.18f * pulse, 1.18f * pulse, 1f);
-            }
-
-            if (portalText != null)
-            {
-                portalText.text = string.Empty;
-            }
         }
 
         private void UpdateFortressVisual()
@@ -311,8 +205,7 @@ namespace IdleGame.Battlefield
 
             float hpRatio = battleManager.FortressHpRatio;
             bool alive = hpRatio > 0f;
-            float pulse = 1f + Mathf.Sin(Time.time * 1.8f) * (alive ? 0.025f : 0.008f);
-            fortressRoot.localScale = new Vector3(pulse, pulse, 1f);
+            fortressRoot.localScale = Vector3.one;
 
             Color healthyBase = new Color(0.25f, 0.30f, 0.38f, 1f);
             Color damagedBase = new Color(0.22f, 0.13f, 0.12f, 1f);
@@ -321,22 +214,11 @@ namespace IdleGame.Battlefield
                 fortressBaseRenderer.color = Color.Lerp(damagedBase, healthyBase, hpRatio);
             }
 
-            if (fortressKeepRenderer != null)
-            {
-                fortressKeepRenderer.color = Color.Lerp(new Color(0.28f, 0.17f, 0.16f, 1f), new Color(0.38f, 0.48f, 0.62f, 1f), hpRatio);
-            }
-
             if (fortressHpFillRenderer != null)
             {
                 fortressHpFillRenderer.color = alive ? new Color(0.40f, 0.95f, 0.72f, 1f) : new Color(0.60f, 0.12f, 0.10f, 1f);
                 fortressHpFillRenderer.transform.localScale = new Vector3(1.04f * Mathf.Clamp01(hpRatio), 0.052f, 1f);
                 fortressHpFillRenderer.transform.localPosition = new Vector3(-0.52f * (1f - Mathf.Clamp01(hpRatio)), 0.98f, 0f);
-            }
-
-            if (fortressLabel != null)
-            {
-                fortressLabel.text = "요새 Lv." + battleManager.FortressLevel;
-                fortressLabel.color = alive ? Color.white : new Color(1f, 0.42f, 0.32f, 1f);
             }
         }
 
@@ -385,8 +267,6 @@ namespace IdleGame.Battlefield
                 bool alive = battleManager.IsHeroBattleAlive(hero.Definition.Id);
                 bool hit = actor.HitPulse > 0f;
                 ConfigureHeroActorVisuals(actor, hero.Definition, alive, hit);
-                AnimateHeroActorParts(actor, hero.Definition, Vector2.Distance(currentPosition, targetPosition) > 0.035f, isAttacking, alive);
-                actor.Label.text = string.Empty;
                 actor.HpRoot.SetActive(true);
                 SetActorHp(actor, battleManager.GetHeroHpRatio(hero.Definition.Id), alive ? new Color(0.42f, 0.95f, 0.34f, 1f) : new Color(0.55f, 0.58f, 0.64f, 1f));
 
@@ -453,8 +333,7 @@ namespace IdleGame.Battlefield
                 {
                     if (actor.LastSpawnSequence >= 0 && actor.Root.activeSelf)
                     {
-                        SpawnBurst(actor.LocalPosition, new Color(1f, 0.38f, 0.18f, 1f), 1.25f);
-                        deathBurstRemaining = EnemyDeathBurstSeconds;
+                        SpawnDamageFloater(actor.LocalPosition, "KO", new Color(1f, 0.86f, 0.24f, 1f), 0.95f);
                     }
 
                     actor.LocalPosition = desiredPosition;
@@ -482,8 +361,6 @@ namespace IdleGame.Battlefield
 
                 actor.Root.transform.localScale = new Vector3((scale + hitPulse) * spawnScale, (scale + hitPulse) * spawnScale, 1f);
                 ConfigureEnemyActorVisuals(actor, i, battleManager.IsBossFight, actor.HitPulse > 0f);
-                AnimateEnemyActorParts(actor, Vector2.Distance(actor.LocalPosition, desiredPosition) > 0.035f, actor.AttackPulse > 0f, battleManager.IsBossFight);
-                actor.Label.text = string.Empty;
                 actor.HpRoot.SetActive(true);
                 SetActorHp(actor, battleManager.GetVisibleEnemyHpRatio(i), battleManager.IsBossFight ? new Color(1f, 0.20f, 0.16f, 1f) : new Color(0.40f, 0.95f, 0.24f, 1f));
             }
@@ -503,7 +380,6 @@ namespace IdleGame.Battlefield
                         enemyActors[hitIndex].HitPulse = 0.20f;
                     }
 
-                    SpawnBurst(hitPosition, battleManager.LastHitWasCritical ? new Color(1f, 0.92f, 0.18f, 1f) : new Color(1f, 0.42f, 0.20f, 1f), battleManager.LastHitWasCritical ? 1.65f : 1.15f);
                     SpawnDamageFloater(
                         hitPosition,
                         "-" + NumberFormatter.Format(battleManager.LastHitDamage),
@@ -529,14 +405,12 @@ namespace IdleGame.Battlefield
                     damagedHero.HitPulse = 0.20f;
                 }
 
-                SpawnBurst(battleManager.LastMonsterHitPosition, new Color(0.92f, 0.18f, 0.18f, 1f), 0.7f);
                 SpawnDamageFloater(battleManager.LastMonsterHitPosition, "HIT", new Color(0.95f, 0.20f, 0.18f, 1f), 0.72f);
             }
 
             if (battleManager.EnemyDefeatSequence != observedEnemyDefeatSequence)
             {
                 observedEnemyDefeatSequence = battleManager.EnemyDefeatSequence;
-                SpawnBurst(battleManager.LastDefeatedEnemyPosition, new Color(1f, 0.65f, 0.18f, 1f), 1.55f);
                 SpawnDamageFloater(battleManager.LastDefeatedEnemyPosition, "KO", new Color(1f, 0.86f, 0.24f, 1f), 1.05f);
             }
 
@@ -563,7 +437,6 @@ namespace IdleGame.Battlefield
                             SpawnHeroAttackVisual(hero.Definition, position, targetPosition);
                         }
 
-                        SpawnBurst(position, new Color(0.72f, 0.90f, 1f, 1f), 0.68f);
                     }
                 }
             }
@@ -602,14 +475,12 @@ namespace IdleGame.Battlefield
             instance.SetActive(false);
 
             Transform body = instance.transform.Find("Body");
-            Transform label = instance.transform.Find("Label");
             Transform hpRoot = instance.transform.Find("HpRoot");
             Transform hpFill = hpRoot != null ? hpRoot.Find("HpFill") : null;
 
             return new WorldActor(
                 instance,
                 body.GetComponent<SpriteRenderer>(),
-                label.GetComponent<TextMesh>(),
                 hpRoot.gameObject,
                 hpFill.GetComponent<SpriteRenderer>());
         }
@@ -623,9 +494,6 @@ namespace IdleGame.Battlefield
             SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, squareSprite, hero ? new Color(0.36f, 0.56f, 0.96f, 1f) : new Color(0.70f, 0.13f, 0.10f, 1f), hero ? 4 : 14);
             body.transform.localPosition = Vector3.zero;
             body.transform.localScale = hero ? Vector3.one * 0.58f : Vector3.one * 0.54f;
-
-            TextMesh label = CreateTextMesh("Label", root.transform, string.Empty, 0.08f, Color.white, hero ? 8 : 18);
-            label.transform.localPosition = Vector3.zero;
 
             GameObject hpRoot = new GameObject("HpRoot");
             hpRoot.transform.SetParent(root.transform, false);
@@ -669,16 +537,6 @@ namespace IdleGame.Battlefield
             renderer.transform.localPosition = localPosition;
             renderer.transform.localScale = localScale;
             renderer.transform.localRotation = Quaternion.Euler(0f, 0f, zRotation);
-        }
-
-        private void AnimateHeroActorParts(WorldActor actor, HeroDefinition hero, bool moving, bool attacking, bool alive)
-        {
-            actor.Body.transform.localRotation = Quaternion.identity;
-        }
-
-        private void AnimateEnemyActorParts(WorldActor actor, bool moving, bool attacking, bool boss)
-        {
-            actor.Body.transform.localRotation = Quaternion.identity;
         }
 
         private static SpriteRenderer CreateSpriteRenderer(string name, Transform parent, Sprite sprite, Color color, int sortingOrder)
@@ -860,23 +718,6 @@ namespace IdleGame.Battlefield
             return false;
         }
 
-        private void SpawnBurst(Vector2 localPosition, Color color, float scale)
-        {
-            ParticleSystem burst = GetBurstParticle();
-            burst.transform.position = ToWorld(localPosition);
-
-            ParticleSystem.MainModule main = burst.main;
-            main.startColor = color;
-            main.startSize = 0.09f * scale;
-            main.startLifetime = 0.32f;
-            main.startSpeed = 1.8f * scale;
-
-            ParticleSystem.EmissionModule emission = burst.emission;
-            emission.enabled = false;
-
-            burst.Emit(Mathf.RoundToInt(11f * scale));
-        }
-
         private void SpawnDamageFloater(Vector2 localPosition, string text, Color color, float scale)
         {
             DamageFloater floater = GetDamageFloater();
@@ -942,21 +783,21 @@ namespace IdleGame.Battlefield
             switch (hero.Trait)
             {
                 case HeroTrait.Ranged:
-                    SpawnProjectile(startPosition + new Vector2(0.18f, 0.12f), targetPosition, new Color(1f, 0.86f, 0.34f, 1f), 0.24f, 0.16f, ProjectileKind.Arrow);
+                    SpawnProjectile(startPosition + new Vector2(0.18f, 0.12f), targetPosition, new Color(1f, 0.86f, 0.34f, 1f), 0.24f, 0.20f);
                     break;
                 case HeroTrait.Support:
-                    SpawnProjectile(startPosition + new Vector2(0.10f, 0.22f), targetPosition, Color.Lerp(GetRarityColor(hero.Rarity), Color.white, 0.18f), 0.30f, 0.24f, ProjectileKind.Orb);
+                    SpawnProjectile(startPosition + new Vector2(0.10f, 0.22f), targetPosition, Color.Lerp(GetRarityColor(hero.Rarity), Color.white, 0.18f), 0.30f, 0.24f);
                     break;
                 case HeroTrait.Defense:
-                    SpawnProjectile(targetPosition, targetPosition + Vector2.up * 0.01f, new Color(0.66f, 0.86f, 1f, 1f), 0.20f, 0.55f, ProjectileKind.Shock);
+                    SpawnProjectile(startPosition, targetPosition, new Color(0.66f, 0.86f, 1f, 1f), 0.20f, 0.18f);
                     break;
                 default:
-                    SpawnProjectile(targetPosition, targetPosition + Vector2.right * 0.01f, new Color(1f, 0.95f, 0.74f, 1f), 0.16f, 0.48f, ProjectileKind.Slash);
+                    SpawnProjectile(startPosition, targetPosition, new Color(1f, 0.95f, 0.74f, 1f), 0.16f, 0.18f);
                     break;
             }
         }
 
-        private void SpawnProjectile(Vector2 startPosition, Vector2 targetPosition, Color color, float duration, float size, ProjectileKind kind)
+        private void SpawnProjectile(Vector2 startPosition, Vector2 targetPosition, Color color, float duration, float size)
         {
             ProjectileVisual projectile = GetProjectile();
             projectile.Root.SetActive(true);
@@ -966,9 +807,7 @@ namespace IdleGame.Battlefield
             projectile.Life = projectile.Duration;
             projectile.BaseColor = color;
             projectile.Size = size;
-            projectile.Kind = kind;
             projectile.Body.color = color;
-            projectile.Trail.color = WithAlpha(color, 0.36f);
             projectile.Root.transform.position = ToWorld(startPosition);
             projectile.Root.transform.localScale = Vector3.one;
         }
@@ -985,10 +824,8 @@ namespace IdleGame.Battlefield
 
             GameObject root = new GameObject("Projectile");
             root.transform.SetParent(sceneRoot, false);
-            SpriteRenderer trail = CreateSpriteRenderer("Trail", root.transform, squareSprite, new Color(1f, 1f, 1f, 0.3f), 54);
             SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, squareSprite, Color.white, 55);
-            SpriteRenderer head = CreateSpriteRenderer("Head", root.transform, squareSprite, Color.white, 56);
-            var projectile = new ProjectileVisual(root, body, trail, head);
+            var projectile = new ProjectileVisual(root, body);
             projectiles.Add(projectile);
             return projectile;
         }
@@ -1013,67 +850,10 @@ namespace IdleGame.Battlefield
                 Color color = projectile.BaseColor;
                 color.a = Mathf.Clamp01(1f - progress * 0.78f);
                 projectile.Body.color = color;
-                projectile.Trail.color = WithAlpha(projectile.BaseColor, 0.36f * (1f - progress));
-                projectile.Head.color = WithAlpha(Color.white, color.a);
-
-                switch (projectile.Kind)
-                {
-                    case ProjectileKind.Arrow:
-                        projectile.Head.gameObject.SetActive(true);
-                        projectile.Body.sprite = squareSprite;
-                        projectile.Trail.sprite = squareSprite;
-                        projectile.Head.sprite = squareSprite;
-                        projectile.Body.transform.localPosition = Vector3.zero;
-                        projectile.Body.transform.localScale = new Vector3(projectile.Size * 1.35f, projectile.Size * 0.18f, 1f);
-                        projectile.Body.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
-                        projectile.Head.transform.localPosition = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad) * projectile.Size * 0.76f, Mathf.Sin(angle * Mathf.Deg2Rad) * projectile.Size * 0.76f, 0f);
-                        projectile.Head.transform.localScale = new Vector3(projectile.Size * 0.34f, projectile.Size * 0.34f, 1f);
-                        projectile.Head.transform.localRotation = Quaternion.Euler(0f, 0f, angle + 45f);
-                        projectile.Trail.transform.localPosition = new Vector3(-Mathf.Cos(angle * Mathf.Deg2Rad) * projectile.Size * 0.82f, -Mathf.Sin(angle * Mathf.Deg2Rad) * projectile.Size * 0.82f, 0f);
-                        projectile.Trail.transform.localScale = new Vector3(projectile.Size * 1.05f, projectile.Size * 0.08f, 1f);
-                        projectile.Trail.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
-                        break;
-                    case ProjectileKind.Orb:
-                        projectile.Head.gameObject.SetActive(true);
-                        projectile.Body.sprite = circleSprite;
-                        projectile.Trail.sprite = circleSprite;
-                        projectile.Head.sprite = circleSprite;
-                        float orbPulse = 1f + Mathf.Sin(Time.time * 22f) * 0.10f;
-                        projectile.Body.transform.localPosition = Vector3.zero;
-                        projectile.Body.transform.localScale = new Vector3(projectile.Size * orbPulse, projectile.Size * orbPulse, 1f);
-                        projectile.Body.transform.localRotation = Quaternion.identity;
-                        projectile.Head.transform.localPosition = Vector3.zero;
-                        projectile.Head.transform.localScale = new Vector3(projectile.Size * 0.34f, projectile.Size * 0.34f, 1f);
-                        projectile.Head.transform.localRotation = Quaternion.identity;
-                        projectile.Trail.transform.localPosition = Vector3.zero;
-                        projectile.Trail.transform.localScale = new Vector3(projectile.Size * 1.85f * (1f - progress), projectile.Size * 1.85f * (1f - progress), 1f);
-                        projectile.Trail.transform.localRotation = Quaternion.identity;
-                        break;
-                    case ProjectileKind.Shock:
-                        projectile.Head.gameObject.SetActive(false);
-                        projectile.Body.sprite = circleSprite;
-                        projectile.Trail.sprite = circleSprite;
-                        float shockScale = projectile.Size * Mathf.Lerp(0.55f, 1.95f, progress);
-                        projectile.Body.transform.localPosition = Vector3.zero;
-                        projectile.Body.transform.localScale = new Vector3(shockScale, shockScale * 0.55f, 1f);
-                        projectile.Body.transform.localRotation = Quaternion.identity;
-                        projectile.Trail.transform.localPosition = Vector3.zero;
-                        projectile.Trail.transform.localScale = new Vector3(shockScale * 1.25f, shockScale * 0.66f, 1f);
-                        projectile.Trail.transform.localRotation = Quaternion.identity;
-                        break;
-                    case ProjectileKind.Slash:
-                        projectile.Head.gameObject.SetActive(false);
-                        projectile.Body.sprite = squareSprite;
-                        projectile.Trail.sprite = squareSprite;
-                        float slashAngle = -35f + progress * 95f;
-                        projectile.Body.transform.localPosition = Vector3.zero;
-                        projectile.Body.transform.localScale = new Vector3(projectile.Size * 1.10f, projectile.Size * 0.16f, 1f);
-                        projectile.Body.transform.localRotation = Quaternion.Euler(0f, 0f, slashAngle);
-                        projectile.Trail.transform.localPosition = Vector3.zero;
-                        projectile.Trail.transform.localScale = new Vector3(projectile.Size * 0.72f, projectile.Size * 0.08f, 1f);
-                        projectile.Trail.transform.localRotation = Quaternion.Euler(0f, 0f, slashAngle - 22f);
-                        break;
-                }
+                projectile.Body.sprite = squareSprite;
+                projectile.Body.transform.localPosition = Vector3.zero;
+                projectile.Body.transform.localScale = new Vector3(Mathf.Max(0.12f, projectile.Size * 1.20f), Mathf.Max(0.035f, projectile.Size * 0.18f), 1f);
+                projectile.Body.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
 
                 if (projectile.Life <= 0f)
                 {
@@ -1137,36 +917,6 @@ namespace IdleGame.Battlefield
             return 1f - (1f - t) * (1f - t);
         }
 
-        private ParticleSystem GetBurstParticle()
-        {
-            for (int i = 0; i < burstPool.Count; i++)
-            {
-                if (!burstPool[i].IsAlive(true))
-                {
-                    return burstPool[i];
-                }
-            }
-
-            GameObject obj = new GameObject("HitBurst");
-            obj.transform.SetParent(sceneRoot, false);
-            ParticleSystem particle = obj.AddComponent<ParticleSystem>();
-            ParticleSystem.MainModule main = particle.main;
-            main.loop = false;
-            main.playOnAwake = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-
-            ParticleSystem.ShapeModule shape = particle.shape;
-            shape.shapeType = ParticleSystemShapeType.Circle;
-            shape.radius = 0.04f;
-
-            ParticleSystemRenderer renderer = obj.GetComponent<ParticleSystemRenderer>();
-            renderer.sortingOrder = 40;
-            renderer.renderMode = ParticleSystemRenderMode.Billboard;
-
-            burstPool.Add(particle);
-            return particle;
-        }
-
         private static Vector3 ToWorld(Vector2 localPosition)
         {
             return new Vector3(OriginX + localPosition.x, localPosition.y, 0f);
@@ -1206,16 +956,6 @@ namespace IdleGame.Battlefield
             return color;
         }
 
-        private static string GetShortName(string displayName)
-        {
-            if (string.IsNullOrEmpty(displayName))
-            {
-                return "?";
-            }
-
-            return displayName.Length <= 2 ? displayName : displayName.Substring(displayName.Length - 2);
-        }
-
         private static float PseudoRandom01(int seed)
         {
             unchecked
@@ -1227,33 +967,20 @@ namespace IdleGame.Battlefield
             }
         }
 
-        private enum ProjectileKind
-        {
-            Arrow,
-            Orb,
-            Shock,
-            Slash
-        }
-
         private sealed class ProjectileVisual
         {
-            public ProjectileVisual(GameObject root, SpriteRenderer body, SpriteRenderer trail, SpriteRenderer head)
+            public ProjectileVisual(GameObject root, SpriteRenderer body)
             {
                 Root = root;
                 Body = body;
-                Trail = trail;
-                Head = head;
                 Root.SetActive(false);
             }
 
             public GameObject Root { get; }
             public SpriteRenderer Body { get; }
-            public SpriteRenderer Trail { get; }
-            public SpriteRenderer Head { get; }
             public Vector2 StartPosition { get; set; }
             public Vector2 TargetPosition { get; set; }
             public Color BaseColor { get; set; }
-            public ProjectileKind Kind { get; set; }
             public float Life { get; set; }
             public float Duration { get; set; }
             public float Size { get; set; }
@@ -1264,20 +991,17 @@ namespace IdleGame.Battlefield
             public WorldActor(
                 GameObject root,
                 SpriteRenderer body,
-                TextMesh label,
                 GameObject hpRoot,
                 SpriteRenderer hpFill)
             {
                 Root = root;
                 Body = body;
-                Label = label;
                 HpRoot = hpRoot;
                 HpFill = hpFill;
             }
 
             public GameObject Root { get; }
             public SpriteRenderer Body { get; }
-            public TextMesh Label { get; }
             public GameObject HpRoot { get; }
             public SpriteRenderer HpFill { get; }
             public Vector2 LocalPosition { get; set; }

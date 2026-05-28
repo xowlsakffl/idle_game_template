@@ -87,15 +87,9 @@ namespace IdleGame.UI.Hero.TotemRune
                 args.RuneButtonTexts[rune.Id] = button.GetComponentInChildren<Text>();
 
                 Text buttonText = args.RuneButtonTexts[rune.Id];
-                if (buttonText != null)
-                {
-                    buttonText.resizeTextForBestFit = true;
-                    buttonText.resizeTextMinSize = 10;
-                    buttonText.resizeTextMaxSize = 15;
-                    buttonText.lineSpacing = 0.86f;
-                }
+                HudUiFactory.ConfigureBestFitText(buttonText, 10, 15, 0.86f);
 
-                Button actionButton = CreateCornerActionButton("+", button.transform, new Color(0.88f, 0.72f, 0.20f, 1f));
+                Button actionButton = HudUiFactory.CreateCornerActionButton("+", button.transform, HudButtonStyle.ActionAdd, 34f, 4f);
                 actionButton.onClick.AddListener(() => args.OnRuneAction?.Invoke(capturedId));
                 args.RuneActionButtons[rune.Id] = actionButton;
             }
@@ -133,35 +127,7 @@ namespace IdleGame.UI.Hero.TotemRune
             refs.EquipButton.onClick.AddListener(() => args.OnEquipSelected?.Invoke());
 
             refs.LevelUpButton = HudUiFactory.CreateButton("강화", actionRow.transform, 25, new Color(0.54f, 0.78f, 0.22f, 1f));
-            ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);
-        }
-
-        private static Button CreateCornerActionButton(string label, Transform parent, Color color)
-        {
-            Button button = HudUiFactory.CreateButton(label, parent, 20, color);
-            RectTransform rect = button.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.one;
-            rect.anchorMax = Vector2.one;
-            rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(34f, 34f);
-            rect.anchoredPosition = new Vector2(-4f, -4f);
-            return button;
-        }
-
-        private static void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat)
-        {
-            if (button == null)
-            {
-                return;
-            }
-
-            HoldRepeatButton repeatButton = button.GetComponent<HoldRepeatButton>();
-            if (repeatButton == null)
-            {
-                repeatButton = button.gameObject.AddComponent<HoldRepeatButton>();
-            }
-
-            repeatButton.Configure(action, canRepeat);
+            HudUiFactory.ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);
         }
     }
 }

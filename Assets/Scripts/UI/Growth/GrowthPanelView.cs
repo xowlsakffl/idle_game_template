@@ -96,7 +96,7 @@ namespace IdleGame.UI.Growth
                 HudUiFactory.AddLayoutElement(button.gameObject, -1, 64);
 
                 AbilityKind kind = ability.Definition.Kind;
-                ConfigureHoldRepeat(button, () => args.OnLevelUpAbility?.Invoke(kind), () => args.CanLevelUpAbility == null || args.CanLevelUpAbility(kind));
+                HudUiFactory.ConfigureHoldRepeat(button, () => args.OnLevelUpAbility?.Invoke(kind), () => args.CanLevelUpAbility == null || args.CanLevelUpAbility(kind));
                 Text rowText = button.GetComponentInChildren<Text>();
                 rowText.alignment = TextAnchor.MiddleLeft;
                 rowText.color = Color.white;
@@ -119,42 +119,8 @@ namespace IdleGame.UI.Growth
                 HudUiFactory.StretchToParent(costText.gameObject);
                 args.AbilityCostBadgeTexts[kind] = costText;
 
-                args.AbilityNotificationDots[kind] = CreateNotificationDot(button.transform, 40f, new Vector2(-16f, -16f));
+                args.AbilityNotificationDots[kind] = HudUiFactory.CreateNotificationDot(button.transform, 40f, new Vector2(-16f, -16f));
             }
-        }
-
-        private static void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat)
-        {
-            if (button == null)
-            {
-                return;
-            }
-
-            HoldRepeatButton repeatButton = button.GetComponent<HoldRepeatButton>();
-            if (repeatButton == null)
-            {
-                repeatButton = button.gameObject.AddComponent<HoldRepeatButton>();
-            }
-
-            repeatButton.Configure(action, canRepeat);
-        }
-
-        private static GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
-        {
-            Text dot = HudUiFactory.CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
-            dot.text = "●";
-            dot.color = new Color(1f, 0.04f, 0.04f, 1f);
-            dot.raycastTarget = false;
-
-            RectTransform rect = dot.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.one;
-            rect.anchorMax = Vector2.one;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(size, size);
-            rect.anchoredPosition = anchoredPosition;
-
-            dot.gameObject.SetActive(false);
-            return dot.gameObject;
         }
     }
 }

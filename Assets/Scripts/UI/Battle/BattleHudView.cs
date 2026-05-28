@@ -140,7 +140,7 @@ namespace IdleGame.UI.Battle
             guideTextRect.anchorMax = Vector2.one;
             guideTextRect.offsetMin = new Vector2(18f, 8f);
             guideTextRect.offsetMax = new Vector2(-18f, -8f);
-            refs.GuideQuestDot = CreateNotificationDot(guideQuest.transform, 34f, new Vector2(-12f, -12f));
+            refs.GuideQuestDot = HudUiFactory.CreateNotificationDot(guideQuest.transform, 34f, new Vector2(-12f, -12f));
 
             CreateHeroActors(args, field.transform);
             CreateEnemyActors(args, field.transform);
@@ -239,24 +239,6 @@ namespace IdleGame.UI.Battle
             rect.sizeDelta = size;
             rect.anchoredPosition = Vector2.zero;
             return actor;
-        }
-
-        private static GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
-        {
-            Text dot = HudUiFactory.CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
-            dot.text = "●";
-            dot.color = new Color(1f, 0.04f, 0.04f, 1f);
-            dot.raycastTarget = false;
-
-            RectTransform rect = dot.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.one;
-            rect.anchorMax = Vector2.one;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(size, size);
-            rect.anchoredPosition = anchoredPosition;
-
-            dot.gameObject.SetActive(false);
-            return dot.gameObject;
         }
 
     }

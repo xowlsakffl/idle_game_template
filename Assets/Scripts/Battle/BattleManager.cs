@@ -1329,7 +1329,7 @@ namespace IdleGame.Battle
         public GameNumber GetFacilityMaxStoredAmount(string facilityId)
         {
             GameNumber perHour = GetFacilityProductionPerHour(facilityId);
-            return perHour * (FacilityDefinition.MaxAccumulatedSeconds / FacilityDefinition.ProductionCycleSeconds);
+            return FacilityProductionService.GetMaxStoredAmount(perHour);
         }
 
         public double GetFacilityHeroBonusPercent(string facilityId)
@@ -1649,25 +1649,28 @@ namespace IdleGame.Battle
                 return;
             }
 
-            while (visibleEnemies.Count < GameData.MaxVisibleEnemies
-                && nextEnemySpawnSequence < RequiredKills)
-            {
-                visibleEnemies.Add(CreateVisibleEnemy(InitialEnemySpawnGraceSeconds));
-            }
-
+            MonsterSpawnService.FillVisibleEnemies(
+                visibleEnemies,
+                ref nextEnemySpawnSequence,
+                RequiredKills,
+                TargetMaxHp,
+                InitialEnemySpawnGraceSeconds,
+                EnemyAttackIntervalSeconds,
+                FieldHalfWidth,
+                FieldHalfHeight,
+                GameData.MaxVisibleEnemies);
             VisibleEnemyCount = visibleEnemies.Count;
         }
 
         private VisibleEnemyState CreateVisibleEnemy(float spawnGraceSeconds)
         {
-            int spawnSequence = nextEnemySpawnSequence;
-            nextEnemySpawnSequence += 1;
-            return new VisibleEnemyState(
-                spawnSequence,
-                GameNumber.Max(GameNumber.One, TargetMaxHp),
-                spawnSequence + 1,
+            return MonsterSpawnService.CreateVisibleEnemy(
+                ref nextEnemySpawnSequence,
+                TargetMaxHp,
                 spawnGraceSeconds,
-                GetEnemySpawnPosition(spawnSequence));
+                EnemyAttackIntervalSeconds,
+                FieldHalfWidth,
+                FieldHalfHeight);
         }
 
         private void SyncTargetFromVisibleEnemies()
@@ -1695,18 +1698,7 @@ namespace IdleGame.Battle
 
         private void TickVisibleEnemySpawnGrace(float deltaTime)
         {
-            if (IsBossFight || visibleEnemies.Count <= 0)
-            {
-                return;
-            }
-
-            foreach (VisibleEnemyState enemy in visibleEnemies)
-            {
-                if (enemy.SpawnGraceRemaining > 0f)
-                {
-                    enemy.SpawnGraceRemaining = Mathf.Max(0f, enemy.SpawnGraceRemaining - deltaTime);
-                }
-            }
+            CombatTickService.TickVisibleEnemySpawnGrace(IsBossFight, visibleEnemies, deltaTime);
         }
 
         private void TickBattle(float deltaTime)
@@ -1888,22 +1880,16 @@ namespace IdleGame.Battle
                     continue;
                 }
 
-                float attackRangeSqr = EnemyAttackRange * EnemyAttackRange;
-                float distanceSqr = (enemy.Position - targetHero.Position).sqrMagnitude;
-                if (distanceSqr > attackRangeSqr)
+                if (CombatTickService.TryTickEnemyAttack(
+                    enemy,
+                    targetHero.Position,
+                    EnemyAttackRange,
+                    deltaTime,
+                    EnemyAttackIntervalSeconds,
+                    0.18f))
                 {
-                    enemy.AttackCooldown = Mathf.Min(enemy.AttackCooldown, 0.18f);
-                    continue;
+                    ApplyMonsterDamageToHero(i, enemy, targetHero);
                 }
-
-                enemy.AttackCooldown -= deltaTime;
-                if (enemy.AttackCooldown > 0f)
-                {
-                    continue;
-                }
-
-                enemy.AttackCooldown += EnemyAttackIntervalSeconds;
-                ApplyMonsterDamageToHero(i, enemy, targetHero);
             }
         }
 
@@ -1914,22 +1900,16 @@ namespace IdleGame.Battle
                 return;
             }
 
-            float attackRangeSqr = FortressEnemyAttackRange * FortressEnemyAttackRange;
-            float distanceSqr = enemy.Position.sqrMagnitude;
-            if (distanceSqr > attackRangeSqr)
+            if (CombatTickService.TryTickEnemyAttack(
+                enemy,
+                Vector2.zero,
+                FortressEnemyAttackRange,
+                deltaTime,
+                EnemyAttackIntervalSeconds,
+                0.18f))
             {
-                enemy.AttackCooldown = Mathf.Min(enemy.AttackCooldown, 0.18f);
-                return;
+                ApplyMonsterDamageToFortress(enemyIndex, enemy);
             }
-
-            enemy.AttackCooldown -= deltaTime;
-            if (enemy.AttackCooldown > 0f)
-            {
-                return;
-            }
-
-            enemy.AttackCooldown += EnemyAttackIntervalSeconds;
-            ApplyMonsterDamageToFortress(enemyIndex, enemy);
         }
 
         private void TickFortressAttack(float deltaTime)
@@ -2009,40 +1989,18 @@ namespace IdleGame.Battle
 
         private void TickHeroes(float deltaTime)
         {
-            readyHeroAttacks.Clear();
-            recentHeroAttackIds.Clear();
-
-            foreach (HeroState hero in deployedHeroes)
-            {
-                if (!IsHeroAlive(hero.Definition.Id))
-                {
-                    continue;
-                }
-
-                hero.AttackCooldown -= deltaTime;
-                if (hero.AttackCooldown > 0f)
-                {
-                    continue;
-                }
-
-                if (SelectVisibleEnemyIndexForHero(hero) < 0)
-                {
-                    hero.AttackCooldown = Mathf.Min(hero.AttackCooldown, 0.08f);
-                    continue;
-                }
-
-                hero.AttackCooldown += hero.AttackInterval / (float)(GetTotemAttackSpeedMultiplier(hero) * GetRuneAttackSpeedMultiplier(hero));
-                readyHeroAttacks.Add(hero);
-            }
-
-            if (readyHeroAttacks.Count <= 0)
+            bool hasReadyHeroAttacks = CombatTickService.CollectReadyHeroAttacks(
+                deployedHeroes,
+                readyHeroAttacks,
+                recentHeroAttackIds,
+                deltaTime,
+                IsHeroAlive,
+                hero => SelectVisibleEnemyIndexForHero(hero) >= 0,
+                hero => hero.AttackInterval / (float)(GetTotemAttackSpeedMultiplier(hero) * GetRuneAttackSpeedMultiplier(hero)),
+                0.08f);
+            if (!hasReadyHeroAttacks)
             {
                 return;
-            }
-
-            foreach (HeroState hero in readyHeroAttacks)
-            {
-                recentHeroAttackIds.Add(hero.Definition.Id);
             }
 
             HeroAttackBatchSequence += 1;
@@ -2110,13 +2068,14 @@ namespace IdleGame.Battle
                 }
 
                 skill.CooldownRemaining += skill.Definition.CooldownSeconds * (float)(GetTotemSkillCooldownMultiplier() * GetRuneSkillCooldownMultiplier());
-                GameNumber damage = NormalizeDamage(GetPartyAttackPower()
-                    * skill.Definition.PartyAttackMultiplier
-                    * abilityManager.FinalDamageMultiplier
-                    * GetTalentMultiplier(TalentEffectKind.FinalDamagePercent)
-                    * GetTalentMultiplier(TalentEffectKind.SkillDamagePercent)
-                    * GetTotemSkillDamageMultiplier()
-                    * GetRuneSkillDamageMultiplier());
+                GameNumber damage = CombatDamageService.CalculateSkillDamage(
+                    GetPartyAttackPower(),
+                    skill,
+                    abilityManager,
+                    GetTalentMultiplier(TalentEffectKind.FinalDamagePercent),
+                    GetTalentMultiplier(TalentEffectKind.SkillDamagePercent),
+                    GetTotemSkillDamageMultiplier(),
+                    GetRuneSkillDamageMultiplier());
                 if (IsBossFight)
                 {
                     ApplyDamage(damage, skill.Definition.DisplayName, false);
@@ -2149,9 +2108,10 @@ namespace IdleGame.Battle
                 }
 
                 pet.AttackCooldown += pet.Definition.AttackInterval;
-                GameNumber damage = NormalizeDamage(pet.Definition.AttackPower
-                    * abilityManager.FinalDamageMultiplier
-                    * GetTalentMultiplier(TalentEffectKind.FinalDamagePercent));
+                GameNumber damage = CombatDamageService.CalculatePetDamage(
+                    pet,
+                    abilityManager,
+                    GetTalentMultiplier(TalentEffectKind.FinalDamagePercent));
                 if (IsBossFight)
                 {
                     ApplyDamage(damage, pet.Definition.DisplayName, false);
@@ -2170,95 +2130,56 @@ namespace IdleGame.Battle
 
         private GameNumber CalculateDamage(HeroState hero, out bool isCritical)
         {
-            double damage = (hero.AttackPower + abilityManager.AttackPowerBonus)
-                * GetHeroOwnedAttackMultiplier()
-                * GetTalentMultiplier(TalentEffectKind.AttackPercent)
-                * GetTotemAttackMultiplier(hero)
-                * GetRuneAttackMultiplier(hero);
-            double criticalChance = Math.Min(0.75d, abilityManager.CriticalChance + (GetTotemCriticalChanceBonus() + GetRuneCriticalChanceBonus()) / 100d);
-            isCritical = random.NextDouble() < criticalChance;
-            if (isCritical)
-            {
-                damage *= abilityManager.CriticalDamageMultiplier * GetTalentMultiplier(TalentEffectKind.CriticalDamagePercent);
-                if (random.NextDouble() < abilityManager.DoubleCriticalChance)
-                {
-                    damage *= abilityManager.DoubleCriticalBonusMultiplier;
-                }
-            }
-
-            damage *= abilityManager.FinalDamageMultiplier * GetTalentMultiplier(TalentEffectKind.FinalDamagePercent) * GetRuneFinalDamageMultiplier();
-            return NormalizeDamage(damage);
+            return CombatDamageService.CalculateHeroDamage(
+                hero,
+                abilityManager,
+                GetHeroOwnedAttackMultiplier(),
+                GetTalentMultiplier(TalentEffectKind.AttackPercent),
+                GetTalentMultiplier(TalentEffectKind.CriticalDamagePercent),
+                GetTalentMultiplier(TalentEffectKind.FinalDamagePercent),
+                GetTotemAttackMultiplier(hero),
+                GetRuneAttackMultiplier(hero),
+                GetTotemCriticalChanceBonus(),
+                GetRuneCriticalChanceBonus(),
+                GetRuneFinalDamageMultiplier(),
+                random.NextDouble,
+                out isCritical);
         }
 
         private double GetPartyAttackPower()
         {
-            if (deployedHeroes.Count <= 0 || abilityManager == null)
-            {
-                return 0d;
-            }
-
-            double total = 0d;
-            foreach (HeroState hero in deployedHeroes)
-            {
-                total += (hero.AttackPower + abilityManager.AttackPowerBonus)
-                    * GetHeroOwnedAttackMultiplier()
-                    * GetTalentMultiplier(TalentEffectKind.AttackPercent)
-                    * GetTotemAttackMultiplier(hero)
-                    * GetRuneAttackMultiplier(hero);
-            }
-
-            return Math.Max(1d, total);
+            return CombatDamageService.GetPartyAttackPower(
+                deployedHeroes,
+                abilityManager,
+                GetHeroOwnedAttackMultiplier(),
+                GetTalentMultiplier(TalentEffectKind.AttackPercent),
+                GetTotemAttackMultiplier,
+                GetRuneAttackMultiplier);
         }
 
         public double GetHeroOwnedAttackBonusPercent(HeroState hero)
         {
-            if (hero == null || !hero.IsOwned)
-            {
-                return 0d;
-            }
-
-            return 0.5d + Math.Max(0, hero.Stars) * 0.08d;
+            return CombatDamageService.GetHeroOwnedAttackBonusPercent(hero);
         }
 
         private double GetHeroOwnedAttackBonusPercent()
         {
-            if (heroes == null)
-            {
-                return 0d;
-            }
-
-            double total = 0d;
-            foreach (HeroState hero in heroes)
-            {
-                total += GetHeroOwnedAttackBonusPercent(hero);
-            }
-
-            return total;
+            return CombatDamageService.GetHeroOwnedAttackBonusPercent(heroes);
         }
 
         private double GetHeroOwnedAttackMultiplier()
         {
-            return 1d + GetHeroOwnedAttackBonusPercent() / 100d;
+            return CombatDamageService.GetHeroOwnedAttackMultiplier(heroes);
         }
 
         private static GameNumber NormalizeDamage(double damage)
         {
-            if (double.IsNaN(damage) || damage <= 1d)
-            {
-                return GameNumber.One;
-            }
-
-            if (double.IsInfinity(damage))
-            {
-                return GameNumber.FromDouble(double.MaxValue / 1024d);
-            }
-
-            return GameData.ClampNumber(GameNumber.Floor(GameNumber.Max(GameNumber.One, damage)));
+            return CombatDamageService.NormalizeDamage(damage);
         }
 
         private static GameNumber NormalizeDamage(GameNumber damage)
         {
-            return GameData.ClampNumber(GameNumber.Floor(GameNumber.Max(GameNumber.One, damage)));
+            return CombatDamageService.NormalizeDamage(damage);
         }
 
         private float GetPetGoldBonusMultiplier()
@@ -2274,40 +2195,12 @@ namespace IdleGame.Battle
 
         private int SelectVisibleEnemyIndexForHero(HeroState hero)
         {
-            if (visibleEnemies.Count <= 0)
-            {
-                return -1;
-            }
-
-            string heroId = hero.Definition.Id;
-            if (!heroRuntimeStates.TryGetValue(heroId, out BattleHeroRuntimeState heroState) || !heroState.IsAlive)
-            {
-                return -1;
-            }
-
-            float attackRange = GetHeroAttackRange(hero);
-            if (heroTargetSpawnSequences.TryGetValue(heroId, out int spawnSequence))
-            {
-                int lockedIndex = FindVisibleEnemyIndexBySpawnSequence(spawnSequence);
-                if (lockedIndex >= 0 && visibleEnemies[lockedIndex].IsAttackable)
-                {
-                    float attackRangeSqr = attackRange * attackRange;
-                    return (heroState.Position - visibleEnemies[lockedIndex].Position).sqrMagnitude <= attackRangeSqr
-                        ? lockedIndex
-                        : -1;
-                }
-
-                RemoveHeroTargetLock(heroId);
-            }
-
-            int targetIndex = FindNearestAttackableEnemyInRange(heroState.Position, attackRange);
-            if (targetIndex < 0)
-            {
-                return -1;
-            }
-
-            heroTargetSpawnSequences[heroId] = visibleEnemies[targetIndex].SpawnSequence;
-            return targetIndex;
+            return CombatTargetingService.SelectVisibleEnemyIndexForHero(
+                hero,
+                visibleEnemies,
+                heroTargetSpawnSequences,
+                heroRuntimeStates,
+                GetHeroAttackRange(hero));
         }
 
         private int SelectVisibleEnemyIndexForSkill(CombatSkillState skill)
@@ -2333,71 +2226,26 @@ namespace IdleGame.Battle
             Dictionary<string, int> targetLocks,
             int preferredOffset)
         {
-            if (visibleEnemies.Count <= 0)
-            {
-                return -1;
-            }
-
-            if (!string.IsNullOrEmpty(sourceId)
-                && targetLocks.TryGetValue(sourceId, out int spawnSequence))
-            {
-                int lockedIndex = FindVisibleEnemyIndexBySpawnSequence(spawnSequence);
-                if (lockedIndex >= 0 && visibleEnemies[lockedIndex].IsAttackable)
-                {
-                    return lockedIndex;
-                }
-            }
-
-            int targetIndex = FindAttackableVisibleEnemyIndex(preferredOffset);
-            if (targetIndex < 0)
-            {
-                return -1;
-            }
-
-            if (!string.IsNullOrEmpty(sourceId))
-            {
-                targetLocks[sourceId] = visibleEnemies[targetIndex].SpawnSequence;
-            }
-
-            return targetIndex;
+            return CombatTargetingService.SelectVisibleEnemyIndexForLockedSource(
+                sourceId,
+                visibleEnemies,
+                targetLocks,
+                preferredOffset);
         }
 
         private int FindFirstAttackableVisibleEnemyIndex()
         {
-            return FindAttackableVisibleEnemyIndex(0);
+            return CombatTargetingService.FindFirstAttackableVisibleEnemyIndex(visibleEnemies);
         }
 
         private int FindAttackableVisibleEnemyIndex(int preferredOffset)
         {
-            if (visibleEnemies.Count <= 0)
-            {
-                return -1;
-            }
-
-            int startIndex = Mathf.Abs(preferredOffset) % visibleEnemies.Count;
-            for (int offset = 0; offset < visibleEnemies.Count; offset++)
-            {
-                int index = (startIndex + offset) % visibleEnemies.Count;
-                if (visibleEnemies[index].IsAttackable)
-                {
-                    return index;
-                }
-            }
-
-            return -1;
+            return CombatTargetingService.FindAttackableVisibleEnemyIndex(visibleEnemies, preferredOffset);
         }
 
         private int FindVisibleEnemyIndexBySpawnSequence(int spawnSequence)
         {
-            for (int i = 0; i < visibleEnemies.Count; i++)
-            {
-                if (visibleEnemies[i].SpawnSequence == spawnSequence)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
+            return CombatTargetingService.FindVisibleEnemyIndexBySpawnSequence(visibleEnemies, spawnSequence);
         }
 
         private void ApplyDamageToVisibleEnemy(int enemyIndex, GameNumber damage, string sourceName, bool isCritical, string heroId = null)
@@ -2453,74 +2301,29 @@ namespace IdleGame.Battle
 
             if (stage.Type == StageType.Boss)
             {
-                GameNumber bossGold = GameNumber.Floor(GameData.GetBossClearGold(stage) * GetTalentMultiplier(TalentEffectKind.GoldGainPercent) * GetTotemGoldMultiplier() * GetRuneGoldMultiplier());
-                GameNumber bossAccountExp = GetAccountExperienceReward(stage, true);
-                StageClearReward firstClearReward = ShouldGrantFirstClearReward(stage)
-                    ? GameData.GetStageFirstClearReward(stage)
-                    : StageClearReward.Empty;
-                LastRewardLog = "+" + NumberFormatter.Format(bossGold) + " 골드";
-                wallet.AddGold(bossGold);
-                LastRewardLog += ", +" + NumberFormatter.Format(bossAccountExp) + " Account EXP";
-                accountProgressManager?.AddExperience(bossAccountExp);
-                GameNumber bossFortressExp = GetFortressExperienceReward(stage, true);
-                AddFortressExperience(bossFortressExp);
-                LastRewardLog += ", 요새 EXP +" + NumberFormatter.Format(bossFortressExp);
+                CombatRewardService.RewardAmounts reward = CalculateBossClearReward(stage);
+                ApplyCombatReward(reward, includeHeroExp: false);
                 LastRewardLog += GrantHuntingFacilityMaterials(stage, true);
-                ApplyStageFirstClearReward(firstClearReward);
-                AppendStageFirstClearRewardLog(firstClearReward);
-                progressManager.HandleStageCleared();
-                LastBattleLog = "보스 처치 성공: " + stage.Id + " 클리어";
-                NotifyChanged();
+                CompleteStage(stage, StageClearRewardService.BuildBossClearLog(stage), clearVisibleEnemies: false);
                 return;
             }
 
-            GameNumber gold = GameNumber.Floor(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier() * GetTalentMultiplier(TalentEffectKind.GoldGainPercent) * GetTotemGoldMultiplier() * GetRuneGoldMultiplier());
-            GameNumber heroExp = GameNumber.Floor(GameData.GetEnemyHeroExpItem(stage) * GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent) * GetTotemHeroExpMultiplier() * GetRuneHeroExpMultiplier());
-            GameNumber accountExp = GetAccountExperienceReward(stage, false);
-            LastRewardLog = "+" + NumberFormatter.Format(gold) + " 골드, +" + NumberFormatter.Format(heroExp) + " EXP";
-            wallet.AddGold(gold);
-            wallet.AddHeroExpItem(heroExp);
-            LastRewardLog += ", +" + NumberFormatter.Format(accountExp) + " Account EXP";
-            accountProgressManager?.AddExperience(accountExp);
-            GameNumber fortressExp = GetFortressExperienceReward(stage, false);
-            AddFortressExperience(fortressExp);
-            LastRewardLog += ", 요새 EXP +" + NumberFormatter.Format(fortressExp);
-            LastRewardLog += GrantHuntingFacilityMaterials(stage, false);
-            KillsThisStage += 1;
+            StageClearRewardService.StageKillResult killResult = ApplyEnemyDefeatRewardAndRegisterKill(stage);
 
-            if (KillsThisStage >= RequiredKills)
+            if (killResult.IsComplete)
             {
-                StageClearReward firstClearReward = ShouldGrantFirstClearReward(stage)
-                    ? GameData.GetStageFirstClearReward(stage)
-                    : StageClearReward.Empty;
-                ApplyStageFirstClearReward(firstClearReward);
-                AppendStageFirstClearRewardLog(firstClearReward);
-                progressManager.HandleStageCleared();
-                LastBattleLog = stage.Id + " 완료";
-                NotifyChanged();
+                CompleteStage(stage, killResult.BattleLog, clearVisibleEnemies: false);
                 return;
             }
 
-            LastBattleLog = stage.Id + " 처치 " + KillsThisStage + "/" + RequiredKills;
+            LastBattleLog = killResult.BattleLog;
             SpawnTarget();
         }
 
         private void HandleVisibleEnemyDefeated(int enemyIndex, int defeatedSpawnSequence)
         {
             StageDefinition stage = progressManager.CurrentStage;
-            GameNumber gold = GameNumber.Floor(GameData.GetEnemyGold(stage) * GetPetGoldBonusMultiplier() * GetTalentMultiplier(TalentEffectKind.GoldGainPercent) * GetTotemGoldMultiplier() * GetRuneGoldMultiplier());
-            GameNumber heroExp = GameNumber.Floor(GameData.GetEnemyHeroExpItem(stage) * GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent) * GetTotemHeroExpMultiplier() * GetRuneHeroExpMultiplier());
-            GameNumber accountExp = GetAccountExperienceReward(stage, false);
-            LastRewardLog = "+" + NumberFormatter.Format(gold) + " 골드, +" + NumberFormatter.Format(heroExp) + " EXP";
-            wallet.AddGold(gold);
-            wallet.AddHeroExpItem(heroExp);
-            LastRewardLog += ", +" + NumberFormatter.Format(accountExp) + " Account EXP";
-            accountProgressManager?.AddExperience(accountExp);
-            GameNumber fortressExp = GetFortressExperienceReward(stage, false);
-            AddFortressExperience(fortressExp);
-            LastRewardLog += ", 요새 EXP +" + NumberFormatter.Format(fortressExp);
-            LastRewardLog += GrantHuntingFacilityMaterials(stage, false);
-            KillsThisStage += 1;
+            StageClearRewardService.StageKillResult killResult = ApplyEnemyDefeatRewardAndRegisterKill(stage);
             RemoveTargetLocksForSpawn(defeatedSpawnSequence);
             if (enemyIndex >= 0 && enemyIndex < visibleEnemies.Count)
             {
@@ -2528,18 +2331,9 @@ namespace IdleGame.Battle
                 enemyDefeatSequence += 1;
             }
 
-            if (KillsThisStage >= RequiredKills)
+            if (killResult.IsComplete)
             {
-                StageClearReward firstClearReward = ShouldGrantFirstClearReward(stage)
-                    ? GameData.GetStageFirstClearReward(stage)
-                    : StageClearReward.Empty;
-                ApplyStageFirstClearReward(firstClearReward);
-                AppendStageFirstClearRewardLog(firstClearReward);
-                visibleEnemies.Clear();
-                SyncTargetFromVisibleEnemies();
-                progressManager.HandleStageCleared();
-                LastBattleLog = stage.Id + " 완료";
-                NotifyChanged();
+                CompleteStage(stage, killResult.BattleLog, clearVisibleEnemies: true);
                 return;
             }
 
@@ -2555,91 +2349,107 @@ namespace IdleGame.Battle
             }
 
             SyncTargetFromVisibleEnemies();
-            LastBattleLog = stage.Id + " 처치 " + KillsThisStage + "/" + RequiredKills;
+            LastBattleLog = killResult.BattleLog;
             NotifyChanged();
         }
 
-        private bool ShouldGrantFirstClearReward(StageDefinition stage)
+        private StageClearRewardService.StageKillResult ApplyEnemyDefeatRewardAndRegisterKill(StageDefinition stage)
         {
-            if (stage == null || progressManager == null)
-            {
-                return false;
-            }
-
-            if (stage.Type == StageType.Boss)
-            {
-                return stage.Id == progressManager.HighestStageId
-                    && (stage.Id != GameData.ChapterOneBossStageId || !progressManager.ChapterOneBossCleared);
-            }
-
-            return stage.Id == progressManager.HighestStageId;
+            ApplyCombatReward(CalculateEnemyDefeatReward(stage), includeHeroExp: true);
+            LastRewardLog += GrantHuntingFacilityMaterials(stage, false);
+            StageClearRewardService.StageKillResult killResult = StageClearRewardService.RegisterKill(stage, KillsThisStage, RequiredKills);
+            KillsThisStage = killResult.Kills;
+            return killResult;
         }
 
-        private void ApplyStageFirstClearReward(StageClearReward reward)
+        private void CompleteStage(StageDefinition stage, string battleLog, bool clearVisibleEnemies)
         {
-            if (reward.IsEmpty)
+            ApplyFirstClearReward(stage);
+            if (clearVisibleEnemies)
+            {
+                visibleEnemies.Clear();
+                SyncTargetFromVisibleEnemies();
+            }
+
+            progressManager.HandleStageCleared();
+            LastBattleLog = battleLog;
+            NotifyChanged();
+        }
+
+        private void ApplyFirstClearReward(StageDefinition stage)
+        {
+            if (progressManager == null)
             {
                 return;
             }
 
-            wallet.AddHeroSummonTicket(reward.HeroSummonTickets);
-            wallet.AddEquipmentSummonTicket(reward.EquipmentSummonTickets);
-            wallet.AddRuby(reward.Ruby);
-            wallet.AddHeroExpItem(reward.HeroExpItems);
-            wallet.AddEquipmentExpItem(reward.EquipmentExpItems);
-            wallet.AddHeroTranscendStone(reward.HeroTranscendStones);
+            StageClearReward reward = StageClearRewardService.GetFirstClearReward(
+                stage,
+                progressManager.HighestStageId,
+                progressManager.ChapterOneBossCleared);
+            StageClearRewardService.ApplyFirstClearReward(wallet, reward);
+            LastRewardLog += StageClearRewardService.BuildFirstClearRewardLogSuffix(reward);
         }
 
-        private void AppendStageFirstClearRewardLog(StageClearReward reward)
+        private CombatRewardService.RewardAmounts CalculateBossClearReward(StageDefinition stage)
         {
-            if (reward.IsEmpty)
-            {
-                return;
-            }
-
-            string rewardText = BuildStageFirstClearRewardText(reward);
-            if (string.IsNullOrEmpty(rewardText))
-            {
-                return;
-            }
-
-            LastRewardLog += " / 최초 클리어 " + rewardText;
+            return CombatRewardService.CalculateBossClearReward(
+                stage,
+                GetBossGoldMultiplier(),
+                GetAccountExperienceMultiplier());
         }
 
-        private static string BuildStageFirstClearRewardText(StageClearReward reward)
+        private CombatRewardService.RewardAmounts CalculateEnemyDefeatReward(StageDefinition stage)
         {
-            var parts = new List<string>();
-            if (reward.HeroSummonTickets > 0)
+            return CombatRewardService.CalculateEnemyDefeatReward(
+                stage,
+                GetEnemyGoldMultiplier(),
+                GetEnemyHeroExpMultiplier(),
+                GetAccountExperienceMultiplier());
+        }
+
+        private void ApplyCombatReward(CombatRewardService.RewardAmounts reward, bool includeHeroExp)
+        {
+            LastRewardLog = includeHeroExp
+                ? CombatRewardService.BuildEnemyRewardLog(reward)
+                : CombatRewardService.BuildBossRewardLog(reward);
+            wallet.AddGold(reward.Gold);
+            if (includeHeroExp)
             {
-                parts.Add("영웅권 +" + reward.HeroSummonTickets);
+                wallet.AddHeroExpItem(reward.HeroExpItems);
             }
 
-            if (reward.EquipmentSummonTickets > 0)
-            {
-                parts.Add("장비권 +" + reward.EquipmentSummonTickets);
-            }
+            accountProgressManager?.AddExperience(reward.AccountExp);
+            AddFortressExperience(reward.FortressExp);
+        }
 
-            if (reward.Ruby > 0)
-            {
-                parts.Add("루비 +" + reward.Ruby);
-            }
+        private double GetBossGoldMultiplier()
+        {
+            return GetTalentMultiplier(TalentEffectKind.GoldGainPercent)
+                * GetTotemGoldMultiplier()
+                * GetRuneGoldMultiplier();
+        }
 
-            if (reward.HeroExpItems > 0)
-            {
-                parts.Add("경험치책 +" + reward.HeroExpItems);
-            }
+        private double GetEnemyGoldMultiplier()
+        {
+            return GetPetGoldBonusMultiplier()
+                * GetTalentMultiplier(TalentEffectKind.GoldGainPercent)
+                * GetTotemGoldMultiplier()
+                * GetRuneGoldMultiplier();
+        }
 
-            if (reward.EquipmentExpItems > 0)
-            {
-                parts.Add("장비책 +" + reward.EquipmentExpItems);
-            }
+        private double GetEnemyHeroExpMultiplier()
+        {
+            return GetTalentMultiplier(TalentEffectKind.HeroExpGainPercent)
+                * GetTotemHeroExpMultiplier()
+                * GetRuneHeroExpMultiplier();
+        }
 
-            if (reward.HeroTranscendStones > 0)
-            {
-                parts.Add("초월석 +" + reward.HeroTranscendStones);
-            }
-
-            return string.Join(", ", parts);
+        private double GetAccountExperienceMultiplier()
+        {
+            return GetTalentMultiplier(TalentEffectKind.AccountExpGainPercent)
+                * GetTotemAccountExpMultiplier()
+                * GetRuneAccountExpMultiplier();
         }
 
         private string BuildSupportStatusText()
@@ -2673,31 +2483,11 @@ namespace IdleGame.Battle
 
         private void RemoveTargetLocksForSpawn(int spawnSequence)
         {
-            RemoveTargetLocksForSpawn(heroTargetSpawnSequences, spawnSequence);
-            RemoveTargetLocksForSpawn(skillTargetSpawnSequences, spawnSequence);
-            RemoveTargetLocksForSpawn(petTargetSpawnSequences, spawnSequence);
-        }
-
-        private static void RemoveTargetLocksForSpawn(Dictionary<string, int> targetLocks, int spawnSequence)
-        {
-            if (targetLocks.Count <= 0)
-            {
-                return;
-            }
-
-            var removeKeys = new List<string>();
-            foreach (KeyValuePair<string, int> entry in targetLocks)
-            {
-                if (entry.Value == spawnSequence)
-                {
-                    removeKeys.Add(entry.Key);
-                }
-            }
-
-            foreach (string key in removeKeys)
-            {
-                targetLocks.Remove(key);
-            }
+            CombatTargetingService.RemoveTargetLocksForSpawn(
+                heroTargetSpawnSequences,
+                skillTargetSpawnSequences,
+                petTargetSpawnSequences,
+                spawnSequence);
         }
 
         private void ResetHeroDamageMeter()
@@ -2769,284 +2559,71 @@ namespace IdleGame.Battle
 
         private BattleHeroRuntimeState FindNearestLivingHero(Vector2 fromPosition)
         {
-            BattleHeroRuntimeState nearest = null;
-            float nearestDistance = float.MaxValue;
-            foreach (BattleHeroRuntimeState heroState in heroRuntimeStates.Values)
-            {
-                if (!heroState.IsAlive)
-                {
-                    continue;
-                }
-
-                float distance = (heroState.Position - fromPosition).sqrMagnitude;
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearest = heroState;
-                }
-            }
-
-            return nearest;
+            return CombatTargetingService.FindNearestLivingHero(heroRuntimeStates.Values, fromPosition);
         }
 
         private BattleHeroRuntimeState FindNearestMonsterTargetHero(Vector2 fromPosition)
         {
-            BattleHeroRuntimeState nearestFrontline = null;
-            float frontlineDistance = float.MaxValue;
-            foreach (BattleHeroRuntimeState heroState in heroRuntimeStates.Values)
-            {
-                if (!heroState.IsAlive || !IsFrontlineHero(heroState.Hero))
-                {
-                    continue;
-                }
-
-                float distance = (heroState.Position - fromPosition).sqrMagnitude;
-                if (distance < frontlineDistance)
-                {
-                    frontlineDistance = distance;
-                    nearestFrontline = heroState;
-                }
-            }
-
-            if (nearestFrontline != null)
-            {
-                return nearestFrontline;
-            }
-
-            return fortressHp > GameNumber.Zero ? null : FindNearestLivingHero(fromPosition);
+            return CombatTargetingService.FindNearestMonsterTargetHero(
+                heroRuntimeStates.Values,
+                fromPosition,
+                fortressHp > GameNumber.Zero);
         }
 
         private int FindNearestVisibleEnemyIndex(Vector2 fromPosition, bool attackableOnly)
         {
-            int nearestIndex = -1;
-            float nearestDistance = float.MaxValue;
-            for (int i = 0; i < visibleEnemies.Count; i++)
-            {
-                VisibleEnemyState enemy = visibleEnemies[i];
-                if (enemy.Hp <= GameNumber.Zero || (attackableOnly && !enemy.IsAttackable))
-                {
-                    continue;
-                }
-
-                float distance = (enemy.Position - fromPosition).sqrMagnitude;
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestIndex = i;
-                }
-            }
-
-            return nearestIndex;
+            return CombatTargetingService.FindNearestVisibleEnemyIndex(visibleEnemies, fromPosition, attackableOnly);
         }
 
         private int FindNearestAttackableEnemyInRange(Vector2 fromPosition, float range)
         {
-            int nearestIndex = -1;
-            float nearestDistance = range * range;
-            for (int i = 0; i < visibleEnemies.Count; i++)
-            {
-                VisibleEnemyState enemy = visibleEnemies[i];
-                if (!enemy.IsAttackable)
-                {
-                    continue;
-                }
-
-                float distance = (enemy.Position - fromPosition).sqrMagnitude;
-                if (distance <= nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestIndex = i;
-                }
-            }
-
-            return nearestIndex;
+            return CombatTargetingService.FindNearestAttackableEnemyInRange(visibleEnemies, fromPosition, range);
         }
 
         private static Vector2 MoveTowardCombatRange(Vector2 current, Vector2 target, float preferredDistance, float speed, float deltaTime)
         {
-            Vector2 toTarget = target - current;
-            float distance = toTarget.magnitude;
-            if (distance <= 0.001f)
-            {
-                return current;
-            }
-
-            Vector2 desired = distance > preferredDistance
-                ? target - toTarget.normalized * preferredDistance
-                : current;
-            return ClampBattlePosition(Vector2.MoveTowards(current, desired, speed * deltaTime));
+            return CombatMovementService.MoveTowardCombatRange(
+                current,
+                target,
+                preferredDistance,
+                speed,
+                deltaTime,
+                FieldHalfWidth,
+                FieldHalfHeight);
         }
 
         private void ApplyHeroSeparation()
         {
-            var states = new List<BattleHeroRuntimeState>();
-            for (int i = 0; i < deployedHeroes.Count; i++)
-            {
-                HeroState hero = deployedHeroes[i];
-                if (heroRuntimeStates.TryGetValue(hero.Definition.Id, out BattleHeroRuntimeState state) && state.IsAlive)
-                {
-                    states.Add(state);
-                }
-            }
-
-            for (int i = 0; i < states.Count; i++)
-            {
-                for (int j = i + 1; j < states.Count; j++)
-                {
-                    PushActorsApart(states[i], states[j], HeroSeparationRadius, i, j);
-                }
-            }
+            CombatMovementService.ApplyHeroSeparation(
+                deployedHeroes,
+                heroRuntimeStates,
+                HeroSeparationRadius,
+                FieldHalfWidth,
+                FieldHalfHeight);
         }
 
         private void ApplyEnemySeparation()
         {
-            for (int i = 0; i < visibleEnemies.Count; i++)
-            {
-                VisibleEnemyState left = visibleEnemies[i];
-                if (left.Hp <= GameNumber.Zero)
-                {
-                    continue;
-                }
-
-                for (int j = i + 1; j < visibleEnemies.Count; j++)
-                {
-                    VisibleEnemyState right = visibleEnemies[j];
-                    if (right.Hp <= GameNumber.Zero)
-                    {
-                        continue;
-                    }
-
-                    PushEnemiesApart(left, right, EnemySeparationRadius, i, j);
-                }
-            }
-        }
-
-        private static void PushActorsApart(BattleHeroRuntimeState left, BattleHeroRuntimeState right, float minDistance, int leftIndex, int rightIndex)
-        {
-            Vector2 delta = right.Position - left.Position;
-            float distance = delta.magnitude;
-            if (distance >= minDistance)
-            {
-                return;
-            }
-
-            Vector2 direction = distance > 0.001f ? delta / distance : GetFallbackSeparationDirection(leftIndex, rightIndex);
-            float push = (minDistance - distance) * 0.5f;
-            left.Position = ClampBattlePosition(left.Position - direction * push);
-            right.Position = ClampBattlePosition(right.Position + direction * push);
-        }
-
-        private static void PushEnemiesApart(VisibleEnemyState left, VisibleEnemyState right, float minDistance, int leftIndex, int rightIndex)
-        {
-            Vector2 delta = right.Position - left.Position;
-            float distance = delta.magnitude;
-            if (distance >= minDistance)
-            {
-                return;
-            }
-
-            Vector2 direction = distance > 0.001f ? delta / distance : GetFallbackSeparationDirection(leftIndex, rightIndex);
-            float push = (minDistance - distance) * 0.5f;
-            left.Position = ClampBattlePosition(left.Position - direction * push);
-            right.Position = ClampBattlePosition(right.Position + direction * push);
-        }
-
-        private static Vector2 GetFallbackSeparationDirection(int leftIndex, int rightIndex)
-        {
-            float angle = (leftIndex * 37f + rightIndex * 53f) * Mathf.Deg2Rad;
-            return new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)).normalized;
+            CombatMovementService.ApplyEnemySeparation(
+                visibleEnemies,
+                EnemySeparationRadius,
+                FieldHalfWidth,
+                FieldHalfHeight);
         }
 
         private static Vector2 GetHeroBattleSlotPosition(HeroState hero, int heroIndex)
         {
-            if (IsFortressProtectedHero(hero))
-            {
-                switch (heroIndex % GameData.MaxPartyHeroes)
-                {
-                    case 0:
-                        return new Vector2(-0.36f, -0.08f);
-                    case 1:
-                        return new Vector2(0.36f, -0.08f);
-                    case 2:
-                        return new Vector2(-0.34f, 0.42f);
-                    case 3:
-                        return new Vector2(0.34f, 0.42f);
-                    case 4:
-                        return new Vector2(0f, -0.52f);
-                    case 5:
-                        return new Vector2(-0.58f, 0.18f);
-                    case 6:
-                        return new Vector2(0.58f, 0.18f);
-                    default:
-                        return new Vector2(0f, 0.70f);
-                }
-            }
-
-            switch (heroIndex % GameData.MaxPartyHeroes)
-            {
-                case 0:
-                    return new Vector2(-0.92f, -0.58f);
-                case 1:
-                    return new Vector2(0.92f, -0.58f);
-                case 2:
-                    return new Vector2(-1.42f, 0.12f);
-                case 3:
-                    return new Vector2(1.42f, 0.12f);
-                case 4:
-                    return new Vector2(0f, -1.18f);
-                case 5:
-                    return new Vector2(-1.82f, -0.44f);
-                case 6:
-                    return new Vector2(1.82f, -0.44f);
-                default:
-                    return new Vector2(0f, 1.10f);
-            }
+            return CombatMovementService.GetHeroBattleSlotPosition(hero, heroIndex);
         }
 
         private static bool IsFortressProtectedHero(HeroState hero)
         {
-            return hero != null
-                && (hero.Definition.Trait == HeroTrait.Ranged || hero.Definition.Trait == HeroTrait.Support);
-        }
-
-        private static bool IsFrontlineHero(HeroState hero)
-        {
-            return hero != null
-                && (hero.Definition.Trait == HeroTrait.Melee || hero.Definition.Trait == HeroTrait.Defense);
-        }
-
-        private static Vector2 GetEnemySpawnPosition(int spawnSequence)
-        {
-            int side = Mathf.Abs(spawnSequence) % 4;
-            float offset = Mathf.Lerp(-2.6f, 2.6f, PseudoRandom01(spawnSequence * 19 + 5));
-            switch (side)
-            {
-                case 0:
-                    return new Vector2(-FieldHalfWidth - 0.55f, offset);
-                case 1:
-                    return new Vector2(FieldHalfWidth + 0.55f, offset);
-                case 2:
-                    return new Vector2(offset, FieldHalfHeight + 0.55f);
-                default:
-                    return new Vector2(offset, -FieldHalfHeight - 0.55f);
-            }
+            return CombatMovementService.IsFortressProtectedHero(hero);
         }
 
         private static float GetHeroAttackRange(HeroState hero)
         {
-            switch (hero.Definition.Trait)
-            {
-                case HeroTrait.Melee:
-                    return 0.82f;
-                case HeroTrait.Ranged:
-                    return 4.35f;
-                case HeroTrait.Support:
-                    return 3.65f;
-                case HeroTrait.Defense:
-                    return 0.92f;
-                default:
-                    return 1.25f;
-            }
+            return CombatMovementService.GetHeroAttackRange(hero);
         }
 
         private float GetHeroMoveSpeed(HeroState hero)
@@ -3071,80 +2648,32 @@ namespace IdleGame.Battle
 
         private static GameNumber GetFortressRequiredExperienceForLevel(int level)
         {
-            if (level <= 1)
-            {
-                return GameNumber.Zero;
-            }
-
-            int normalizedLevel = Mathf.Clamp(level, 1, FortressMaxLevelValue);
-            double steps = normalizedLevel - 1;
-            double required = 62d * Math.Pow(steps, 2.08d) + 35d * steps;
-            return GameData.ClampNumber(GameNumber.Ceiling(GameNumber.FromDouble(required)));
+            return FortressCombatService.GetRequiredExperienceForLevel(level, FortressMaxLevelValue);
         }
 
         private static GameNumber CalculateFortressMaxHp(int level)
         {
-            int normalizedLevel = Mathf.Clamp(level, 1, FortressMaxLevelValue);
-            double hp = 520d + normalizedLevel * 38d + Math.Pow(normalizedLevel, 1.22d) * 16d;
-            return GameData.ClampNumber(GameNumber.Floor(GameNumber.FromDouble(hp)));
+            return FortressCombatService.CalculateMaxHp(level, FortressMaxLevelValue);
         }
 
         private static GameNumber CalculateFortressAttackPower(int level)
         {
-            int normalizedLevel = Mathf.Clamp(level, 1, FortressMaxLevelValue);
-            double attack = 12d + normalizedLevel * 2.6d + Math.Pow(normalizedLevel, 1.16d) * 1.8d;
-            return NormalizeDamage(attack);
+            return FortressCombatService.CalculateAttackPower(level, FortressMaxLevelValue);
         }
 
         private static float CalculateFortressAttackInterval(int level)
         {
-            return Mathf.Max(0.82f, 2.10f - Mathf.Clamp(level, 1, FortressMaxLevelValue) * 0.0065f);
+            return FortressCombatService.CalculateAttackInterval(level, FortressMaxLevelValue);
         }
 
         private static float CalculateFortressAttackRange(int level)
         {
-            return Mathf.Min(4.35f, 2.35f + Mathf.Clamp(level, 1, FortressMaxLevelValue) * 0.018f);
+            return FortressCombatService.CalculateAttackRange(level, FortressMaxLevelValue);
         }
 
         private static double CalculateFortressCombatPower(int level)
         {
-            int normalizedLevel = Mathf.Clamp(level, 1, FortressMaxLevelValue);
-            double power = 300d + normalizedLevel * 18d + Math.Pow(normalizedLevel, 1.08d) * 2.6d;
-            return Math.Max(1d, Math.Floor(power));
-        }
-
-        private GameNumber GetFortressExperienceReward(StageDefinition stage, bool boss)
-        {
-            if (stage == null)
-            {
-                return GameNumber.Zero;
-            }
-
-            int stageIndex = GameData.GetStageIndex(stage.Id) + 1;
-            double reward = 3d + stageIndex * 0.85d;
-            if (boss)
-            {
-                reward *= 24d;
-            }
-
-            return GameNumber.Floor(GameNumber.FromDouble(Math.Max(1d, reward)));
-        }
-
-        private GameNumber GetAccountExperienceReward(StageDefinition stage, bool boss)
-        {
-            if (stage == null)
-            {
-                return GameNumber.Zero;
-            }
-
-            double baseReward = 2d + stage.Chapter * 0.5d + stage.Number * 0.08d;
-            if (boss)
-            {
-                baseReward *= 30d;
-            }
-
-            baseReward *= GetTalentMultiplier(TalentEffectKind.AccountExpGainPercent) * GetTotemAccountExpMultiplier() * GetRuneAccountExpMultiplier();
-            return GameNumber.Floor(GameNumber.FromDouble(Math.Max(1d, baseReward)));
+            return FortressCombatService.CalculateCombatPower(level, FortressMaxLevelValue);
         }
 
         private string GrantHuntingFacilityMaterials(StageDefinition stage, bool boss)
@@ -3154,49 +2683,14 @@ namespace IdleGame.Battle
                 return string.Empty;
             }
 
-            int stageIndex = GameData.GetStageIndex(stage.Id) + 1;
-            long wood = 0L;
-            long brick = 0L;
-            long iron = 0L;
-
-            if (boss)
-            {
-                wood = 8L + stageIndex;
-                brick = stageIndex >= 8 ? 2L + stageIndex / 5L : 1L;
-                iron = stageIndex >= 18 ? 1L + stageIndex / 12L : 0L;
-            }
-            else
-            {
-                double woodChance = Math.Min(0.18d, 0.04d + stageIndex * 0.002d);
-                if (random.NextDouble() < woodChance)
-                {
-                    wood = 1L + stageIndex / 25L;
-                }
-            }
-
-            if (wood <= 0L && brick <= 0L && iron <= 0L)
+            CombatRewardService.FacilityMaterialReward reward = CombatRewardService.RollHuntingFacilityMaterials(stage, boss, random.NextDouble);
+            if (!reward.HasAny)
             {
                 return string.Empty;
             }
 
-            wallet.AddFacilityMaterials(wood, brick, iron);
-            var parts = new List<string>();
-            if (wood > 0L)
-            {
-                parts.Add("목재 +" + wood);
-            }
-
-            if (brick > 0L)
-            {
-                parts.Add("벽돌 +" + brick);
-            }
-
-            if (iron > 0L)
-            {
-                parts.Add("철재 +" + iron);
-            }
-
-            return " / " + string.Join(", ", parts);
+            wallet.AddFacilityMaterials(reward.Wood, reward.Brick, reward.Iron);
+            return CombatRewardService.BuildHuntingFacilityMaterialLog(reward);
         }
 
         private double GetTalentMultiplier(TalentEffectKind kind)
@@ -3213,25 +2707,7 @@ namespace IdleGame.Battle
 
         private static float GetEnemyMoveSpeed(VisibleEnemyState enemy)
         {
-            return 1.15f + (Mathf.Abs(enemy.SpawnSequence) % 4) * 0.09f;
-        }
-
-        private static Vector2 ClampBattlePosition(Vector2 position)
-        {
-            return new Vector2(
-                Mathf.Clamp(position.x, -FieldHalfWidth + 0.12f, FieldHalfWidth - 0.12f),
-                Mathf.Clamp(position.y, -FieldHalfHeight + 0.12f, FieldHalfHeight - 0.12f));
-        }
-
-        private static float PseudoRandom01(int seed)
-        {
-            unchecked
-            {
-                uint value = (uint)(seed * 747796405 + 2891336453);
-                value = ((value >> ((int)(value >> 28) + 4)) ^ value) * 277803737;
-                value = (value >> 22) ^ value;
-                return (value & 0xFFFFFF) / 16777215f;
-            }
+            return CombatMovementService.GetEnemyMoveSpeed(enemy);
         }
 
         private void AddHeroDamage(string heroId, GameNumber damage)
@@ -3805,35 +3281,8 @@ namespace IdleGame.Battle
 
         private void RefreshFacilityProduction(FacilityState state, bool save)
         {
-            if (state == null)
-            {
-                return;
-            }
-
-            long nowTicks = DateTime.UtcNow.Ticks;
-            if (state.LastUpdateUtcTicks <= 0L)
-            {
-                state.LastUpdateUtcTicks = nowTicks;
-                if (save)
-                {
-                    SaveFacilityState(state, true);
-                }
-
-                return;
-            }
-
-            double elapsedSeconds = TimeSpan.FromTicks(Math.Max(0L, nowTicks - state.LastUpdateUtcTicks)).TotalSeconds;
-            if (elapsedSeconds <= 0d)
-            {
-                return;
-            }
-
-            GameNumber productionPerHour = GetFacilityProductionPerHour(state);
-            GameNumber maxStored = productionPerHour * (FacilityDefinition.MaxAccumulatedSeconds / FacilityDefinition.ProductionCycleSeconds);
-            GameNumber produced = productionPerHour * (elapsedSeconds / FacilityDefinition.ProductionCycleSeconds);
-            state.StoredAmount = GameNumber.Min(maxStored, GameNumber.Max(GameNumber.Zero, state.StoredAmount + produced));
-            state.LastUpdateUtcTicks = nowTicks;
-            if (save)
+            bool changed = FacilityProductionService.RefreshProduction(state, GetFacilityProductionPerHour, DateTime.UtcNow.Ticks);
+            if (changed && save)
             {
                 SaveFacilityState(state, true);
             }
@@ -3841,162 +3290,27 @@ namespace IdleGame.Battle
 
         private GameNumber GetFacilityProductionPerHour(FacilityState state)
         {
-            return state != null
-                ? state.Definition.GetProductionPerHour(state.Level, GetFacilityHeroBonusPercent(state))
-                : GameNumber.Zero;
+            return FacilityProductionService.GetProductionPerHour(state, GetFacilityHeroBonusPercent);
         }
 
         private double GetFacilityHeroBonusPercent(FacilityState state)
         {
-            if (state == null)
-            {
-                return 0d;
-            }
-
-            double total = 0d;
-            for (int i = 0; i < state.UnlockedSlotCount; i++)
-            {
-                HeroState hero = FindHero(state.GetAssignedHeroId(i));
-                if (hero != null && hero.IsOwned)
-                {
-                    total += GetFacilityHeroProductionBonusPercent(hero);
-                }
-            }
-
-            return Math.Min(FacilityDefinition.MaxHeroProductionBonusPercent, total);
+            return FacilityProductionService.GetHeroBonusPercent(state, FindHero);
         }
 
         private double GetFacilityHeroProductionBonusPercent(HeroState hero)
         {
-            if (hero == null)
-            {
-                return 0d;
-            }
-
-            double rarity = Math.Max(0, (int)hero.Definition.Rarity);
-            double score = hero.AttackPower * 0.018d
-                + hero.MaxHp * 0.006d
-                + hero.Level * 0.025d
-                + hero.Stars * 0.35d
-                + rarity * 0.85d;
-            return Math.Max(1d, Math.Min(10d, score));
-        }
-
-        private List<HeroState> GetFacilityAssignmentCandidates(HashSet<string> usedHeroIds)
-        {
-            var candidates = new List<HeroState>();
-            foreach (HeroState hero in Heroes)
-            {
-                if (hero != null
-                    && hero.IsOwned
-                    && (usedHeroIds == null || !usedHeroIds.Contains(hero.Definition.Id)))
-                {
-                    candidates.Add(hero);
-                }
-            }
-
-            candidates.Sort((left, right) => GetFacilityHeroSortScore(right).CompareTo(GetFacilityHeroSortScore(left)));
-            return candidates;
+            return FacilityProductionService.GetHeroProductionBonusPercent(hero);
         }
 
         private int FillFacilityEmptyAssignments(FacilityState state, HashSet<string> usedHeroIds)
         {
-            if (state == null)
-            {
-                return 0;
-            }
-
-            if (usedHeroIds == null)
-            {
-                usedHeroIds = new HashSet<string>();
-            }
-
-            var localUsedHeroIds = new HashSet<string>();
-            for (int slot = 0; slot < FacilityDefinition.MaxAssignedHeroSlots; slot++)
-            {
-                string heroId = state.GetAssignedHeroId(slot);
-                bool unlocked = slot < state.UnlockedSlotCount;
-                HeroState hero = FindHero(heroId);
-                if (!unlocked
-                    || string.IsNullOrEmpty(heroId)
-                    || hero == null
-                    || !hero.IsOwned
-                    || localUsedHeroIds.Contains(heroId)
-                    || usedHeroIds.Contains(heroId))
-                {
-                    state.SetAssignedHeroId(slot, string.Empty);
-                    continue;
-                }
-
-                localUsedHeroIds.Add(heroId);
-                usedHeroIds.Add(heroId);
-            }
-
-            List<HeroState> candidates = GetFacilityAssignmentCandidates(usedHeroIds);
-            int candidateIndex = 0;
-            int assigned = 0;
-            for (int slot = 0; slot < state.UnlockedSlotCount; slot++)
-            {
-                if (!string.IsNullOrEmpty(state.GetAssignedHeroId(slot)))
-                {
-                    continue;
-                }
-
-                while (candidateIndex < candidates.Count && usedHeroIds.Contains(candidates[candidateIndex].Definition.Id))
-                {
-                    candidateIndex += 1;
-                }
-
-                if (candidateIndex >= candidates.Count)
-                {
-                    break;
-                }
-
-                string heroId = candidates[candidateIndex].Definition.Id;
-                state.SetAssignedHeroId(slot, heroId);
-                usedHeroIds.Add(heroId);
-                assigned += 1;
-                candidateIndex += 1;
-            }
-
-            return assigned;
-        }
-
-        private double GetFacilityHeroSortScore(HeroState hero)
-        {
-            if (hero == null)
-            {
-                return 0d;
-            }
-
-            return hero.AttackPower
-                + hero.MaxHp * 0.25d
-                + hero.Level * 6d
-                + hero.Stars * 120d
-                + Math.Max(0, (int)hero.Definition.Rarity) * 220d;
+            return FacilityProductionService.FillEmptyAssignments(state, Heroes, usedHeroIds);
         }
 
         private HashSet<string> GetAssignedFacilityHeroIdsExcept(string excludedFacilityId)
         {
-            var used = new HashSet<string>();
-            foreach (FacilityState facility in facilities)
-            {
-                if (facility == null || facility.Definition.Id == excludedFacilityId)
-                {
-                    continue;
-                }
-
-                for (int i = 0; i < facility.UnlockedSlotCount; i++)
-                {
-                    string heroId = facility.GetAssignedHeroId(i);
-                    if (!string.IsNullOrEmpty(heroId))
-                    {
-                        used.Add(heroId);
-                    }
-                }
-            }
-
-            return used;
+            return FacilityProductionService.GetAssignedHeroIdsExcept(facilities, excludedFacilityId);
         }
 
         private string GrantFacilityReward(FacilityState state, GameNumber amount)
@@ -4074,151 +3388,27 @@ namespace IdleGame.Battle
 
         private void RefreshDeployedHeroes()
         {
-            deployedHeroes.Clear();
-            if (heroes == null)
-            {
-                return;
-            }
-
-            List<string> ids = NormalizeFormationHeroIds(LoadFormationHeroIds(activeHeroPreset));
-            activeFormationHeroIds.Clear();
-            activeFormationHeroIds.AddRange(ids);
-
-            foreach (string heroId in ids)
-            {
-                if (string.IsNullOrEmpty(heroId))
-                {
-                    continue;
-                }
-
-                HeroState hero = FindHero(heroId);
-                if (hero != null && hero.IsOwned && !deployedHeroes.Contains(hero) && deployedHeroes.Count < GameData.MaxPartyHeroes)
-                {
-                    deployedHeroes.Add(hero);
-                }
-            }
-
-            if (deployedHeroes.Count <= 0)
-            {
-                foreach (HeroState hero in heroes)
-                {
-                    if (deployedHeroes.Count >= GameData.MaxPartyHeroes)
-                    {
-                        break;
-                    }
-
-                    if (hero.IsOwned)
-                    {
-                        deployedHeroes.Add(hero);
-                    }
-                }
-
-                activeFormationHeroIds.Clear();
-                foreach (HeroState hero in deployedHeroes)
-                {
-                    activeFormationHeroIds.Add(hero.Definition.Id);
-                }
-
-                while (activeFormationHeroIds.Count < GameData.MaxPartyHeroes)
-                {
-                    activeFormationHeroIds.Add(string.Empty);
-                }
-            }
+            HeroFormationService.RefreshDeployedHeroes(heroes, activeHeroPreset, deployedHeroes, activeFormationHeroIds);
         }
 
         private List<string> LoadFormationHeroIds(int preset)
         {
-            var ids = new List<string>(GameData.MaxPartyHeroes);
-            bool hasSavedFormation = false;
-            for (int i = 0; i < GameData.MaxPartyHeroes; i++)
-            {
-                string key = SaveKeys.HeroFormationSlot(preset, i);
-                hasSavedFormation |= PlayerPrefs.HasKey(key);
-                ids.Add(PlayerPrefs.GetString(key, string.Empty));
-            }
-
-            if (!hasSavedFormation && preset == 1 && heroes != null)
-            {
-                ids.Clear();
-                for (int i = 0; i < GameData.MaxPartyHeroes; i++)
-                {
-                    ids.Add(GetDefaultFormationHeroId(i));
-                }
-            }
-
-            return ids;
+            return HeroFormationService.LoadFormationHeroIds(preset, heroes);
         }
 
         private void SaveFormationHeroIds(int preset, List<string> ids)
         {
-            for (int i = 0; i < GameData.MaxPartyHeroes; i++)
-            {
-                string heroId = i < ids.Count ? ids[i] : string.Empty;
-                PlayerPrefs.SetString(SaveKeys.HeroFormationSlot(preset, i), heroId ?? string.Empty);
-            }
-
-            saveManager.Flush();
+            HeroFormationService.SaveFormationHeroIds(preset, ids, saveManager);
         }
 
         private List<string> NormalizeFormationHeroIds(IReadOnlyList<string> sourceIds)
         {
-            var ids = new List<string>(GameData.MaxPartyHeroes);
-            var usedHeroIds = new HashSet<string>();
-            for (int i = 0; i < GameData.MaxPartyHeroes; i++)
-            {
-                string heroId = sourceIds != null && i < sourceIds.Count ? sourceIds[i] : string.Empty;
-                HeroState hero = FindHero(heroId);
-                if (string.IsNullOrEmpty(heroId) || hero == null || !hero.IsOwned || usedHeroIds.Contains(heroId))
-                {
-                    ids.Add(string.Empty);
-                    continue;
-                }
-
-                usedHeroIds.Add(heroId);
-                ids.Add(heroId);
-            }
-
-            return ids;
-        }
-
-        private string GetDefaultFormationHeroId(int formationIndex)
-        {
-            if (heroes == null)
-            {
-                return string.Empty;
-            }
-
-            int ownedIndex = 0;
-            foreach (HeroState hero in heroes)
-            {
-                if (!hero.IsOwned)
-                {
-                    continue;
-                }
-
-                if (ownedIndex == formationIndex)
-                {
-                    return hero.Definition.Id;
-                }
-
-                ownedIndex += 1;
-            }
-
-            return string.Empty;
+            return HeroFormationService.NormalizeFormationHeroIds(sourceIds, heroes);
         }
 
         private static int GetFilledFormationCount(List<string> ids)
         {
-            int count = 0;
-            foreach (string heroId in ids)
-            {
-                if (!string.IsNullOrEmpty(heroId))
-                {
-                    count += 1;
-                }
-            }
-
-            return count;
+            return HeroFormationService.GetFilledFormationCount(ids);
         }
 
         private HeroState FindHero(string heroId)
@@ -4255,50 +3445,5 @@ namespace IdleGame.Battle
                 && heroes != null;
         }
 
-        private sealed class BattleHeroRuntimeState
-        {
-            public BattleHeroRuntimeState(HeroState hero, Vector2 position, int slotIndex, float maxHp)
-            {
-                Hero = hero;
-                Position = position;
-                SlotIndex = slotIndex;
-                MaxHp = Mathf.Max(1f, maxHp);
-                Hp = MaxHp;
-            }
-
-            public HeroState Hero { get; }
-            public Vector2 Position { get; set; }
-            public int SlotIndex { get; set; }
-            public float MaxHp { get; set; }
-            public float Hp { get; set; }
-            public float ReviveRemaining { get; set; }
-            public bool IsAlive => Hp > 0f && ReviveRemaining <= 0f;
-        }
-
-        private sealed class VisibleEnemyState
-        {
-            public VisibleEnemyState(int spawnSequence, GameNumber maxHp, int displayNumber, float spawnGraceSeconds, Vector2 spawnPosition)
-            {
-                SpawnSequence = spawnSequence;
-                MaxHp = maxHp;
-                Hp = maxHp;
-                DisplayNumber = displayNumber;
-                SpawnGraceRemaining = Mathf.Max(0f, spawnGraceSeconds);
-                Position = spawnPosition;
-                SpawnPosition = spawnPosition;
-                AttackCooldown = EnemyAttackIntervalSeconds * (0.35f + 0.05f * (Mathf.Abs(spawnSequence) % 5));
-            }
-
-            public int SpawnSequence { get; }
-            public GameNumber MaxHp { get; }
-            public int DisplayNumber { get; }
-            public GameNumber Hp { get; set; }
-            public float SpawnGraceRemaining { get; set; }
-            public float AttackCooldown { get; set; }
-            public Vector2 Position { get; set; }
-            public Vector2 SpawnPosition { get; }
-            public string TargetHeroId { get; set; } = string.Empty;
-            public bool IsAttackable => SpawnGraceRemaining <= 0f && Hp > GameNumber.Zero;
-        }
     }
 }

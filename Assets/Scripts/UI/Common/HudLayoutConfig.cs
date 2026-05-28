@@ -11,29 +11,29 @@ namespace IdleGame.UI.Common
         public const float BottomNavHeight = 112f;
         public const int BottomNavFontSize = 19;
 
-        public const float HeroTitleHeight = 32f;
-        public const int HeroTitleFontSize = 26;
-        public const float HeroFormationSummaryHeight = 30f;
-        public const int HeroFormationSummaryFontSize = 20;
-        public const float HeroFormationAreaHeight = 286f;
-        public const float HeroFormationRuneRowHeight = 72f;
-        public const float HeroFormationOwnedEffectHeight = 32f;
-        public const float HeroFormationActionRowHeight = 52f;
-        public const float HeroPageTabsHeight = 56f;
+        public const float HeroTitleHeight = 30f;
+        public const int HeroTitleFontSize = 24;
+        public const float HeroFormationSummaryHeight = 34f;
+        public const int HeroFormationSummaryFontSize = 21;
+        public const float HeroFormationAreaHeight = 300f;
+        public const float HeroFormationRuneRowHeight = 64f;
+        public const float HeroFormationOwnedEffectHeight = 30f;
+        public const float HeroFormationActionRowHeight = 46f;
+        public const float HeroPageTabsHeight = 48f;
         public const float HeroRosterMinHeight = 240f;
 
-        public const float HeroPresetColumnWidth = 76f;
-        public const float HeroPresetTitleHeight = 26f;
-        public const float HeroPresetButtonHeight = 34f;
-        public const int HeroPresetTitleFontSize = 17;
-        public const int HeroPresetButtonFontSize = 18;
+        public const float HeroPresetColumnWidth = 70f;
+        public const float HeroPresetTitleHeight = 24f;
+        public const float HeroPresetButtonHeight = 30f;
+        public const int HeroPresetTitleFontSize = 16;
+        public const int HeroPresetButtonFontSize = 16;
 
         public const int HeroRosterColumns = 6;
-        public const int HeroRosterCardFontSize = 18;
+        public const int HeroRosterCardFontSize = 19;
 
-        public static readonly Vector2 HeroFormationSlotCellSize = new Vector2(118f, 104f);
-        public static readonly Vector2 HeroFormationSlotSpacing = new Vector2(10f, 12f);
-        public static readonly Vector2 HeroRosterCardSize = new Vector2(104f, 118f);
+        public static readonly Vector2 HeroFormationSlotCellSize = new Vector2(150f, 112f);
+        public static readonly Vector2 HeroFormationSlotSpacing = new Vector2(8f, 8f);
+        public static readonly Vector2 HeroRosterCardSize = new Vector2(112f, 126f);
         public static readonly Vector2 HeroRosterCardSpacing = new Vector2(6f, 8f);
     }
 }

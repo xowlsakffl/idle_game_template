@@ -55,15 +55,13 @@ namespace IdleGame.UI.Header
             stageRect.sizeDelta = new Vector2(410f, 34f);
             stageRect.anchoredPosition = new Vector2(146f, 42f);
 
-            CreateAnchoredIcon("CombatPowerIcon", panel.transform, HudSpriteFactory.GetPowerIconSprite(), new Vector2(146f, 8f), new Vector2(40f, 40f));
-
             refs.ModeText = HudUiFactory.CreateText("Mode", panel.transform, 31, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform modeRect = refs.ModeText.GetComponent<RectTransform>();
             modeRect.anchorMin = new Vector2(0f, 0.5f);
             modeRect.anchorMax = new Vector2(0f, 0.5f);
             modeRect.pivot = new Vector2(0f, 0.5f);
-            modeRect.sizeDelta = new Vector2(382f, 42f);
-            modeRect.anchoredPosition = new Vector2(192f, 8f);
+            modeRect.sizeDelta = new Vector2(430f, 42f);
+            modeRect.anchoredPosition = new Vector2(146f, 8f);
 
             GameObject accountExpBar = HudUiFactory.CreatePanel("AccountExpBar", panel.transform, new Color(0.03f, 0.08f, 0.15f, 1f));
             RectTransform accountBarRect = accountExpBar.GetComponent<RectTransform>();
@@ -94,13 +92,11 @@ namespace IdleGame.UI.Header
             CreateHeaderResourceDisplay(
                 resourcePill.transform,
                 "GoldResource",
-                HudSpriteFactory.GetCoinIconSprite(),
                 new Vector2(18f, 0f),
                 out refs.ResourceText);
             CreateHeaderResourceDisplay(
                 resourcePill.transform,
                 "RubyResource",
-                HudSpriteFactory.GetGemIconSprite(),
                 new Vector2(args.ShowDebugGrantButton ? 178f : 226f, 0f),
                 out refs.RubyResourceText);
 
@@ -127,39 +123,19 @@ namespace IdleGame.UI.Header
             return refs;
         }
 
-        private static Image CreateAnchoredIcon(string name, Transform parent, Sprite sprite, Vector2 anchoredPosition, Vector2 size)
-        {
-            GameObject iconObject = new GameObject(name, typeof(RectTransform), typeof(Image));
-            iconObject.transform.SetParent(parent, false);
-            Image image = iconObject.GetComponent<Image>();
-            image.sprite = sprite;
-            image.raycastTarget = false;
-
-            RectTransform rect = iconObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0f, 0.5f);
-            rect.anchorMax = new Vector2(0f, 0.5f);
-            rect.pivot = new Vector2(0f, 0.5f);
-            rect.sizeDelta = size;
-            rect.anchoredPosition = anchoredPosition;
-            return image;
-        }
-
         private static void CreateHeaderResourceDisplay(
             Transform parent,
             string name,
-            Sprite iconSprite,
-            Vector2 iconPosition,
+            Vector2 textPosition,
             out Text valueText)
         {
-            CreateAnchoredIcon(name + "Icon", parent, iconSprite, iconPosition, new Vector2(38f, 38f));
-
             valueText = HudUiFactory.CreateText(name + "Text", parent, 25, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform textRect = valueText.GetComponent<RectTransform>();
             textRect.anchorMin = new Vector2(0f, 0.5f);
             textRect.anchorMax = new Vector2(0f, 0.5f);
             textRect.pivot = new Vector2(0f, 0.5f);
-            textRect.sizeDelta = new Vector2(132f, 46f);
-            textRect.anchoredPosition = new Vector2(iconPosition.x + 46f, iconPosition.y);
+            textRect.sizeDelta = new Vector2(172f, 46f);
+            textRect.anchoredPosition = textPosition;
         }
     }
 }

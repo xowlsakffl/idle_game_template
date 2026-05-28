@@ -124,7 +124,7 @@ namespace IdleGame.UI.Hero.Trait
             refs.DetailText = HudUiFactory.CreateText("HeroTraitDetailText", detailPanel.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
             refs.LevelUpButton = HudUiFactory.CreateButton("레벨업", detailPanel.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
             HudUiFactory.AddLayoutElement(refs.LevelUpButton.gameObject, 220, -1);
-            ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);
+            HudUiFactory.ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);
         }
 
         private static void CreateDepthColumn(
@@ -223,22 +223,6 @@ namespace IdleGame.UI.Hero.Trait
             rect.sizeDelta = new Vector2(delta.magnitude, 5f);
             rect.anchoredPosition = (start + end) * 0.5f;
             rect.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
-        }
-
-        private static void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat)
-        {
-            if (button == null)
-            {
-                return;
-            }
-
-            HoldRepeatButton repeatButton = button.GetComponent<HoldRepeatButton>();
-            if (repeatButton == null)
-            {
-                repeatButton = button.gameObject.AddComponent<HoldRepeatButton>();
-            }
-
-            repeatButton.Configure(action, canRepeat);
         }
 
         private static int FindDepthIndex(IReadOnlyList<TalentDefinition> depthTalents, string talentId)

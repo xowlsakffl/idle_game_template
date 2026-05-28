@@ -116,7 +116,7 @@ namespace IdleGame.UI.Navigation
                 text.resizeTextMaxSize = HudLayoutConfig.BottomNavFontSize;
             }
 
-            RegisterNotificationDot(args.TabNotificationDots, tab, CreateNotificationDot(button.transform, 38f, new Vector2(-14f, -14f)));
+            RegisterNotificationDot(args.TabNotificationDots, tab, HudUiFactory.CreateNotificationDot(button.transform, 38f, new Vector2(-14f, -14f)));
             button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
             args.TabButtons[tab] = button;
             args.TabButtonLabels[tab] = label;
@@ -137,24 +137,6 @@ namespace IdleGame.UI.Navigation
 
             dots.Add(dot);
             dot.SetActive(false);
-        }
-
-        private static GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
-        {
-            Text dot = HudUiFactory.CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
-            dot.text = "●";
-            dot.color = new Color(1f, 0.04f, 0.04f, 1f);
-            dot.raycastTarget = false;
-
-            RectTransform rect = dot.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.one;
-            rect.anchorMax = Vector2.one;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(size, size);
-            rect.anchoredPosition = anchoredPosition;
-
-            dot.gameObject.SetActive(false);
-            return dot.gameObject;
         }
     }
 }

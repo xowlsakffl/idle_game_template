@@ -492,7 +492,7 @@ namespace IdleGame.UI.Hero.Detail
             refs.LevelUpButton = HudUiFactory.CreateButton("레벨업", refs.ActionRow.transform, 23, new Color(0.34f, 0.36f, 0.34f, 1f));
             refs.StarUpButton = HudUiFactory.CreateButton("승급", refs.ActionRow.transform, 23, new Color(0.34f, 0.36f, 0.34f, 1f));
             refs.ExcludeButton.onClick.AddListener(() => args.OnToggleFormation?.Invoke());
-            ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUpHero, args.CanLevelUpHero);
+            HudUiFactory.ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUpHero, args.CanLevelUpHero);
             refs.StarUpButton.onClick.AddListener(() => args.OnStarUpHero?.Invoke());
         }
 
@@ -571,7 +571,7 @@ namespace IdleGame.UI.Hero.Detail
                 }
 
                 args.TranscendSlotButtons.Add(slotButton);
-                Button lockButton = CreateCornerActionButton("잠", slotButton.transform, new Color(0.20f, 0.25f, 0.36f, 1f));
+                Button lockButton = HudUiFactory.CreateCornerActionButton("잠", slotButton.transform, 18, new Color(0.20f, 0.25f, 0.36f, 1f), 34f, 2f);
                 lockButton.onClick.AddListener(() => args.OnToggleTranscendSlotLock?.Invoke(slotIndex));
                 args.TranscendLockButtons.Add(lockButton);
             }
@@ -651,7 +651,7 @@ namespace IdleGame.UI.Hero.Detail
             refs.EquipmentDetailLevelUpButton = HudUiFactory.CreateButton("레벨업", row.transform, 24, new Color(0.54f, 0.78f, 0.22f, 1f));
             refs.EquipmentDetailStarUpButton = HudUiFactory.CreateButton("승급", row.transform, 27, new Color(0.88f, 0.62f, 0.16f, 1f));
             refs.EquipmentDetailEquipButton.onClick.AddListener(() => args.OnToggleSelectedEquipmentDetailEquip?.Invoke());
-            ConfigureHoldRepeat(refs.EquipmentDetailLevelUpButton, args.OnLevelUpSelectedEquipmentDetail, args.CanLevelUpSelectedEquipmentDetail);
+            HudUiFactory.ConfigureHoldRepeat(refs.EquipmentDetailLevelUpButton, args.OnLevelUpSelectedEquipmentDetail, args.CanLevelUpSelectedEquipmentDetail);
             refs.EquipmentDetailStarUpButton.onClick.AddListener(() => args.OnStarUpSelectedEquipmentDetail?.Invoke());
 
             Button closeButton = HudUiFactory.CreateButton("X", refs.EquipmentDetailPopup.transform, 40, new Color(0.20f, 0.28f, 0.43f, 1f));
@@ -761,7 +761,7 @@ namespace IdleGame.UI.Hero.Detail
                 args.EquipmentSlotTexts[equipmentSlot] = text;
             }
 
-            Button removeButton = CreateCornerActionButton("-", slot.transform, new Color(0.58f, 0.12f, 0.12f, 1f));
+            Button removeButton = HudUiFactory.CreateCornerActionButton("-", slot.transform, 18, new Color(0.58f, 0.12f, 0.12f, 1f), 34f, 2f);
             removeButton.onClick.AddListener(() => args.OnRemoveEquipmentSlot?.Invoke(equipmentSlot));
             args.EquipmentSlotRemoveButtons[equipmentSlot] = removeButton;
         }
@@ -837,13 +837,6 @@ namespace IdleGame.UI.Hero.Detail
             return row;
         }
 
-        private static Button CreateCornerActionButton(string label, Transform parent, Color color)
-        {
-            Button button = HudUiFactory.CreateButton(label, parent, 18, color);
-            SetAnchored(button.gameObject, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(34f, 34f), new Vector2(-2f, -2f));
-            return button;
-        }
-
         private static Text CreateTextAnchored(
             string name,
             Transform parent,
@@ -858,22 +851,6 @@ namespace IdleGame.UI.Hero.Detail
             Text text = HudUiFactory.CreateText(name, parent, fontSize, FontStyle.Bold, anchor);
             SetAnchored(text.gameObject, anchorMin, anchorMax, pivot, size, position);
             return text;
-        }
-
-        private static void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat = null)
-        {
-            if (button == null)
-            {
-                return;
-            }
-
-            HoldRepeatButton repeat = button.GetComponent<HoldRepeatButton>();
-            if (repeat == null)
-            {
-                repeat = button.gameObject.AddComponent<HoldRepeatButton>();
-            }
-
-            repeat.Configure(action, canRepeat);
         }
 
         private static void ApplyButton(Button button, HeroDetailButtonViewState state)

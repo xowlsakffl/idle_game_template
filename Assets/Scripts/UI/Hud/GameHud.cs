@@ -56,6 +56,8 @@ namespace IdleGame.UI.Hud
         private HudTab lastRenderedActiveTab = HudTab.Growth;
         private bool lastRenderedContentPanelOpen = true;
         private bool lastRenderedHeroDetailPanelOpen;
+        private bool cachedGrowthAttention;
+        private bool cachedHeroAttention;
         private GameObject canvasObject;
 
         private Text resourceText;
@@ -164,7 +166,11 @@ namespace IdleGame.UI.Hud
                 ClearGrowthNoticeTexts();
             }
 
-            RefreshBattlefieldVisuals();
+            if (IsBattlePanelVisible())
+            {
+                RefreshBattlefieldVisuals();
+            }
+
             RefreshPendingRuneSlotGlow();
         }
 
@@ -305,18 +311,6 @@ namespace IdleGame.UI.Hud
         }
 
 
-        private Button CreateCornerActionButton(string label, Transform parent, Color color)
-        {
-            Button button = CreateButton(label, parent, 20, color);
-            RectTransform rect = button.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.one;
-            rect.anchorMax = Vector2.one;
-            rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(34f, 34f);
-            rect.anchoredPosition = new Vector2(-4f, -4f);
-            return button;
-        }
-
         private void UpdateView()
         {
             if (resourceText == null)
@@ -336,102 +330,132 @@ namespace IdleGame.UI.Hud
             });
 
             StageDefinition stage = progressManager.CurrentStage;
-            HeaderHudPresenter.Refresh(new HeaderHudPresenterArgs
+            if (panelState.RefreshHeader)
             {
-                Wallet = wallet,
-                AccountProgressManager = accountProgressManager,
-                BattleManager = battleManager,
-                Stage = stage,
-                ResourceText = resourceText,
-                RubyResourceText = rubyResourceText,
-                StageText = battleHud.StageText,
-                ModeText = battleHud.ModeText,
-                AccountLevelText = accountLevelText,
-                FieldStagePillText = fieldStagePillText,
-                AccountExpFill = accountExpFill,
-                FormatGameNumber = value => FormatShortNumber(value),
-                FormatDoubleNumber = value => FormatShortNumber(value),
-                FormatCountNumber = FormatCountNumber
-            });
+                HeaderHudPresenter.Refresh(new HeaderHudPresenterArgs
+                {
+                    Wallet = wallet,
+                    AccountProgressManager = accountProgressManager,
+                    BattleManager = battleManager,
+                    Stage = stage,
+                    ResourceText = resourceText,
+                    RubyResourceText = rubyResourceText,
+                    StageText = battleHud.StageText,
+                    ModeText = battleHud.ModeText,
+                    AccountLevelText = accountLevelText,
+                    FieldStagePillText = fieldStagePillText,
+                    AccountExpFill = accountExpFill,
+                    FormatGameNumber = value => FormatShortNumber(value),
+                    FormatDoubleNumber = value => FormatShortNumber(value),
+                    FormatCountNumber = FormatCountNumber
+                });
+            }
 
-            BattleProgressPresenter.Refresh(new BattleProgressPresenterArgs
+            if (panelState.RefreshBattlePanel)
             {
-                BattleManager = battleManager,
-                Stage = stage,
-                TargetText = battleHud.TargetText,
-                ProgressFill = battleHud.HpFill,
-                ProgressValueText = battleHud.HpText,
-                ProgressText = battleHud.ProgressText,
-                GuideQuestText = guideQuestText
-            });
+                BattleProgressPresenter.Refresh(new BattleProgressPresenterArgs
+                {
+                    BattleManager = battleManager,
+                    Stage = stage,
+                    TargetText = battleHud.TargetText,
+                    ProgressFill = battleHud.HpFill,
+                    ProgressValueText = battleHud.HpText,
+                    ProgressText = battleHud.ProgressText,
+                    GuideQuestText = guideQuestText
+                });
 
-            RefreshDamageMeter();
+                RefreshDamageMeter();
+
+                BattleLogPresenter.Refresh(new BattleLogPresenterArgs
+                {
+                    BattleManager = battleManager,
+                    SupportText = battleHud.SupportText,
+                    LogText = battleHud.LogText,
+                    RewardText = battleHud.RewardText
+                });
+
+                RefreshBattlefieldVisuals();
+
+                BattleControlPresenter.Refresh(new BattleControlPresenterArgs
+                {
+                    BattleManager = battleManager,
+                    SpeedManager = speedManager,
+                    SkillAutoButton = battleHud.SkillAutoButton,
+                    FeverAutoButton = battleHud.FeverAutoButton,
+                    SpeedCycleButton = battleHud.SpeedCycleButton
+                });
+            }
+
             if (panelState.RefreshFortressPanel)
             {
                 RefreshFortressPanel();
             }
 
-            BattleLogPresenter.Refresh(new BattleLogPresenterArgs
+            if (panelState.RefreshSummonPanel)
             {
-                BattleManager = battleManager,
-                SupportText = battleHud.SupportText,
-                LogText = battleHud.LogText,
-                RewardText = battleHud.RewardText
-            });
-            RefreshBattlefieldVisuals();
+                SummonPanelPresenter.Refresh(new SummonPanelPresenterArgs
+                {
+                    GachaManager = gachaManager,
+                    EquipmentInventory = equipmentInventory,
+                    ResultText = gachaText,
+                    RefreshPanel = true
+                });
+            }
 
-            SummonPanelPresenter.Refresh(new SummonPanelPresenterArgs
+            if (panelState.GrowthPanelOpen)
             {
-                GachaManager = gachaManager,
-                EquipmentInventory = equipmentInventory,
-                ResultText = gachaText,
-                RefreshPanel = panelState.RefreshSummonPanel
-            });
+                HudStatusPresenter.Refresh(new HudStatusPresenterArgs
+                {
+                    BattleManager = battleManager,
+                    TotalCombatPowerText = totalCombatPowerText,
+                    GrowthNoticeText = growthNoticeText,
+                    GrowthNoticeMessage = runtimeTickState.NoticeMessage,
+                    GrowthNoticeUntil = runtimeTickState.NoticeUntil,
+                    CurrentTime = Time.unscaledTime,
+                    FormatShortNumber = value => FormatShortNumber(value)
+                });
+            }
 
-            HudStatusPresenter.Refresh(new HudStatusPresenterArgs
+            if (panelState.RefreshGrowthAttention)
             {
-                BattleManager = battleManager,
-                TotalCombatPowerText = totalCombatPowerText,
-                GrowthNoticeText = growthNoticeText,
-                GrowthNoticeMessage = runtimeTickState.NoticeMessage,
-                GrowthNoticeUntil = runtimeTickState.NoticeUntil,
-                CurrentTime = Time.unscaledTime,
-                FormatShortNumber = value => FormatShortNumber(value)
-            });
-
-            bool hasGrowthAttention = GrowthPanelPresenter.Refresh(new GrowthPanelPresenterArgs
-            {
-                AbilityManager = abilityManager,
-                Wallet = wallet,
-                SelectedGrowthLevelStep = selectedGrowthLevelStep,
-                RefreshPanel = panelState.RefreshGrowthPanel,
-                GrowthStepButtons = growthStepButtons,
-                AbilityButtonTexts = abilityButtonTexts,
-                AbilityCostBadgeTexts = abilityCostBadgeTexts,
-                AbilityNotificationDots = abilityNotificationDots,
-                FormatShortNumber = FormatShortNumber
-            });
+                cachedGrowthAttention = GrowthPanelPresenter.Refresh(new GrowthPanelPresenterArgs
+                {
+                    AbilityManager = abilityManager,
+                    Wallet = wallet,
+                    SelectedGrowthLevelStep = selectedGrowthLevelStep,
+                    RefreshPanel = panelState.RefreshGrowthPanel,
+                    GrowthStepButtons = growthStepButtons,
+                    AbilityButtonTexts = abilityButtonTexts,
+                    AbilityCostBadgeTexts = abilityCostBadgeTexts,
+                    AbilityNotificationDots = abilityNotificationDots,
+                    FormatShortNumber = FormatShortNumber
+                });
+            }
 
             if (panelState.RefreshHeroPanel)
             {
                 RefreshHeroFormationPanel();
             }
 
-            bool hasHeroAttention = HeroRosterPresenter.Refresh(new HeroRosterPresenterArgs
+            if (panelState.RefreshHeroAttention)
             {
-                BattleManager = battleManager,
-                Wallet = wallet,
-                RefreshPanel = panelState.RefreshHeroPanel,
-                SelectedHeroForPlacement = heroFormationState.SelectedHeroForPlacement,
-                HeroRosterButtons = heroHud.RosterButtons,
-                HeroButtonTexts = heroHud.HeroButtonTexts,
-                HeroRosterActionButtons = heroHud.RosterActionButtons,
-                HeroRosterDeployedOverlays = heroHud.RosterDeployedOverlays,
-                HeroNotificationDots = heroHud.NotificationDots,
-                IsHeroInFormation = IsHeroInEditingFormation,
-                FormatShortNumber = FormatShortNumber,
-                GetShortHeroLabel = GetShortHeroLabel
-            });
+                cachedHeroAttention = HeroRosterPresenter.Refresh(new HeroRosterPresenterArgs
+                {
+                    BattleManager = battleManager,
+                    Wallet = wallet,
+                    RefreshPanel = panelState.RefreshHeroPanel,
+                    SelectedHeroForPlacement = heroFormationState.SelectedHeroForPlacement,
+                    HeroRosterButtons = heroHud.RosterButtons,
+                    HeroButtonTexts = heroHud.HeroButtonTexts,
+                    HeroRosterActionButtons = heroHud.RosterActionButtons,
+                    HeroRosterDeployedOverlays = heroHud.RosterDeployedOverlays,
+                    HeroNotificationDots = heroHud.NotificationDots,
+                    IsHeroInFormation = IsHeroInEditingFormation,
+                    FormatShortNumber = FormatShortNumber,
+                    GetShortHeroLabel = GetShortHeroLabel
+                });
+            }
+
             if (panelState.RefreshSupportPanel)
             {
                 SecondaryPanelView.ApplySupportPanelState(
@@ -459,38 +483,35 @@ namespace IdleGame.UI.Hud
                 }
             }
 
-            BattleControlPresenter.Refresh(new BattleControlPresenterArgs
+            if (panelState.RefreshDebugPanel)
             {
-                BattleManager = battleManager,
-                SpeedManager = speedManager,
-                SkillAutoButton = battleHud.SkillAutoButton,
-                FeverAutoButton = battleHud.FeverAutoButton,
-                SpeedCycleButton = battleHud.SpeedCycleButton
-            });
+                DebugPanelPresenter.Refresh(new DebugPanelPresenterArgs
+                {
+                    RefreshPanel = true,
+                    StatusText = debugText,
+                    SpeedManager = speedManager,
+                    Wallet = wallet,
+                    AccountProgressManager = accountProgressManager,
+                    ProgressManager = progressManager,
+                    BattleManager = battleManager,
+                    FormatShortNumber = value => FormatShortNumber(value),
+                    FormatCountNumber = FormatCountNumber
+                });
+            }
 
-            DebugPanelPresenter.Refresh(new DebugPanelPresenterArgs
+            if (panelState.RefreshNotifications)
             {
-                RefreshPanel = panelState.RefreshDebugPanel,
-                StatusText = debugText,
-                SpeedManager = speedManager,
-                Wallet = wallet,
-                AccountProgressManager = accountProgressManager,
-                ProgressManager = progressManager,
-                BattleManager = battleManager,
-                FormatShortNumber = value => FormatShortNumber(value),
-                FormatCountNumber = FormatCountNumber
-            });
-
-            HudNotificationDotPresenter.Refresh(new HudNotificationDotPresenterArgs
-            {
-                TabNotificationDots = tabNotificationDots,
-                GuideQuestDot = guideQuestDot,
-                Wallet = wallet,
-                ProgressManager = progressManager,
-                BattleManager = battleManager,
-                HasGrowthAttention = hasGrowthAttention,
-                HasHeroAttention = hasHeroAttention
-            });
+                HudNotificationDotPresenter.Refresh(new HudNotificationDotPresenterArgs
+                {
+                    TabNotificationDots = tabNotificationDots,
+                    GuideQuestDot = guideQuestDot,
+                    Wallet = wallet,
+                    ProgressManager = progressManager,
+                    BattleManager = battleManager,
+                    HasGrowthAttention = cachedGrowthAttention,
+                    HasHeroAttention = cachedHeroAttention
+                });
+            }
 
             HudPanelVisibilityPresenter.Refresh(new HudPanelVisibilityPresenterArgs
             {
@@ -537,14 +558,17 @@ namespace IdleGame.UI.Hud
                 }
             }
 
-            HudBottomNavPresenter.Refresh(new HudBottomNavPresenterArgs
+            if (panelState.RefreshNavigation)
             {
-                TabButtons = tabButtons,
-                TabButtonLabels = tabButtonLabels,
-                ActiveTab = activeTab,
-                ContentPanelOpen = contentPanelOpen,
-                HeroDetailPanelOpen = heroDetailPanelOpen
-            });
+                HudBottomNavPresenter.Refresh(new HudBottomNavPresenterArgs
+                {
+                    TabButtons = tabButtons,
+                    TabButtonLabels = tabButtonLabels,
+                    ActiveTab = activeTab,
+                    ContentPanelOpen = contentPanelOpen,
+                    HeroDetailPanelOpen = heroDetailPanelOpen
+                });
+            }
 
             hudRefreshQueued = false;
             dirtyHudFlags = HudDirtyFlags.None;
@@ -871,6 +895,11 @@ namespace IdleGame.UI.Hud
                 Time = Time.time,
                 DeltaTime = Time.deltaTime
             });
+        }
+
+        private bool IsBattlePanelVisible()
+        {
+            return !contentPanelOpen || activeTab == HudTab.Growth;
         }
 
         private string GetShortHeroLabel(HeroDefinition hero)

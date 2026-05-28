@@ -34,6 +34,12 @@ namespace IdleGame.UI.Hud
         public bool RefreshSupportPanel;
         public bool RefreshDebugPanel;
         public bool RefreshHeroDetailPanel;
+        public bool RefreshHeader;
+        public bool RefreshBattlePanel;
+        public bool RefreshNavigation;
+        public bool RefreshNotifications;
+        public bool RefreshGrowthAttention;
+        public bool RefreshHeroAttention;
         public float BattlePanelHeight;
         public float ContentPanelHeight;
 
@@ -58,6 +64,9 @@ namespace IdleGame.UI.Hud
             bool activeTabJustOpened = args.ContentPanelOpen
                 && (!args.LastRenderedContentPanelOpen || args.LastRenderedActiveTab != args.ActiveTab);
             bool heroDetailJustOpened = args.HeroDetailPanelOpen && !args.LastRenderedHeroDetailPanelOpen;
+            bool navigationStateChanged = args.LastRenderedActiveTab != args.ActiveTab
+                || args.LastRenderedContentPanelOpen != args.ContentPanelOpen
+                || args.LastRenderedHeroDetailPanelOpen != args.HeroDetailPanelOpen;
 
             state.RefreshGrowthPanel = state.GrowthPanelOpen && ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Growth, activeTabJustOpened);
             state.RefreshHeroPanel = state.HeroPanelOpen && ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Hero, activeTabJustOpened);
@@ -71,6 +80,25 @@ namespace IdleGame.UI.Hud
 
             state.BattlePanelHeight = GetBattlePanelHeight(args.ActiveTab, args.ContentPanelOpen);
             state.ContentPanelHeight = GetContentPanelHeight(args.ActiveTab, args.ContentPanelOpen);
+            float lastBattlePanelHeight = GetBattlePanelHeight(args.LastRenderedActiveTab, args.LastRenderedContentPanelOpen);
+            bool battlePanelOpen = state.BattlePanelHeight > 0.5f;
+            bool battlePanelJustOpened = battlePanelOpen && lastBattlePanelHeight <= 0.5f;
+
+            state.RefreshHeader = ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Header, false);
+            state.RefreshBattlePanel = battlePanelOpen && ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Battle, battlePanelJustOpened);
+            state.RefreshNavigation = ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Navigation, navigationStateChanged);
+            state.RefreshGrowthAttention = state.RefreshGrowthPanel
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Growth, false);
+            state.RefreshHeroAttention = state.RefreshHeroPanel
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Hero, false)
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.HeroDetail, false);
+            state.RefreshNotifications = state.RefreshNavigation
+                || state.RefreshGrowthAttention
+                || state.RefreshHeroAttention
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Summon, false)
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Stage, false)
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Support, false)
+                || ShouldRefreshUiSection(args.DirtyFlags, HudDirtyFlags.Fortress, false);
             return state;
         }
 

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine.UI;
 using UnityEngine;
 
@@ -59,6 +60,81 @@ namespace IdleGame.UI.Common
             RectTransform rect = text.GetComponent<RectTransform>();
             rect.sizeDelta = new Vector2(0f, fontSize + 22f);
             return text;
+        }
+
+        public static Button CreateCornerActionButton(
+            string label,
+            Transform parent,
+            HudButtonVisualStyle style,
+            float size = 30f,
+            float inset = 3f)
+        {
+            return CreateCornerActionButton(label, parent, style.FontSize, style.Color, size, inset);
+        }
+
+        public static Button CreateCornerActionButton(
+            string label,
+            Transform parent,
+            int fontSize,
+            Color color,
+            float size = 30f,
+            float inset = 3f)
+        {
+            Button button = CreateButton(label, parent, fontSize, color);
+            RectTransform rect = button.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.one;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(1f, 1f);
+            rect.sizeDelta = new Vector2(size, size);
+            rect.anchoredPosition = new Vector2(-inset, -inset);
+            return button;
+        }
+
+        public static GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
+        {
+            Text dot = CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
+            dot.text = "●";
+            dot.color = new Color(1f, 0.04f, 0.04f, 1f);
+            dot.raycastTarget = false;
+
+            RectTransform rect = dot.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.one;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(size, size);
+            rect.anchoredPosition = anchoredPosition;
+
+            dot.gameObject.SetActive(false);
+            return dot.gameObject;
+        }
+
+        public static void ConfigureBestFitText(Text text, int minSize, int maxSize, float lineSpacing = 1f)
+        {
+            if (text == null)
+            {
+                return;
+            }
+
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = minSize;
+            text.resizeTextMaxSize = maxSize;
+            text.lineSpacing = lineSpacing;
+        }
+
+        public static void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            HoldRepeatButton repeatButton = button.GetComponent<HoldRepeatButton>();
+            if (repeatButton == null)
+            {
+                repeatButton = button.gameObject.AddComponent<HoldRepeatButton>();
+            }
+
+            repeatButton.Configure(action, canRepeat);
         }
 
         public static void SetButtonColor(Button button, Color color)

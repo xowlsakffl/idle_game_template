@@ -59,7 +59,7 @@ namespace IdleGame.UI.Hero.Formation
                 viewportWidth = content.rect.width;
             }
 
-            if (Mathf.Approximately(viewportWidth, lastViewportWidth) && childCount == lastChildCount)
+            if (Mathf.Abs(viewportWidth - lastViewportWidth) < 0.5f && childCount == lastChildCount)
             {
                 return;
             }

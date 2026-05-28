@@ -26,6 +26,8 @@ namespace IdleGame.UI.Hud
             lastRenderedActiveTab = HudTab.Growth;
             lastRenderedContentPanelOpen = true;
             lastRenderedHeroDetailPanelOpen = false;
+            cachedGrowthAttention = false;
+            cachedHeroAttention = false;
 
             contentPanelOpen = true;
             contentRoot = null;

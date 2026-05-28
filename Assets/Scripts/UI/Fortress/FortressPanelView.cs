@@ -110,29 +110,13 @@ namespace IdleGame.UI.Fortress
 
             refs.LevelUpButton = HudUiFactory.CreateButton("레벨업", args.Parent, 30, new Color(0.58f, 0.84f, 0.20f, 1f));
             HudUiFactory.AddLayoutElement(refs.LevelUpButton.gameObject, -1, 74);
-            ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);
+            HudUiFactory.ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);
 
             refs.NoticeText = HudUiFactory.CreateText("FortressNotice", args.Parent, 24, FontStyle.Bold, TextAnchor.UpperLeft);
             refs.NoticeText.color = new Color(0.95f, 0.78f, 0.42f, 1f);
             refs.NoticeText.text = "전투 중 요새는 중앙에서 자동 공격합니다. 원거리/지원 영웅은 요새 안쪽에서 공격하고, 근접/방어 영웅만 밖에서 맞붙습니다.";
             HudUiFactory.AddLayoutElement(refs.NoticeText.gameObject, -1, 100);
             return refs;
-        }
-
-        private static void ConfigureHoldRepeat(Button button, Action action, Func<bool> canRepeat)
-        {
-            if (button == null)
-            {
-                return;
-            }
-
-            HoldRepeatButton repeatButton = button.GetComponent<HoldRepeatButton>();
-            if (repeatButton == null)
-            {
-                repeatButton = button.gameObject.AddComponent<HoldRepeatButton>();
-            }
-
-            repeatButton.Configure(action, canRepeat);
         }
 
         private static void SetButtonText(Button button, string text)
