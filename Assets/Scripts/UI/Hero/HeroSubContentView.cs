@@ -17,7 +17,6 @@ namespace IdleGame.UI.Hero
         public GameObject TotemContent;
         public Text TotemSummaryText;
         public Text TotemDetailText;
-        public Button TotemEquipButton;
         public Button TotemLevelUpButton;
         public GameObject RuneContent;
         public Text RuneSummaryText;
@@ -35,8 +34,6 @@ namespace IdleGame.UI.Hero
         public Action OnTraitLevelUp;
         public Func<bool> CanTraitLevelUp;
         public Action<string> OnSelectTotem;
-        public Action<string> OnTotemAction;
-        public Action OnEquipSelectedTotem;
         public Action OnLevelUpTotem;
         public Func<bool> CanLevelUpTotem;
         public Action<string> OnSelectRune;
@@ -48,7 +45,6 @@ namespace IdleGame.UI.Hero
         public Dictionary<string, Text> TalentButtonTexts;
         public Dictionary<string, Button> TotemButtons;
         public Dictionary<string, Text> TotemButtonTexts;
-        public Dictionary<string, Button> TotemActionButtons;
         public Dictionary<string, Button> RuneButtons;
         public Dictionary<string, Text> RuneButtonTexts;
         public Dictionary<string, Button> RuneActionButtons;
@@ -78,13 +74,10 @@ namespace IdleGame.UI.Hero
                 Parent = args.Parent,
                 Totems = args.Totems,
                 OnSelectTotem = args.OnSelectTotem,
-                OnTotemAction = args.OnTotemAction,
-                OnEquipSelected = args.OnEquipSelectedTotem,
                 OnLevelUp = args.OnLevelUpTotem,
                 CanLevelUp = args.CanLevelUpTotem,
                 TotemButtons = args.TotemButtons,
-                TotemButtonTexts = args.TotemButtonTexts,
-                TotemActionButtons = args.TotemActionButtons
+                TotemButtonTexts = args.TotemButtonTexts
             });
 
             HeroRuneViewRefs runeRefs = HeroRuneView.Build(new HeroRuneViewBuildArgs
@@ -110,7 +103,6 @@ namespace IdleGame.UI.Hero
                 TotemContent = totemRefs.Content,
                 TotemSummaryText = totemRefs.SummaryText,
                 TotemDetailText = totemRefs.DetailText,
-                TotemEquipButton = totemRefs.EquipButton,
                 TotemLevelUpButton = totemRefs.LevelUpButton,
                 RuneContent = runeRefs.Content,
                 RuneSummaryText = runeRefs.SummaryText,

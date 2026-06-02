@@ -79,6 +79,113 @@ namespace IdleGame.Battle
             return true;
         }
 
+        public static void TickReadySkills(
+            IReadOnlyList<CombatSkillState> skills,
+            float deltaTime,
+            Func<bool> hasAttackableTarget,
+            float cooldownMultiplier,
+            Action<CombatSkillState> castSkill)
+        {
+            if (skills == null || hasAttackableTarget == null || castSkill == null || !hasAttackableTarget())
+            {
+                return;
+            }
+
+            foreach (CombatSkillState skill in skills)
+            {
+                if (skill == null)
+                {
+                    continue;
+                }
+
+                skill.CooldownRemaining -= deltaTime;
+                if (skill.CooldownRemaining > 0f)
+                {
+                    continue;
+                }
+
+                skill.CooldownRemaining += skill.Definition.CooldownSeconds * cooldownMultiplier;
+                castSkill(skill);
+                if (!hasAttackableTarget())
+                {
+                    return;
+                }
+            }
+        }
+
+        public static void TickReadyPets(
+            IReadOnlyList<PetState> pets,
+            float deltaTime,
+            Func<bool> hasAttackableTarget,
+            Action<PetState> attackWithPet)
+        {
+            if (pets == null || hasAttackableTarget == null || attackWithPet == null || !hasAttackableTarget())
+            {
+                return;
+            }
+
+            foreach (PetState pet in pets)
+            {
+                if (pet == null)
+                {
+                    continue;
+                }
+
+                pet.AttackCooldown -= deltaTime;
+                if (pet.AttackCooldown > 0f)
+                {
+                    continue;
+                }
+
+                pet.AttackCooldown += pet.Definition.AttackInterval;
+                attackWithPet(pet);
+                if (!hasAttackableTarget())
+                {
+                    return;
+                }
+            }
+        }
+
+        public static bool TryTickFortressAttack(
+            GameNumber fortressHp,
+            bool hasAttackableTarget,
+            bool isBossFight,
+            ref float attackCooldown,
+            float deltaTime,
+            float attackInterval,
+            Func<int> findTargetIndex,
+            float retryCooldown,
+            out int targetIndex)
+        {
+            targetIndex = -1;
+            if (fortressHp <= GameNumber.Zero || !hasAttackableTarget)
+            {
+                return false;
+            }
+
+            attackCooldown -= deltaTime;
+            if (attackCooldown > 0f)
+            {
+                return false;
+            }
+
+            if (isBossFight)
+            {
+                attackCooldown += attackInterval;
+                return true;
+            }
+
+            targetIndex = findTargetIndex?.Invoke() ?? -1;
+            if (targetIndex < 0)
+            {
+                attackCooldown = Mathf.Min(attackCooldown, retryCooldown);
+                return false;
+            }
+
+            attackCooldown += attackInterval;
+            return true;
+        }
+
         public static bool TryTickEnemyAttack(
             VisibleEnemyState enemy,
             Vector2 targetPosition,

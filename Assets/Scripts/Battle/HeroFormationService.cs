@@ -81,6 +81,102 @@ namespace IdleGame.Battle
             return count;
         }
 
+        public static bool TryToggleHeroInFormation(
+            IReadOnlyList<HeroState> heroes,
+            IReadOnlyList<string> currentIds,
+            string heroId,
+            out List<string> nextIds,
+            out string battleLog)
+        {
+            nextIds = NormalizeFormationHeroIds(currentIds, heroes);
+            battleLog = string.Empty;
+
+            HeroState hero = FindHero(heroes, heroId);
+            if (hero == null || !hero.IsOwned)
+            {
+                return false;
+            }
+
+            int existingIndex = nextIds.IndexOf(heroId);
+            if (existingIndex >= 0)
+            {
+                if (GetFilledFormationCount(nextIds) <= 1)
+                {
+                    battleLog = "편성 실패: 최소 1명은 필요";
+                    return false;
+                }
+
+                nextIds[existingIndex] = string.Empty;
+                return true;
+            }
+
+            int emptyIndex = nextIds.FindIndex(string.IsNullOrEmpty);
+            if (emptyIndex < 0)
+            {
+                battleLog = "편성 실패: 최대 " + GameData.MaxPartyHeroes + "명";
+                return false;
+            }
+
+            nextIds[emptyIndex] = heroId;
+            return true;
+        }
+
+        public static bool TrySetHeroInFormationSlot(
+            IReadOnlyList<HeroState> heroes,
+            IReadOnlyList<string> currentIds,
+            string heroId,
+            int slotIndex,
+            out List<string> nextIds,
+            out HeroState hero)
+        {
+            nextIds = NormalizeFormationHeroIds(currentIds, heroes);
+            hero = FindHero(heroes, heroId);
+            if (hero == null || !hero.IsOwned || slotIndex < 0 || slotIndex >= GameData.MaxPartyHeroes)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < nextIds.Count; i++)
+            {
+                if (nextIds[i] == heroId)
+                {
+                    nextIds[i] = string.Empty;
+                }
+            }
+
+            nextIds[slotIndex] = heroId;
+            return true;
+        }
+
+        public static bool TryRemoveHeroFromFormationSlot(
+            IReadOnlyList<HeroState> heroes,
+            IReadOnlyList<string> currentIds,
+            int slotIndex,
+            out List<string> nextIds,
+            out string battleLog)
+        {
+            nextIds = NormalizeFormationHeroIds(currentIds, heroes);
+            battleLog = string.Empty;
+            if (slotIndex < 0 || slotIndex >= GameData.MaxPartyHeroes)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(nextIds[slotIndex]))
+            {
+                return false;
+            }
+
+            if (GetFilledFormationCount(nextIds) <= 1)
+            {
+                battleLog = "편성 실패: 최소 1명은 필요";
+                return false;
+            }
+
+            nextIds[slotIndex] = string.Empty;
+            return true;
+        }
+
         public static void RefreshDeployedHeroes(
             IReadOnlyList<HeroState> heroes,
             int activePreset,

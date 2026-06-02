@@ -54,6 +54,55 @@ namespace IdleGame.Battle
                 enemyAttackIntervalSeconds);
         }
 
+        public static bool TryGetVisibleEnemyPosition(
+            IReadOnlyList<VisibleEnemyState> visibleEnemies,
+            int enemyIndex,
+            out Vector2 position)
+        {
+            position = Vector2.zero;
+            if (visibleEnemies == null || enemyIndex < 0 || enemyIndex >= visibleEnemies.Count)
+            {
+                return false;
+            }
+
+            position = visibleEnemies[enemyIndex].Position;
+            return true;
+        }
+
+        public static bool ReplaceOrRemoveDefeatedEnemy(
+            IList<VisibleEnemyState> visibleEnemies,
+            int enemyIndex,
+            ref int nextEnemySpawnSequence,
+            int requiredKills,
+            GameNumber targetMaxHp,
+            float respawnGraceSeconds,
+            float enemyAttackIntervalSeconds,
+            float fieldHalfWidth,
+            float fieldHalfHeight)
+        {
+            if (visibleEnemies == null || enemyIndex < 0 || enemyIndex >= visibleEnemies.Count)
+            {
+                return false;
+            }
+
+            if (nextEnemySpawnSequence < requiredKills)
+            {
+                visibleEnemies[enemyIndex] = CreateVisibleEnemy(
+                    ref nextEnemySpawnSequence,
+                    targetMaxHp,
+                    respawnGraceSeconds,
+                    enemyAttackIntervalSeconds,
+                    fieldHalfWidth,
+                    fieldHalfHeight);
+            }
+            else
+            {
+                visibleEnemies.RemoveAt(enemyIndex);
+            }
+
+            return true;
+        }
+
         public static Vector2 GetSpawnPosition(int spawnSequence, float fieldHalfWidth, float fieldHalfHeight)
         {
             int side = Mathf.Abs(spawnSequence) % 4;

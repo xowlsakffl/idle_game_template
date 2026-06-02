@@ -104,7 +104,7 @@
 ├────────────────────┤
 │ 영웅 성장 패널        │
 ├────────────────────┤
-│ 성장 / 영웅 / 소환 / 던전 배틀 / 상점 + 빨간 점 │
+│ 성장 / 영웅 / 요새 / 시설 / 소환 / 배틀 / 상점 + 빨간 점 │
 └────────────────────┘
 ```
 
@@ -200,7 +200,8 @@
 - 영웅 레벨 상한은 0성 50레벨에서 시작하고, 성급 1개당 50레벨씩 증가한다. 1성 상한은 100레벨이고, 15성 최종 상한은 800레벨이다.
 - 5성 효과는 해당 영웅의 기본 패시브를 강화하고, 10성 효과는 공격력/체력/공속/이속 전체 스탯 보너스를 연다.
 - 영웅 탭은 편성, 특성, 토템, 룬 4개 하위 탭으로 나눈다.
-- 1차 구현은 편성 탭과 특성 탭을 구현하고, 사이드킥은 제외한다. 토템은 편성 슬롯이 아니라 전역 성장 탭으로 관리한다.
+- 1차 구현은 편성, 특성, 토템, 룬 탭을 구현하고, 사이드킥은 제외한다. 토템은 편성 슬롯이 아니라 전역 성장 탭으로 관리한다.
+- 시설은 영웅 하위 탭이 아니라 하단 대메뉴 `시설`에서 관리한다.
 - 편성 탭은 최대 8명 출전과 프리셋 3개를 지원한다.
 - 특성 탭은 계정 레벨로 획득한 특성 포인트를 소모해 올린다. 계정 경험치와 계정 레벨은 영웅 레벨과 분리한다.
 - 특성 트리는 19개 뎁스를 가로로 진행한다. 뎁스별 노드 수는 `1, 3, 3, 1, 2, 2, 1, 3, 3, 2, 1, 2, 1, 3, 3, 3, 1, 2, 1`이다.
@@ -250,6 +251,21 @@
 - 펫은 일정 주기마다 현재 락온한 타깃을 자동 공격한다. 타깃이 죽은 뒤에만 새 타깃을 잡는다.
 - 펫은 소량의 전투 보조 효과를 줄 수 있다.
 - 펫 수집, 펫 성장, 펫 뽑기는 이후로 미룬다.
+
+## 요새 규칙
+
+요새는 하단 대메뉴 `요새`에서 관리하는 전투 보조 성장축이다. 성벽/망루 같은 별도 부위 강화는 현재 MVP에서 제외하고, 요새 자체 레벨 하나만 둔다.
+
+- 요새는 전장 중앙에 존재하고 체력과 자동 공격을 가진다.
+- 원거리/지원 영웅은 요새 주변 보호 위치에서 전투하고, 근접/방어 영웅은 전장 밖으로 나가 싸운다.
+- 몬스터가 살아있는 영웅을 찾지 못하면 요새를 공격한다.
+- 요새가 쓰러져도 스테이지 실패 조건은 아직 만들지 않는다. 현재 실패 조건은 보스 제한 시간 초과다.
+- 요새 경험치는 일반 몬스터와 보스 처치 보상으로 누적된다.
+- 요새 레벨업은 자동이 아니라 유저가 `레벨업` 버튼을 눌렀을 때만 실행한다.
+- 요새 경험치는 누적 기준으로 사용하고, 레벨업 시 소모하지 않는다.
+- 현재 구현 레벨 범위는 Lv.1~300이다.
+- 레벨이 오르면 요새 HP, 자동 공격력, 공격 간격, 사거리, 종합 전투력 보정이 증가한다.
+- 요새 강화가 성공하면 현재 스테이지를 다시 시작해 전투 계산을 갱신한다.
 
 ## 전투 속도 규칙
 
@@ -393,7 +409,7 @@
 - 등급별 토템 레벨 1~100
 - 장착 없이 모든 토템 효과 전체 적용
 - 같은 등급 6종 Lv.100 달성 후 전체 진화
-- 영웅 하단 `토템` 탭 UI
+- 영웅 하단 `토템` 탭 UI: 선택, 효과 확인, 강화/전체 진화만 제공
 - 토템 강화 버튼 길게 누르기
 - 토템 전체 진화
 - 전투 계산 반영: 공격력, 치명타 확률, 보스전 공격력, 체력, 피해 감소, 골드, 경험치책, 계정 경험치, 공속, 이속, 스킬 피해, 스킬 쿨타임
@@ -422,25 +438,9 @@
 
 룬은 토템처럼 전역 성장축이 아니라 프리셋 선택을 만드는 장착물이다. 별도 룬조각/룬가루 재화를 두면 장비 강화와 역할이 겹치므로, 룬 자체를 획득하고 합성하는 방식만 사용한다.
 
-## 성물 규칙 (폐기/보류)
-
-이 섹션은 현재 MVP에서 사용하지 않는다. 기존 성물 탭은 폐기했고, 시설은 영웅 하위 탭이 아니라 별도 대메뉴로 이동했다. 성물류 장기 성장축은 토템/룬/시설과 역할이 겹치지 않는 방향으로 재기획할 때까지 보류한다.
-
-성물은 영웅 속성을 강화하는 장기 성장축이다. 화염 성물은 화염 영웅, 냉기 성물은 냉기 영웅처럼 같은 속성 영웅에게만 적용한다.
-
-- 속성은 화염, 냉기, 번개, 암흑, 신성, 자연 6종으로 시작한다.
-- 모든 성물은 기본 제공한다.
-- 성물은 장착물이 아니며 편성 저장 확인 로직을 타지 않는다.
-- 성물 레벨은 0~1000이다.
-- 레벨당 같은 속성 영웅 공격력 +0.02%, 체력 +0.02%를 적용한다.
-- 강화 재료는 `성물 파편`이다.
-- 강화에 성공하면 현재 스테이지를 다시 시작해서 전투 계산을 갱신한다.
-- 1차 구현에서는 속성 상성, 속성 피해, 상태 이상, 성물 뽑기, 성물 등급을 제외한다.
-
-이 구조를 택하는 이유는 단순 전체 공격력 보너스를 하나 더 추가하면 성장축이 과도하게 겹치기 때문이다. 성물은 “전체가 더 세지는 버튼”이 아니라 “어떤 속성 영웅 풀을 키울지 정하는 장기 투자처”로 둔다.
 ## 시설 파견 시스템
 
-기존 성물 시스템은 폐기/보류한다. 시설 파견은 영웅 하위 탭이 아니라 하단 대메뉴 `시설`에서 관리한다.
+시설 파견은 영웅 하위 탭이 아니라 하단 대메뉴 `시설`에서 관리한다.
 
 - 시설은 의뢰소, 훈련소, 대장간, 토템 제단, 룬 공방, 초월 연구소 6종이다.
 - 시설별 생산 자원은 각각 골드, 영웅 경험치책, 장비 경험치책, 토템 정수, 룬 상자, 초월석 하나만 가진다.
@@ -455,24 +455,13 @@
 - 시설별 수령, 모두 획득, 전체 추천 배치, 모두 해제를 제공한다.
 - 시설 탭 UI는 세로 카드 리스트를 기본으로 한다.
 - `배치 인력` 모달의 추천 배치는 기존 배치를 유지하고 빈 슬롯만 생산 점수 순으로 채운다.
+- `모두 획득` 성공 시 획득한 자원 목록을 팝업으로 요약 표시한다.
 - 일반 몬스터 처치 시 낮은 확률로 목재를 지급하고, 보스 처치 시 목재/벽돌/철재를 지급한다. 스테이지가 높아질수록 보스 자재량이 증가한다.
-## ACTIVE UPDATE - Facility Dispatch replaces Relic
+## 현재 구현 상태 요약
 
-The previous Relic/Seongmul system is deprecated and held for later redesign. Facility Dispatch now lives in the main bottom `시설` menu, not inside the hero sub-tab list.
-
-Facility Dispatch rules:
-
-- Facilities: `FAC_REQUEST` 의뢰소 produces Gold, `FAC_TRAINING` 훈련소 produces Hero EXP Books, `FAC_FORGE` 대장간 produces Equipment EXP Books, `FAC_TOTEM` 토템 제단 produces Totem Essence, `FAC_RUNE` 룬 공방 produces Rune Boxes, `FAC_TRANSCEND` 초월 연구소 produces Transcend Stones.
-- Every facility has a 1 hour production cycle, 12 hour max accumulation, and levels 1-20.
-- Upgrade material is never Gold. Upgrade uses hunting materials only: Wood, Brick, Iron.
-- Upgrade bands: Lv.2-5 Wood, Lv.6-10 Wood+Brick, Lv.11-15 Brick+Iron, Lv.16-20 Wood+Brick+Iron.
-- Assignment slots unlock by facility level: Lv.1 = 1 slot, Lv.5 = 2, Lv.10 = 3, Lv.15 = 4, Lv.20 = 5.
-- Deployed battle heroes can also be assigned to facilities, but the same hero cannot be assigned to multiple facilities.
-- Auto assignment uses production score based only on combat power, level, stars, and rarity. There is no facility preference trait.
-- Production formula: base production * facility level multiplier * hero assignment multiplier.
-- Facility level multiplier starts at `1 + (level - 1) * 0.08`.
-- Hero assignment bonus is capped at +50% per facility.
-- Offline time is included, capped by the same 12 hour accumulation limit.
-- UI exposes per-facility collect, collect all, per-facility auto assign, global recommended assignment, clear all, and upgrade/MAX state.
-- Wood/Brick/Iron are gained from hunting, not from facilities. Normal monsters can drop Wood at low chance; bosses drop Wood/Brick/Iron with higher stages increasing Brick/Iron availability.
-- Save data must include facility level, assigned hero ids, stored production, last production tick, and Wood/Brick/Iron wallet amounts.
+- 하단 대메뉴는 `성장, 영웅, 요새, 시설, 소환, 배틀, 상점` 순서다.
+- 성장 패널만 전투 영역을 줄이고, 나머지 대메뉴는 전투 화면 위 오버레이 패널로 열린다.
+- 전투는 영웅/몬스터 이동, 대상 락온, 몬스터별 HP바, 100마리 처치 진행률, 요새 체력/자동 공격, 영웅별 데미지 미터기를 포함한다.
+- 영웅 편성은 8명, 프리셋 3개, 룬 4칸을 지원한다. 영웅/룬 변경은 저장 확인 후 적용하고 스테이지를 재시작한다.
+- 토템은 장착물이 아니라 6종 전역 성장축이다. 토템 탭에는 선택, 효과 확인, 강화/전체 진화만 둔다.
+- 시설 파견은 별도 대메뉴 `시설`에 있으며, 6종 시설 생산, 12시간 누적, 영웅 배치, 모두 획득, 업그레이드, 사냥 자재 보상을 지원한다.

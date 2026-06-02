@@ -20,11 +20,10 @@ namespace IdleGame.UI.Hud
                 SelectedTotemId = totemRuneState.SelectedTotemId,
                 SummaryText = heroHud.TotemSummaryText,
                 DetailText = heroHud.TotemDetailText,
-                EquipButton = heroHud.TotemEquipButton,
                 LevelUpButton = heroHud.TotemLevelUpButton,
                 ButtonTexts = heroHud.TotemButtonTexts,
                 Buttons = heroHud.TotemButtons,
-                ActionButtons = heroHud.TotemActionButtons,
+                CachedCardStates = heroHud.TotemCardStates,
                 FormatCountNumber = FormatCountNumber
             });
             totemRuneState.SetResolvedTotem(result.SelectedTotemId);
@@ -44,7 +43,8 @@ namespace IdleGame.UI.Hud
                 LevelUpButton = heroHud.RuneLevelUpButton,
                 ButtonTexts = heroHud.RuneButtonTexts,
                 Buttons = heroHud.RuneButtons,
-                ActionButtons = heroHud.RuneActionButtons
+                ActionButtons = heroHud.RuneActionButtons,
+                CachedCardStates = heroHud.RuneCardStates
             });
             totemRuneState.SetResolvedRune(result.SelectedRuneSlot, result.SelectedRuneId);
         }
@@ -94,11 +94,6 @@ namespace IdleGame.UI.Hud
         private void SelectTotem(string totemId)
         {
             ApplyTotemRuneUiAction(totemRuneState.SelectTotem(totemId));
-        }
-
-        private void EquipSelectedTotem()
-        {
-            ApplyTotemRuneUiAction(totemRuneState.EquipSelectedTotem());
         }
 
         private void RefreshPendingRuneSlotGlow()

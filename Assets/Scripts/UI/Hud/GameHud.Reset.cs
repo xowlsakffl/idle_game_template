@@ -70,6 +70,9 @@ namespace IdleGame.UI.Hud
             facilityCollectButtons.Clear();
             facilityAssignmentRowTexts.Clear();
             facilityAssignmentSlotTexts.Clear();
+            facilityCardStates.Clear();
+            facilityAssignmentRowTextStates.Clear();
+            facilityAssignmentSlotStates.Clear();
             heroDetailEquipmentState.ResetFilters();
             abilityNotificationDots.Clear();
             growthStepButtons.Clear();

@@ -21,6 +21,7 @@ namespace IdleGame.UI.Common
         public static readonly HudButtonVisualStyle Danger = new HudButtonVisualStyle(20, new Color(0.58f, 0.12f, 0.12f, 1f));
         public static readonly HudButtonVisualStyle Tab = new HudButtonVisualStyle(20, new Color(0.18f, 0.24f, 0.38f, 1f));
         public static readonly HudButtonVisualStyle TabSelected = new HudButtonVisualStyle(20, new Color(0.42f, 0.54f, 0.82f, 1f));
+        public static readonly HudButtonVisualStyle HeroSubTab = new HudButtonVisualStyle(HudLayoutConfig.HeroPageTabButtonFontSize, new Color(0.18f, 0.24f, 0.38f, 1f));
         public static readonly HudButtonVisualStyle SmallPreset = new HudButtonVisualStyle(18, new Color(0.21f, 0.29f, 0.45f, 1f));
         public static readonly HudButtonVisualStyle SmallPresetSelected = new HudButtonVisualStyle(18, new Color(0.50f, 0.64f, 0.96f, 1f));
         public static readonly HudButtonVisualStyle Slot = new HudButtonVisualStyle(18, new Color(0.18f, 0.22f, 0.31f, 1f));

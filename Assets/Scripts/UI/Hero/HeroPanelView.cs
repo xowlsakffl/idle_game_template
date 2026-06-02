@@ -57,10 +57,11 @@ namespace IdleGame.UI.Hero
             GameObject tabs = new GameObject("HeroPageTabs", typeof(RectTransform));
             tabs.transform.SetParent(args.Parent, false);
             HorizontalLayoutGroup tabLayout = tabs.AddComponent<HorizontalLayoutGroup>();
-            tabLayout.spacing = 4;
+            tabLayout.spacing = 6;
+            tabLayout.childAlignment = TextAnchor.MiddleCenter;
             tabLayout.childControlWidth = true;
             tabLayout.childControlHeight = true;
-            tabLayout.childForceExpandWidth = true;
+            tabLayout.childForceExpandWidth = false;
             tabLayout.childForceExpandHeight = true;
             HudUiFactory.AddLayoutElement(tabs, -1, HudLayoutConfig.HeroPageTabsHeight);
 
@@ -73,7 +74,8 @@ namespace IdleGame.UI.Hero
 
         private static void CreateTabButton(HeroPanelViewBuildFooterArgs args, Transform parent, HeroPageTab tab, string label)
         {
-            Button button = HudUiFactory.CreateButton(label, parent, HudButtonStyle.Tab);
+            Button button = HudUiFactory.CreateButton(label, parent, HudButtonStyle.HeroSubTab);
+            HudUiFactory.AddLayoutElement(button.gameObject, HudLayoutConfig.HeroPageTabButtonWidth, -1);
             button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
             args.TabButtons[tab] = button;
         }

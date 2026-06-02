@@ -13,18 +13,20 @@ namespace IdleGame.UI.Common
 
         public const float HeroTitleHeight = 30f;
         public const int HeroTitleFontSize = 24;
-        public const float HeroFormationSummaryHeight = 34f;
+        public const float HeroFormationSummaryHeight = 28f;
         public const int HeroFormationSummaryFontSize = 21;
-        public const float HeroFormationAreaHeight = 300f;
-        public const float HeroFormationRuneRowHeight = 64f;
-        public const float HeroFormationOwnedEffectHeight = 30f;
-        public const float HeroFormationActionRowHeight = 46f;
-        public const float HeroPageTabsHeight = 48f;
-        public const float HeroRosterMinHeight = 240f;
+        public const float HeroFormationAreaHeight = 252f;
+        public const float HeroFormationRuneRowHeight = 58f;
+        public const float HeroFormationOwnedEffectHeight = 28f;
+        public const float HeroFormationActionRowHeight = 42f;
+        public const float HeroPageTabsHeight = 34f;
+        public const float HeroPageTabButtonWidth = 78f;
+        public const int HeroPageTabButtonFontSize = 16;
+        public const float HeroRosterMinHeight = 320f;
 
-        public const float HeroPresetColumnWidth = 70f;
+        public const float HeroPresetColumnWidth = 72f;
         public const float HeroPresetTitleHeight = 24f;
-        public const float HeroPresetButtonHeight = 30f;
+        public const float HeroPresetButtonHeight = 28f;
         public const int HeroPresetTitleFontSize = 16;
         public const int HeroPresetButtonFontSize = 16;
 

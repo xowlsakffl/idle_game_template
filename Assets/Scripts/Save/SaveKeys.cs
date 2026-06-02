@@ -72,6 +72,7 @@ namespace IdleGame.Save
 
         public static string HeroFormationTotem(int preset)
         {
+            // Legacy compatibility only. Totems are global progression now, not preset equipment.
             return "heroFormation." + preset + ".totem";
         }
 

@@ -170,21 +170,6 @@ namespace IdleGame.UI.Hero.TotemRune
             return state != null && state.CanPromote;
         }
 
-        public static string GetTotemGlobalEquipMessage()
-        {
-            return "토템은 장착 없이 6종 효과가 모두 적용됩니다.";
-        }
-
-        public static string GetTotemSlotDisabledMessage()
-        {
-            return "토템 장착 슬롯은 사용하지 않습니다.";
-        }
-
-        public static string GetTotemRemoveDisabledMessage()
-        {
-            return "토템은 해제할 수 없는 전역 성장 요소입니다.";
-        }
-
         public static TotemRuneActionResult TryLevelOrPromoteTotem(
             BattleManager battleManager,
             CurrencyWallet wallet,

@@ -57,6 +57,17 @@ namespace IdleGame.Battle
                 : " / 최초 클리어 " + rewardText;
         }
 
+        public static string GrantFirstClearReward(
+            StageDefinition stage,
+            CurrencyWallet wallet,
+            string highestStageId,
+            bool chapterOneBossCleared)
+        {
+            StageClearReward reward = GetFirstClearReward(stage, highestStageId, chapterOneBossCleared);
+            ApplyFirstClearReward(wallet, reward);
+            return BuildFirstClearRewardLogSuffix(reward);
+        }
+
         public static StageKillResult RegisterKill(StageDefinition stage, int currentKills, int requiredKills)
         {
             int nextKills = currentKills + 1;

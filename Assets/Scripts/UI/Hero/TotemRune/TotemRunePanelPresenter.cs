@@ -18,11 +18,10 @@ namespace IdleGame.UI.Hero.TotemRune
         public string SelectedTotemId;
         public Text SummaryText;
         public Text DetailText;
-        public Button EquipButton;
         public Button LevelUpButton;
         public Dictionary<string, Text> ButtonTexts;
         public Dictionary<string, Button> Buttons;
-        public Dictionary<string, Button> ActionButtons;
+        public Dictionary<string, TotemRuneCardViewState> CachedCardStates;
         public Func<long, string> FormatCountNumber;
     }
 
@@ -44,6 +43,7 @@ namespace IdleGame.UI.Hero.TotemRune
         public Dictionary<string, Text> ButtonTexts;
         public Dictionary<string, Button> Buttons;
         public Dictionary<string, Button> ActionButtons;
+        public Dictionary<string, TotemRuneCardViewState> CachedCardStates;
     }
 
     public sealed class RunePanelPresenterResult
@@ -123,6 +123,10 @@ namespace IdleGame.UI.Hero.TotemRune
                 TotemState state = args.BattleManager.GetTotemState(totem.Id);
                 bool selected = selectedState != null && selectedState.Definition.Id == totem.Id;
                 TotemRuneCardViewState cardState = TotemRunePanelStateBuilder.BuildTotemCardState(totem, state, selected);
+                if (IsCachedCardCurrent(args.CachedCardStates, totem.Id, cardState))
+                {
+                    continue;
+                }
 
                 if (args.ButtonTexts != null && args.ButtonTexts.TryGetValue(totem.Id, out Text text) && text != null)
                 {
@@ -134,12 +138,7 @@ namespace IdleGame.UI.Hero.TotemRune
                     HudUiFactory.SetButtonColor(button, cardState.ButtonColor);
                 }
 
-                if (args.ActionButtons != null
-                    && args.ActionButtons.TryGetValue(totem.Id, out Button actionButton)
-                    && actionButton != null)
-                {
-                    actionButton.gameObject.SetActive(cardState.ActionVisible);
-                }
+                CacheCardState(args.CachedCardStates, totem.Id, cardState);
             }
         }
 
@@ -158,11 +157,6 @@ namespace IdleGame.UI.Hero.TotemRune
 
         private static void ApplyTotemButtons(TotemPanelPresenterArgs args, TotemState selectedState)
         {
-            if (args.EquipButton != null)
-            {
-                args.EquipButton.gameObject.SetActive(false);
-            }
-
             if (args.LevelUpButton == null)
             {
                 return;
@@ -198,6 +192,10 @@ namespace IdleGame.UI.Hero.TotemRune
                 bool selected = selectedState != null && selectedState.Definition.Id == rune.Id;
                 bool equipped = TotemRuneActionService.IsRuneEquipped(args.BattleManager, args.SelectedHeroPreset, rune.Id);
                 TotemRuneCardViewState cardState = TotemRunePanelStateBuilder.BuildRuneCardState(rune, state, selected, equipped);
+                if (IsCachedCardCurrent(args.CachedCardStates, rune.Id, cardState))
+                {
+                    continue;
+                }
 
                 if (args.ButtonTexts != null && args.ButtonTexts.TryGetValue(rune.Id, out Text text) && text != null)
                 {
@@ -218,6 +216,8 @@ namespace IdleGame.UI.Hero.TotemRune
                     HudUiFactory.SetButtonText(actionButton, cardState.ActionText);
                     HudUiFactory.SetButtonColor(actionButton, cardState.ActionColor);
                 }
+
+                CacheCardState(args.CachedCardStates, rune.Id, cardState);
             }
         }
 
@@ -250,6 +250,28 @@ namespace IdleGame.UI.Hero.TotemRune
                 args.LevelUpButton.interactable = buttonState.Interactable;
                 HudUiFactory.SetButtonText(args.LevelUpButton, buttonState.Text);
                 HudUiFactory.SetButtonColor(args.LevelUpButton, buttonState.Color);
+            }
+        }
+
+        private static bool IsCachedCardCurrent(
+            Dictionary<string, TotemRuneCardViewState> cachedStates,
+            string id,
+            TotemRuneCardViewState state)
+        {
+            return cachedStates != null
+                && cachedStates.TryGetValue(id, out TotemRuneCardViewState cachedState)
+                && state != null
+                && state.IsSameAs(cachedState);
+        }
+
+        private static void CacheCardState(
+            Dictionary<string, TotemRuneCardViewState> cachedStates,
+            string id,
+            TotemRuneCardViewState state)
+        {
+            if (cachedStates != null && !string.IsNullOrEmpty(id) && state != null)
+            {
+                cachedStates[id] = state;
             }
         }
     }

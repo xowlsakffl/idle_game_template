@@ -19,7 +19,6 @@ namespace IdleGame.UI.Hero.TotemRune
         private const string DefaultRuneId = "RUNE_STRIKE";
 
         public string SelectedTotemId { get; private set; } = DefaultTotemId;
-        public string PendingTotemEquipId { get; private set; } = string.Empty;
         public string SelectedRuneId { get; private set; } = DefaultRuneId;
         public string PendingRuneEquipId { get; private set; } = string.Empty;
         public int SelectedRuneSlot { get; private set; } = 1;
@@ -27,7 +26,6 @@ namespace IdleGame.UI.Hero.TotemRune
         public void ResetRuntime()
         {
             SelectedTotemId = DefaultTotemId;
-            PendingTotemEquipId = string.Empty;
             SelectedRuneId = DefaultRuneId;
             PendingRuneEquipId = string.Empty;
             SelectedRuneSlot = 1;
@@ -54,7 +52,6 @@ namespace IdleGame.UI.Hero.TotemRune
         {
             SelectedRuneId = runeId;
             PendingRuneEquipId = string.Empty;
-            PendingTotemEquipId = string.Empty;
             return new TotemRuneUiActionResult
             {
                 ShouldRefreshRunePanel = true
@@ -69,7 +66,6 @@ namespace IdleGame.UI.Hero.TotemRune
             }
 
             SelectedRuneId = runeId;
-            PendingTotemEquipId = string.Empty;
 
             int equippedSlot = TotemRuneActionService.GetEquippedRuneSlot(battleManager, preset, runeId);
             if (equippedSlot > 0)
@@ -166,45 +162,9 @@ namespace IdleGame.UI.Hero.TotemRune
         public TotemRuneUiActionResult SelectTotem(string totemId)
         {
             SelectedTotemId = totemId;
-            PendingTotemEquipId = string.Empty;
             return new TotemRuneUiActionResult
             {
                 ShouldRefreshTotemPanel = true
-            };
-        }
-
-        public TotemRuneUiActionResult EquipSelectedTotem()
-        {
-            PendingTotemEquipId = string.Empty;
-            return new TotemRuneUiActionResult
-            {
-                NoticeMessage = TotemRuneActionService.GetTotemGlobalEquipMessage()
-            };
-        }
-
-        public TotemRuneUiActionResult HandleTotemSlotClick()
-        {
-            return new TotemRuneUiActionResult
-            {
-                NoticeMessage = TotemRuneActionService.GetTotemSlotDisabledMessage()
-            };
-        }
-
-        public TotemRuneUiActionResult TryEquipPendingTotem()
-        {
-            PendingTotemEquipId = string.Empty;
-            return new TotemRuneUiActionResult
-            {
-                NoticeMessage = TotemRuneActionService.GetTotemGlobalEquipMessage()
-            };
-        }
-
-        public TotemRuneUiActionResult RemoveTotem()
-        {
-            PendingTotemEquipId = string.Empty;
-            return new TotemRuneUiActionResult
-            {
-                NoticeMessage = TotemRuneActionService.GetTotemRemoveDisabledMessage()
             };
         }
 

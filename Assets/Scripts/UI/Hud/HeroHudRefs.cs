@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using IdleGame.Data;
 using IdleGame.UI.Hero;
 using IdleGame.UI.Hero.Detail;
+using IdleGame.UI.Hero.Formation;
+using IdleGame.UI.Hero.TotemRune;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -43,10 +45,11 @@ namespace IdleGame.UI.Hud
         public readonly Dictionary<string, Text> TraitButtonTexts = new Dictionary<string, Text>();
         public readonly Dictionary<string, Button> TotemButtons = new Dictionary<string, Button>();
         public readonly Dictionary<string, Text> TotemButtonTexts = new Dictionary<string, Text>();
-        public readonly Dictionary<string, Button> TotemActionButtons = new Dictionary<string, Button>();
+        public readonly Dictionary<string, TotemRuneCardViewState> TotemCardStates = new Dictionary<string, TotemRuneCardViewState>();
         public readonly Dictionary<string, Button> RuneButtons = new Dictionary<string, Button>();
         public readonly Dictionary<string, Text> RuneButtonTexts = new Dictionary<string, Text>();
         public readonly Dictionary<string, Button> RuneActionButtons = new Dictionary<string, Button>();
+        public readonly Dictionary<string, TotemRuneCardViewState> RuneCardStates = new Dictionary<string, TotemRuneCardViewState>();
         public readonly Dictionary<int, Button> FormationRuneSlotButtons = new Dictionary<int, Button>();
         public readonly Dictionary<int, Text> FormationRuneSlotTexts = new Dictionary<int, Text>();
         public readonly Dictionary<int, Button> FormationRuneSlotRemoveButtons = new Dictionary<int, Button>();
@@ -71,6 +74,7 @@ namespace IdleGame.UI.Hud
         public readonly Dictionary<string, Button> RosterButtons = new Dictionary<string, Button>();
         public readonly Dictionary<string, Button> RosterActionButtons = new Dictionary<string, Button>();
         public readonly Dictionary<string, GameObject> RosterDeployedOverlays = new Dictionary<string, GameObject>();
+        public readonly Dictionary<string, HeroRosterCardState> RosterCardStates = new Dictionary<string, HeroRosterCardState>();
         public readonly List<Text> FormationSlotTexts = new List<Text>();
         public readonly Dictionary<string, GameObject> NotificationDots = new Dictionary<string, GameObject>();
         public readonly Dictionary<string, Text> SkillStatusTexts = new Dictionary<string, Text>();
@@ -80,7 +84,6 @@ namespace IdleGame.UI.Hud
         public Button DetailExcludeButton;
         public Button DetailLevelUpButton;
         public Button DetailStarUpButton;
-        public Button TotemEquipButton;
         public Button TotemLevelUpButton;
         public Button RuneEquipButton;
         public Button RuneLevelUpButton;
@@ -123,10 +126,11 @@ namespace IdleGame.UI.Hud
             TraitButtonTexts.Clear();
             TotemButtons.Clear();
             TotemButtonTexts.Clear();
-            TotemActionButtons.Clear();
+            TotemCardStates.Clear();
             RuneButtons.Clear();
             RuneButtonTexts.Clear();
             RuneActionButtons.Clear();
+            RuneCardStates.Clear();
             FormationRuneSlotButtons.Clear();
             FormationRuneSlotTexts.Clear();
             FormationRuneSlotRemoveButtons.Clear();
@@ -151,6 +155,7 @@ namespace IdleGame.UI.Hud
             RosterButtons.Clear();
             RosterActionButtons.Clear();
             RosterDeployedOverlays.Clear();
+            RosterCardStates.Clear();
             FormationSlotTexts.Clear();
             NotificationDots.Clear();
             SkillStatusTexts.Clear();
@@ -160,7 +165,6 @@ namespace IdleGame.UI.Hud
             DetailExcludeButton = null;
             DetailLevelUpButton = null;
             DetailStarUpButton = null;
-            TotemEquipButton = null;
             TotemLevelUpButton = null;
             RuneEquipButton = null;
             RuneLevelUpButton = null;

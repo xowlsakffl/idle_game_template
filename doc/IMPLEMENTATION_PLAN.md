@@ -14,7 +14,7 @@
 - 룬 2~4번 슬롯은 `GameData.GetRuneSlotUnlockLevel`의 계정 레벨 조건을 따른다.
 - 잠긴 슬롯은 `잠금 / Lv.X`를 표시하고, 클릭하면 해금 레벨 안내만 띄운다.
 - 룬 슬롯 클릭 시 현재 편성 화면 위에 룬 목록 모달을 띄운다.
-- 토템 탭은 강화/전체 진화/정보 확인용으로 유지하고 장착 버튼은 제거한다.
+- 토템 탭은 선택, 강화/전체 진화, 정보 확인용으로 유지하고 장착 버튼과 `+` 액션은 만들지 않는다.
 - 영웅, 룬 변경은 `editingFormationHeroIds`, `editingFormationRuneIds`에 임시 보관한다.
 - 편성 탭을 나가거나 닫을 때 dirty 상태면 저장 확인 팝업을 띄운다.
 - 확인 시 `BattleManager.ApplyHeroFormationLoadout`으로 영웅/룬을 한 번에 저장하고 `StartStage()`로 현재 스테이지를 다시 시작한다.
@@ -26,6 +26,15 @@
 - `activeTab == Growth`일 때만 `contentRoot`가 레이아웃 높이를 차지한다.
 - 그 외 메뉴는 `contentLayoutElement.ignoreLayout = true`로 전환해 전투 화면 위에 오버레이한다.
 - 하단 탭은 유지해야 하므로 오버레이 패널의 하단 오프셋은 130px로 둔다.
+
+# 현재 구현 기준
+
+- 하단 대메뉴는 `성장, 영웅, 요새, 시설, 소환, 배틀, 상점` 순서다.
+- 영웅 하위 탭은 `편성, 특성, 토템, 룬`이다. 시설은 영웅 하위 탭이 아니라 별도 대메뉴다.
+- 토템은 장착 슬롯을 완전히 폐기한 전역 성장축이다. 토템 탭에는 선택, 효과 확인, 강화/전체 진화만 둔다.
+- 룬은 프리셋별 4칸 장착물이다. 영웅/룬 편성 변경은 저장 확인 후 반영하고 스테이지를 다시 시작한다.
+- 요새는 Lv.1~300 단일 레벨 성장축이다. 요새 경험치는 누적 기준이며 레벨업 시 소모하지 않는다.
+- 시설 파견은 6종 시설, 12시간 누적 생산, 영웅 배치, 사냥 자재 업그레이드를 가진 별도 대메뉴다.
 
 # Unity 구현 계획
 
@@ -51,18 +60,32 @@ Assets/
   Scenes/
     Main.unity
   Scripts/
+    App/
+      GameBootstrap.cs
     Battle/
       BattleManager.cs
-      HeroUnit.cs
-      EnemyUnit.cs
+      BattleManager.*.cs
+      BattleStatePersistenceService*.cs
+      Combat*Service.cs
+      Formation*Service.cs
+      Facility*Service.cs
+      Fortress*Service.cs
+      Stage*Service.cs
+      TotemRune*Service.cs
+    Battlefield/
+      BattlefieldWorldView.cs
+      BattlefieldWorldView.*.cs
     Data/
-      HeroData.cs
-      EnemyData.cs
-      BossData.cs
-      StageData.cs
+      GameData*.cs
+      GameNumber*.cs
+      HeroDefinition*.cs
+      RuneDefinition*.cs
+      TotemDefinition*.cs
+      *State.cs
+      *Types.cs
     Economy/
-      CurrencyManager.cs
-      RewardManager.cs
+      CurrencyWallet*.cs
+      EquipmentInventory*.cs
     Gacha/
       GachaManager.cs
     Progression/
@@ -71,10 +94,17 @@ Assets/
     Save/
       SaveManager.cs
     UI/
-      MainHUD.cs
-      HeroPanel.cs
-      StagePanel.cs
-      GachaPanel.cs
+      Battle/
+      Common/
+      Debug/
+      Facility/
+      Fortress/
+      Growth/
+      Hero/
+      Hud/
+      Navigation/
+      Stage/
+      Summon/
   ScriptableObjects/
     Heroes/
     Enemies/
@@ -96,7 +126,7 @@ Assets/
 - 기본 UI Canvas 생성
 - 상단 골드/스테이지/진행 모드 영역 배치
 - 중앙 전투 영역 배치
-- 하단 메뉴를 성장, 영웅, 소환, 던전 배틀, 상점 순서로 배치
+- 하단 메뉴를 성장, 영웅, 요새, 시설, 소환, 배틀, 상점 순서로 배치
 
 ## 2단계: 데이터 정의
 
@@ -177,7 +207,7 @@ Assets/
 
 주의:
 
-뽑기를 캐릭터 해금 시스템으로 만들면 예외 처리가 늘어난다. 1차 MVP에서는 모든 영웅을 기본 보유시키고, 뽑기는 조각 획득으로 제한하는 편이 낫다.
+신규 계정은 커먼 시작 영웅 6명만 기본 보유한다. 나머지 영웅은 뽑기에서 조각을 1개 이상 획득하면 보유 상태가 된다. 뽑기는 영웅 본체를 여러 장 지급하지 않고, 1회당 선택된 영웅 조각 1개를 지급한다.
 
 ## 8단계: 로컬 저장
 
@@ -317,7 +347,7 @@ Assets/
 ```
 
 이벤트 뽑기와 룬 뽑기는 구조만 고려한다. 장비 뽑기는 장비 보유 수량/레벨/성급 저장과 영웅별 장착/해제 UI까지 구현하고, 강화 UI와 스탯 전투 반영은 별도 단계로 둔다.
-## 현재 작업: 토템 강화
+## 완료: 토템 강화
 
 구현 목표는 토템을 프리셋 장착물에서 전역 장기 성장축으로 바꾸는 것이다. 룬/장비와 역할이 겹치지 않도록 장착 슬롯을 폐기하고, 기본 6개 카테고리 효과가 항상 모두 적용되게 한다. 진화는 개별 토템 승급이 아니라 같은 등급 6종을 모두 Lv.100까지 올린 뒤 전체가 다음 등급으로 넘어가는 구조로 간다.
 
@@ -339,7 +369,7 @@ Assets/
 - 토템 정수의 실제 획득처를 스테이지 첫 클리어, 반복 보상, 던전 중 어디에 둘지 결정
 - 토템 성급 또는 중복 획득 구조는 뽑기 경제 설계 후 추가
 - 장기 운영 보상 곡선에서 토템 정수 공급량 검증
-## 현재 작업: 룬 페이지 1차 구현
+## 완료: 룬 페이지 1차 구현
 
 룬은 영웅 탭 하단의 `룬` 페이지에서 합성과 정보 확인을 관리한다. 실제 장착은 편성 탭의 룬 슬롯 4개와 목록 모달에서 처리하고, 같은 룬은 한 프리셋 안에서 중복 장착할 수 없다.
 
@@ -354,81 +384,51 @@ Assets/
 
 아직 제외한 범위는 룬 뽑기와 세트 효과다. 룬 등급은 넣되 레벨과 별도 조각 재화를 빼서 성장축을 줄이고, 합성 요구량을 크게 잡아 장기 수집 축으로 둔다.
 
-## 보류: 성물 1차 구현
+## 활성 구현: 시설 파견
 
-이 작업은 현재 MVP에서 폐기/보류한다. 영웅 하단의 5번째 탭은 성물이 아니라 시설 파견으로 교체되었다. 아래 내용은 재기획 참고용으로만 남긴다.
+시설 파견은 별도 하단 대메뉴다.
 
-성물은 속성별 영웅 강화 시스템으로 둔다. 장착 슬롯이나 랜덤 옵션을 붙이지 않고, 각 속성 성물 레벨이 같은 속성 영웅의 공격력과 체력만 올린다.
+완료된 구현 범위:
 
-구현 범위:
+1. 데이터
+   - `FacilityDefinition`, `FacilityRewardKind`, `FacilityUpgradeCost`, `FacilityState` 추가
+   - `GameData`에 의뢰소, 훈련소, 대장간, 토템 제단, 룬 공방, 초월 연구소 6종 등록
 
-- `HeroElement` 추가: 화염, 냉기, 번개, 암흑, 신성, 자연
-- 기존 영웅에 기본 속성 자동 배정
-- `ElementRelicDefinition`, `ElementRelicState` 추가
-- `GameData`에 성물 6종 등록
-- `CurrencyWallet`에 `ElementRelicFragment` 추가
-- `SaveKeys`에 성물 파편과 성물 레벨 저장 키 추가
-- `BattleManager`에 성물 로드, 강화, 전투력/공격력/체력 계산 반영
-- 영웅 탭 하단 `성물` 페이지에 성물 목록, 효과, 강화 버튼 추가
-- 디버그 패널에 성물 파편 지급 추가
+2. 재화와 저장
+   - `CurrencyWallet`에 목재, 벽돌, 철재 추가
+   - 시설 레벨, 누적 생산량, 마지막 생산 갱신 시각, 배치 영웅, 사냥 자재 저장 키 추가
+   - 시설 업그레이드는 골드를 쓰지 않고 사냥 자재만 사용
 
-제외 범위:
+3. 생산 로직
+   - 실시간/오프라인 경과 시간으로 생산 갱신
+   - 최대 누적 시간 12시간 제한
+   - 시설 레벨 배율 `1 + (level - 1) * 0.08` 적용
+   - 배치 영웅 보너스 시설당 최대 +50% 적용
+   - 시설별 수령과 모두 획득 제공
 
-- 성물 장착 슬롯
-- 성물 뽑기
-- 성물 등급/성급
-- 속성 상성
-- 속성 피해나 상태 이상
-- 성물 세트 효과
+4. 배치 로직
+   - 출전 중인 영웅도 시설 배치 가능
+   - 같은 영웅의 여러 시설 중복 배치 방지
+   - 시설별 자동 배치, 전체 추천 배치, 모두 해제 제공
+   - 생산 점수는 전투력, 레벨, 성급, 등급 기준
 
-다음에 성물을 확장한다면 먼저 속성별 영웅 풀이 충분한지 확인해야 한다. 속성 영웅 수가 적은 상태에서 성물 효과를 크게 주면 특정 속성만 정답이 되거나, 반대로 투자처가 의미 없어질 가능성이 높다.
-## ACTIVE IMPLEMENTATION - Facility Dispatch
-
-Current scope replaces the old Relic/Seongmul page with Facility Dispatch.
-
-Completed implementation targets:
-
-1. Data
-   - Add `FacilityDefinition`, `FacilityRewardKind`, `FacilityUpgradeCost`, and `FacilityState`.
-   - Register six facilities in `GameData`.
-   - Remove active Element Relic data from runtime logic.
-
-2. Economy and save data
-   - Add Wood, Brick, and Iron to `CurrencyWallet`.
-   - Add save keys for facility level, stored production, last update ticks, assigned heroes, and hunting materials.
-   - Keep upgrade costs independent from Gold.
-
-3. Production logic
-   - Refresh production from elapsed realtime/offline time.
-   - Cap accumulated production at 12 hours.
-   - Apply level multiplier `1 + (level - 1) * 0.08`.
-   - Apply assigned hero bonus capped at +50%.
-   - Provide per-facility collect and collect all.
-
-4. Assignment logic
-   - Allow battle-deployed heroes to be assigned.
-   - Prevent the same hero from being assigned to more than one facility.
-   - Add per-facility auto assignment, global recommended assignment, and clear all.
-   - Sort candidates by production score from combat power, level, stars, and rarity.
-
-5. Hunting rewards
-   - Add Wood/Brick/Iron rewards to battle drops.
-   - Normal kills can grant Wood.
-   - Boss kills grant facility materials, with Brick/Iron scaling by stage.
+5. 사냥 보상
+   - 전투 보상에 목재/벽돌/철재 추가
+   - 일반 몬스터는 낮은 확률로 목재 지급
+   - 보스는 자재를 지급하고, 벽돌/철재는 스테이지에 따라 확장
 
 6. UI
-   - Rename the old hero bottom Relic tab display to Facility.
-   - Facility page uses a vertical card list.
-   - Facility cards show facility name, level, produced resource, accumulated reward, accumulated time progress, assigned hero count, collect state, collect, upgrade, and MAX state.
-   - Assignment modal shows every facility row with assigned heroes, locked slots, recommended assignment, and clear all.
-   - Recommended assignment preserves existing valid assignments and fills empty unlocked slots only.
+   - 시설 페이지는 세로 카드 리스트
+   - 카드에는 시설명, 레벨, 생산 자원, 누적 보상, 누적 시간, 배치 인원, 수령/업그레이드/MAX 상태 표시
+   - `모두 획득` 성공 시 획득 자원 목록 팝업 표시
+   - 배치 인력 모달은 시설별 행, 배치 영웅, 잠긴 슬롯, 추천 배치, 모두 해제 제공
+   - 추천 배치는 기존 유효 배치를 유지하고 빈 해금 슬롯만 채움
 
-7. Debug
-   - Add Wood +5000, Brick +5000, Iron +5000.
-   - Add simulate all facility production by 12h.
-   - Add all facilities level +1.
+7. 디버그
+   - 목재 +5000, 벽돌 +5000, 철재 +5000
+   - 모든 시설 생산 12시간 시뮬레이션
+   - 모든 시설 Lv.+1
 
-Validation:
+검증 기준:
 
-- Run Unity C# compile after implementation.
-- If Unity Library still references deleted `ElementRelicDefinition.cs`, refresh the Unity editor or regenerate Bee response files. The runtime source no longer depends on that file.
+- 시설 관련 기능 수정 후 Unity C# 컴파일을 다시 돌린다.

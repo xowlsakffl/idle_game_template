@@ -12,7 +12,6 @@ namespace IdleGame.UI.Hero.TotemRune
         public GameObject Content;
         public Text SummaryText;
         public Text DetailText;
-        public Button EquipButton;
         public Button LevelUpButton;
     }
 
@@ -21,13 +20,10 @@ namespace IdleGame.UI.Hero.TotemRune
         public Transform Parent;
         public IReadOnlyList<TotemDefinition> Totems;
         public Action<string> OnSelectTotem;
-        public Action<string> OnTotemAction;
-        public Action OnEquipSelected;
         public Action OnLevelUp;
         public Func<bool> CanLevelUp;
         public Dictionary<string, Button> TotemButtons;
         public Dictionary<string, Text> TotemButtonTexts;
-        public Dictionary<string, Button> TotemActionButtons;
     }
 
     public static class HeroTotemView
@@ -112,11 +108,6 @@ namespace IdleGame.UI.Hero.TotemRune
                 args.TotemButtonTexts[totem.Id] = button.GetComponentInChildren<Text>();
                 Text buttonText = args.TotemButtonTexts[totem.Id];
                 HudUiFactory.ConfigureBestFitText(buttonText, 11, 18, 0.86f);
-
-                Button actionButton = HudUiFactory.CreateCornerActionButton("+", button.transform, HudButtonStyle.ActionAdd, 34f, 4f);
-                actionButton.onClick.AddListener(() => args.OnTotemAction?.Invoke(capturedId));
-                actionButton.gameObject.SetActive(false);
-                args.TotemActionButtons[totem.Id] = actionButton;
             }
         }
 
@@ -131,10 +122,6 @@ namespace IdleGame.UI.Hero.TotemRune
             actionLayout.childForceExpandWidth = true;
             actionLayout.childForceExpandHeight = true;
             HudUiFactory.AddLayoutElement(actionRow, -1, 68);
-
-            refs.EquipButton = HudUiFactory.CreateButton("장착", actionRow.transform, 26, new Color(0.54f, 0.76f, 0.96f, 1f));
-            refs.EquipButton.onClick.AddListener(() => args.OnEquipSelected?.Invoke());
-            refs.EquipButton.gameObject.SetActive(false);
 
             refs.LevelUpButton = HudUiFactory.CreateButton("강화", actionRow.transform, 26, new Color(0.54f, 0.78f, 0.22f, 1f));
             HudUiFactory.ConfigureHoldRepeat(refs.LevelUpButton, args.OnLevelUp, args.CanLevelUp);

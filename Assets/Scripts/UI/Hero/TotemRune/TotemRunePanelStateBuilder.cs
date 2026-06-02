@@ -13,6 +13,17 @@ namespace IdleGame.UI.Hero.TotemRune
         public bool ActionInteractable;
         public string ActionText;
         public Color ActionColor;
+
+        public bool IsSameAs(TotemRuneCardViewState other)
+        {
+            return other != null
+                && Text == other.Text
+                && ButtonColor == other.ButtonColor
+                && ActionVisible == other.ActionVisible
+                && ActionInteractable == other.ActionInteractable
+                && ActionText == other.ActionText
+                && ActionColor == other.ActionColor;
+        }
     }
 
     public sealed class TotemRuneActionButtonViewState

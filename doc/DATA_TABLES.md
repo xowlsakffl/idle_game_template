@@ -128,9 +128,9 @@
 | 영웅 데이터 수 | 38명 |
 | 최대 출전 영웅 | 8명 |
 | 프리셋 수 | 3개 |
-| 하위 탭 | 편성, 특성, 토템, 룬, 시설 |
+| 하위 탭 | 편성, 특성, 토템, 룬 |
 
-1차 구현에서는 편성 탭, 특성 탭, 토템 탭, 룬 탭을 실제 UI로 구현한다. 사이드킥은 제외한다.
+1차 구현에서는 편성 탭, 특성 탭, 토템 탭, 룬 탭을 실제 UI로 구현한다. 시설은 영웅 하위 탭이 아니라 하단 대메뉴로 관리하고, 사이드킥은 제외한다.
 영웅 목록은 한 줄에 6명씩 배치하고, 낮은 등급부터 표시하며, 같은 등급 안에서는 이름 가나다순으로 정렬한다. 미출전 영웅 카드의 `+` 버튼을 누른 뒤 원하는 출전 슬롯을 클릭하면 해당 슬롯에 배치한다. 대상 슬롯에 이미 영웅이 있으면 새 영웅으로 교체한다. 출전 중인 목록 카드는 중앙에 `배치됨` 오버레이를 띄우고 어둡게 처리한다. 출전 슬롯과 출전 중인 목록 카드의 `-` 버튼을 누르면 편성에서 제외한다. `자동 배치` 버튼은 전투력 높은 순서로 영웅을 정렬해 최대 8명까지 편성 초안에 채운다. `일괄 승급` 버튼은 조각이 충분한 모든 영웅을 가능한 성급까지 즉시 승급하고 저장한다. 신규 계정의 1번 프리셋은 시작 전투용 기본 편성으로 취급하고, 저장 이력이 없는 다른 프리셋은 빈 슬롯으로 표시한다. 편성 탭에는 룬 4칸을 표시하고, 룬 슬롯을 누르면 편성 화면 위에 목록 모달을 띄운다. 토템은 장착 슬롯을 쓰지 않고 6종 효과가 전역 적용된다. 편성 변경은 영웅/룬만 화면 안에서 임시 반영하고, 영웅 화면 이탈 시 저장 확인 팝업에서 확인을 누를 때 프리셋별 슬롯을 로컬 저장한다. 저장이 확정되면 현재 스테이지를 다시 시작한다.
 영웅 카드 또는 편성 슬롯의 영웅을 클릭하면 상세 정보 화면을 연다. 상세 정보 화면은 전투력, 보유 경험치책, 스킬 정보, 공격력, 체력, 공속, 이속, 5성/10성 해금 효과를 표시한다. 기본 정보 탭 하단에는 `제외`, `레벨업`, `승급` 버튼을 두고, 각각 편성 초안 제거, 경험치책 소모 레벨업, 영웅 조각 소모 승급을 처리한다. 장비 슬롯은 무기, 모자, 갑옷, 장신구, 포션 5개만 UI로 표시하고, 6번째 슬롯과 장비 스탯 전투 반영은 보류한다.
 
@@ -250,6 +250,37 @@
 | AutoProgress | 자동 진행 | 할당량 달성 시 다음 스테이지로 이동 |
 | RepeatSelected | 선택 반복 | 유저가 선택한 스테이지만 반복 |
 | BossBlocked | 보스 막힘 | 보스 실패 후 직전 일반 스테이지 반복 |
+
+## 요새 데이터
+
+요새는 하단 대메뉴 `요새`에서 관리하는 단일 레벨 성장축이다. 성벽, 망루, 석재/목재 강화 같은 부위별 업그레이드는 현재 MVP에서 제외한다.
+
+| 항목 | 값 |
+| --- | ---: |
+| 시작 레벨 | 1 |
+| 최대 레벨 | 300 |
+| 레벨업 방식 | 누적 요새 경험치 기준 수동 레벨업 |
+| 경험치 소모 여부 | 소모하지 않음 |
+| 전투 반영 | 요새 HP, 자동 공격력, 공격 간격, 사거리, 종합 전투력 |
+| 저장 키 | `fortress.level`, `fortress.experience` |
+
+```text
+다음 레벨 필요 경험치 = ceil(62 * (다음레벨 - 1)^2.08 + 35 * (다음레벨 - 1))
+요새 HP = floor(520 + 레벨 * 38 + 레벨^1.22 * 16)
+요새 공격력 = floor(12 + 레벨 * 2.6 + 레벨^1.16 * 1.8)
+요새 공격 간격 = max(0.82, 2.10 - 레벨 * 0.0065)
+요새 사거리 = min(4.35, 2.35 + 레벨 * 0.018)
+요새 전투력 = floor(300 + 레벨 * 18 + 레벨^1.08 * 2.6)
+```
+
+요새 경험치 보상:
+
+```text
+일반 처치 요새 EXP = floor(max(1, 3 + 전역 스테이지 번호 * 0.85))
+보스 처치 요새 EXP = 일반 기준 * 24
+```
+
+밸런스 메모: 요새는 영웅 성장을 대체하면 안 된다. 현재 역할은 원거리/지원 영웅 보호, 전장 중앙 기준점, 소량의 자동 공격 보조다. 요새 레벨이 보스 클리어의 주된 답이 되면 영웅 수집/장비/룬의 이유가 약해진다.
 
 ## 스테이지 선택 규칙
 
@@ -558,71 +589,33 @@
 
 룬 목록 모달은 현재 프리셋의 임시 장착 상태를 기준으로 `장착됨` 오버레이를 표시한다. 저장 전 임시 변경은 전투 계산에 반영하지 않는다.
 
-## 성물 데이터 (폐기/보류)
+## 시설 파견 데이터
 
-아래 성물 데이터는 현재 MVP 런타임에서 사용하지 않는다. 영웅 하단 탭의 활성 5번째 페이지는 시설이며, 성물형 장기 성장축은 재기획 전까지 보류한다.
+시설 파견은 하단 대메뉴 `시설`에서 관리하는 시간 기반 자원 생산 시스템이다.
 
-성물은 영웅 속성별 계정 성장축이다. 편성 슬롯에 장착하지 않고, 보유한 모든 성물 레벨이 같은 속성 영웅에게만 적용된다. 1차 구현에서는 속성 상성, 상태 이상, 속성 피해 증폭을 넣지 않는다. 효과는 해당 속성 영웅의 공격력과 체력 증가만 둔다.
+### 시설 목록
 
-| ID | 속성 | 이름 | 적용 대상 | 효과 |
-| --- | --- | --- | --- | --- |
-| RELIC_FIRE | 화염 | 화염 성물 | 화염 영웅 | 공격력, 체력 |
-| RELIC_ICE | 냉기 | 냉기 성물 | 냉기 영웅 | 공격력, 체력 |
-| RELIC_LIGHTNING | 번개 | 번개 성물 | 번개 영웅 | 공격력, 체력 |
-| RELIC_DARK | 암흑 | 암흑 성물 | 암흑 영웅 | 공격력, 체력 |
-| RELIC_HOLY | 신성 | 신성 성물 | 신성 영웅 | 공격력, 체력 |
-| RELIC_NATURE | 자연 | 자연 성물 | 자연 영웅 | 공격력, 체력 |
-
-| 항목 | 값 |
-| --- | ---: |
-| 최대 레벨 | 1000 |
-| 레벨당 공격력 | +0.02% |
-| 레벨당 체력 | +0.02% |
-| Lv.1000 총 공격력 | +20.0% |
-| Lv.1000 총 체력 | +20.0% |
-| 강화 재료 | 성물 파편 |
-
-성물 강화 비용:
-
-```text
-cost = floor(10 * 1.035^currentLevel)
-```
-
-저장 키:
-
-| 키 | 용도 |
-| --- | --- |
-| `elementRelicFragment` | 성물 파편 보유량 |
-| `elementRelic.{relicId}.level` | 성물 레벨 |
-
-밸런스 메모: 성물은 영웅 전체 공격력 증가가 아니라 속성별 공격력/체력만 올린다. 따라서 특정 속성 편성을 밀어주는 장기 목표는 생기지만, 모든 성장축이 동시에 곱연산으로 터지는 문제를 줄인다.
-## ACTIVE DATA - Facility Dispatch
-
-The old Element Relic data table is deprecated. Active replacement data is Facility Dispatch.
-
-### Facilities
-
-| ID | Display | Reward | Base per hour | Cycle | Max stored |
+| ID | 표시명 | 생산 자원 | 시간당 기본 생산량 | 생산 주기 | 최대 누적 |
 | --- | --- | --- | ---: | ---: | ---: |
-| `FAC_REQUEST` | 의뢰소 | Gold | 1200 | 1h | 12h |
-| `FAC_TRAINING` | 훈련소 | Hero EXP Book | 240 | 1h | 12h |
-| `FAC_FORGE` | 대장간 | Equipment EXP Book | 180 | 1h | 12h |
-| `FAC_TOTEM` | 토템 제단 | Totem Essence | 40 | 1h | 12h |
-| `FAC_RUNE` | 룬 공방 | Rune Box | 4 | 1h | 12h |
-| `FAC_TRANSCEND` | 초월 연구소 | Transcend Stone | 12 | 1h | 12h |
+| `FAC_REQUEST` | 의뢰소 | 골드 | 1200 | 1시간 | 12시간 |
+| `FAC_TRAINING` | 훈련소 | 영웅 경험치책 | 240 | 1시간 | 12시간 |
+| `FAC_FORGE` | 대장간 | 장비 경험치책 | 180 | 1시간 | 12시간 |
+| `FAC_TOTEM` | 토템 제단 | 토템 정수 | 40 | 1시간 | 12시간 |
+| `FAC_RUNE` | 룬 공방 | 룬 상자 | 4 | 1시간 | 12시간 |
+| `FAC_TRANSCEND` | 초월 연구소 | 초월석 | 12 | 1시간 | 12시간 |
 
-### Facility Upgrade
+### 시설 업그레이드
 
-| Target level | Materials |
+| 목표 레벨 | 재료 |
 | ---: | --- |
-| 2-5 | Wood |
-| 6-10 | Wood + Brick |
-| 11-15 | Brick + Iron |
-| 16-20 | Wood + Brick + Iron |
+| 2-5 | 목재 |
+| 6-10 | 목재 + 벽돌 |
+| 11-15 | 벽돌 + 철재 |
+| 16-20 | 목재 + 벽돌 + 철재 |
 
-Slot unlocks:
+배치 슬롯 해금:
 
-| Facility level | Assigned hero slots |
+| 시설 레벨 | 배치 영웅 슬롯 |
 | ---: | ---: |
 | 1 | 1 |
 | 5 | 2 |
@@ -630,39 +623,40 @@ Slot unlocks:
 | 15 | 4 |
 | 20 | 5 |
 
-Formula:
+생산 공식:
 
 ```text
-facility_level_multiplier = 1 + (level - 1) * 0.08
-hero_assignment_bonus = clamp(sum(hero_production_score) / 120000, 0, 0.50)
-production_per_hour = base_per_hour * facility_level_multiplier * (1 + hero_assignment_bonus)
+시설 레벨 배율 = 1 + (레벨 - 1) * 0.08
+영웅 배치 보너스 = clamp(배치 영웅 생산 점수 합 / 120000, 0, 0.50)
+시간당 생산량 = 기본 시간당 생산량 * 시설 레벨 배율 * (1 + 영웅 배치 보너스)
 ```
 
-Hero production score uses combat power, level, stars, and rarity only. Facility preference traits are intentionally excluded.
+영웅 생산 점수는 전투력, 레벨, 성급, 등급만 사용한다. 시설별 선호 특성은 의도적으로 제외한다.
 
-UI rules:
+UI 규칙:
 
-- Facility page is a vertical card list.
-- Each card shows facility name, level, produced resource, accumulated reward, equivalent accumulated time, assigned hero count, collect state, and upgrade/MAX state.
-- Bottom actions are `배치 인력` and `모두 획득`.
-- Assignment modal rows show assigned heroes and locked slots.
-- `추천 배치` preserves valid assigned heroes and fills only empty unlocked slots with highest production-score heroes.
-- `모두 해제` clears every facility assignment.
+- 시설 화면은 세로 카드 리스트다.
+- 각 카드는 시설명, 레벨, 생산 자원, 누적 보상, 누적 시간, 배치 인원, 수령 상태, 업그레이드/MAX 상태를 표시한다.
+- 하단 액션은 `배치 인력`, `모두 획득`이다.
+- `모두 획득` 성공 시 획득한 자원 목록을 팝업으로 요약 표시한다.
+- 배치 인력 모달은 시설별 행, 배치 영웅, 잠긴 슬롯을 표시한다.
+- `추천 배치`는 유효한 기존 배치를 유지하고, 비어 있는 해금 슬롯만 생산 점수가 높은 영웅으로 채운다.
+- `모두 해제`는 모든 시설 배치를 해제한다.
 
-### New Wallet Keys
+### 저장 키
 
-| Key | Purpose |
+| 키 | 용도 |
 | --- | --- |
-| `wood` | Hunting material for facility upgrades |
-| `brick` | Hunting material for facility upgrades |
-| `iron` | Hunting material for facility upgrades |
-| `facility.{facilityId}.level` | Facility level |
-| `facility.{facilityId}.stored` | Accumulated reward amount |
-| `facility.{facilityId}.lastUpdateUtcTicks` | Last production refresh UTC ticks |
-| `facility.{facilityId}.assignedHero.{slot}` | Assigned hero id per slot |
+| `wood` | 시설 업그레이드용 사냥 자재: 목재 |
+| `brick` | 시설 업그레이드용 사냥 자재: 벽돌 |
+| `iron` | 시설 업그레이드용 사냥 자재: 철재 |
+| `facility.{facilityId}.level` | 시설 레벨 |
+| `facility.{facilityId}.stored` | 시설별 누적 보상 |
+| `facility.{facilityId}.lastUpdateUtcTicks` | 마지막 생산 갱신 UTC ticks |
+| `facility.{facilityId}.assignedHero.{slot}` | 슬롯별 배치 영웅 ID |
 
-### Hunting Material Rewards
+### 사냥 자재 보상
 
-- Normal monsters: low chance Wood drop.
-- Boss monsters: Wood always, Brick unlocks/scales at higher stages, Iron unlocks/scales later.
-- Wood/Brick/Iron are not produced by facilities.
+- 일반 몬스터는 낮은 확률로 목재를 지급한다.
+- 보스는 목재를 확정 지급하고, 스테이지가 높아질수록 벽돌/철재 지급량 또는 확률이 증가한다.
+- 목재/벽돌/철재는 시설에서 생산하지 않는다.

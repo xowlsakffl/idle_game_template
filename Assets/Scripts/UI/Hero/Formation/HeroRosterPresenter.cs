@@ -19,6 +19,7 @@ namespace IdleGame.UI.Hero.Formation
         public Dictionary<string, Button> HeroRosterActionButtons;
         public Dictionary<string, GameObject> HeroRosterDeployedOverlays;
         public Dictionary<string, GameObject> HeroNotificationDots;
+        public Dictionary<string, HeroRosterCardState> CachedCardStates;
         public Func<string, bool> IsHeroInFormation;
         public Func<double, string> FormatShortNumber;
         public Func<HeroDefinition, string> GetShortHeroLabel;
@@ -47,23 +48,55 @@ namespace IdleGame.UI.Hero.Formation
 
                 bool isDeployed = args.IsHeroInFormation != null && args.IsHeroInFormation(hero.Definition.Id);
                 bool isSelectedForPlacement = args.SelectedHeroForPlacement == hero.Definition.Id;
+                HeroRosterCardState cardState = HeroFormationStateBuilder.BuildRosterCardState(
+                    hero,
+                    isDeployed,
+                    isSelectedForPlacement,
+                    needsAttention,
+                    args.FormatShortNumber,
+                    args.GetShortHeroLabel);
+
+                if (IsCachedStateCurrent(args.CachedCardStates, hero.Definition.Id, cardState))
+                {
+                    continue;
+                }
+
                 HeroFormationView.ApplyRosterCardState(
                     hero.Definition.Id,
-                    HeroFormationStateBuilder.BuildRosterCardState(
-                        hero,
-                        isDeployed,
-                        isSelectedForPlacement,
-                        needsAttention,
-                        args.FormatShortNumber,
-                        args.GetShortHeroLabel),
+                    cardState,
                     args.HeroRosterButtons,
                     args.HeroButtonTexts,
                     args.HeroRosterActionButtons,
                     args.HeroRosterDeployedOverlays,
                     args.HeroNotificationDots);
+                CacheState(args.CachedCardStates, hero.Definition.Id, cardState);
             }
 
             return hasHeroAttention;
+        }
+
+        private static bool IsCachedStateCurrent(
+            Dictionary<string, HeroRosterCardState> cachedStates,
+            string heroId,
+            HeroRosterCardState state)
+        {
+            return cachedStates != null
+                && cachedStates.TryGetValue(heroId, out HeroRosterCardState cachedState)
+                && state != null
+                && state.IsSameAs(cachedState);
+        }
+
+        private static void CacheState(
+            Dictionary<string, HeroRosterCardState> cachedStates,
+            string heroId,
+            HeroRosterCardState state)
+        {
+            if (cachedStates == null || string.IsNullOrEmpty(heroId) || state == null)
+            {
+                return;
+            }
+
+            cachedStates[heroId] = state;
         }
     }
 }

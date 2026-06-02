@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using IdleGame.Data;
+using IdleGame.Economy;
 
 namespace IdleGame.Battle
 {
@@ -72,6 +73,80 @@ namespace IdleGame.Battle
                 FortressCombatService.GetExperienceReward(stage, false));
         }
 
+        public static string ApplyReward(
+            RewardAmounts reward,
+            bool includeHeroExp,
+            CurrencyWallet wallet,
+            Action<GameNumber> addAccountExperience,
+            Action<GameNumber> addFortressExperience)
+        {
+            string rewardLog = includeHeroExp
+                ? BuildEnemyRewardLog(reward)
+                : BuildBossRewardLog(reward);
+            if (wallet == null)
+            {
+                return rewardLog;
+            }
+
+            wallet.AddGold(reward.Gold);
+            if (includeHeroExp)
+            {
+                wallet.AddHeroExpItem(reward.HeroExpItems);
+            }
+
+            addAccountExperience?.Invoke(reward.AccountExp);
+            addFortressExperience?.Invoke(reward.FortressExp);
+            return rewardLog;
+        }
+
+        public static string ApplyBossClearReward(
+            StageDefinition stage,
+            CurrencyWallet wallet,
+            Action<GameNumber> addAccountExperience,
+            Action<GameNumber> addFortressExperience,
+            double goldMultiplier,
+            double accountExpMultiplier,
+            Func<double> random01)
+        {
+            RewardAmounts reward = CalculateBossClearReward(stage, goldMultiplier, accountExpMultiplier);
+            return ApplyReward(reward, false, wallet, addAccountExperience, addFortressExperience)
+                + GrantHuntingFacilityMaterials(stage, true, wallet, random01);
+        }
+
+        public static string ApplyEnemyDefeatReward(
+            StageDefinition stage,
+            CurrencyWallet wallet,
+            Action<GameNumber> addAccountExperience,
+            Action<GameNumber> addFortressExperience,
+            double goldMultiplier,
+            double heroExpMultiplier,
+            double accountExpMultiplier,
+            Func<double> random01)
+        {
+            RewardAmounts reward = CalculateEnemyDefeatReward(stage, goldMultiplier, heroExpMultiplier, accountExpMultiplier);
+            return ApplyReward(reward, true, wallet, addAccountExperience, addFortressExperience)
+                + GrantHuntingFacilityMaterials(stage, false, wallet, random01);
+        }
+
+        public static float GetPetGoldBonusMultiplier(IReadOnlyList<PetState> pets)
+        {
+            float bonus = 1f;
+            if (pets == null)
+            {
+                return bonus;
+            }
+
+            foreach (PetState pet in pets)
+            {
+                if (pet != null)
+                {
+                    bonus += pet.Definition.GoldBonusPercent;
+                }
+            }
+
+            return bonus;
+        }
+
         public static FacilityMaterialReward RollHuntingFacilityMaterials(StageDefinition stage, bool boss, Func<double> random01)
         {
             if (stage == null)
@@ -134,6 +209,27 @@ namespace IdleGame.Battle
             }
 
             return " / " + string.Join(", ", parts);
+        }
+
+        public static string GrantHuntingFacilityMaterials(
+            StageDefinition stage,
+            bool boss,
+            CurrencyWallet wallet,
+            Func<double> random01)
+        {
+            if (stage == null || wallet == null)
+            {
+                return string.Empty;
+            }
+
+            FacilityMaterialReward reward = RollHuntingFacilityMaterials(stage, boss, random01);
+            if (!reward.HasAny)
+            {
+                return string.Empty;
+            }
+
+            wallet.AddFacilityMaterials(reward.Wood, reward.Brick, reward.Iron);
+            return BuildHuntingFacilityMaterialLog(reward);
         }
 
         public static string BuildStageFirstClearRewardText(StageClearReward reward)
