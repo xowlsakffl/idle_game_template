@@ -228,6 +228,24 @@ namespace IdleGame.UI.Common
             button.transition = Selectable.Transition.SpriteSwap;
         }
 
+        public static void MoveButtonText(Button button, Vector2 delta)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            Text text = button.GetComponentInChildren<Text>(true);
+            if (text == null)
+            {
+                return;
+            }
+
+            RectTransform rect = text.GetComponent<RectTransform>();
+            rect.offsetMin += delta;
+            rect.offsetMax += delta;
+        }
+
         private static void ApplyUntintedSpriteSwapColors(Button button)
         {
             ColorBlock colors = button.colors;

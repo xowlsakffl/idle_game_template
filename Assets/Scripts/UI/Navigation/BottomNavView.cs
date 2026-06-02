@@ -47,8 +47,8 @@ namespace IdleGame.UI.Navigation
             HudUiFactory.AddLayoutElement(panel, -1, HudLayoutConfig.BottomNavHeight);
 
             HorizontalLayoutGroup layout = panel.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(6, 6, 6, 6);
-            layout.spacing = 5;
+            layout.padding = new RectOffset(3, 3, 3, 3);
+            layout.spacing = 2;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -111,6 +111,7 @@ namespace IdleGame.UI.Navigation
         {
             Button button = HudUiFactory.CreateButton(label, parent, HudLayoutConfig.BottomNavFontSize, Color.white);
             ApplyMenuButtonSprite(button, false);
+            HudUiFactory.MoveButtonText(button, new Vector2(0f, 2f));
             Text text = button.GetComponentInChildren<Text>(true);
             if (text != null)
             {

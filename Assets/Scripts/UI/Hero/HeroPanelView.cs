@@ -77,6 +77,7 @@ namespace IdleGame.UI.Hero
                 HudSpriteKind.SmallBlueSquareButton,
                 HudSpriteKind.SmallBlueSquareButtonPressed,
                 false);
+            HudUiFactory.MoveButtonText(button, new Vector2(0f, 2f));
             ConfigureTabButtonRect(button, index, 4, HudLayoutConfig.HeroPageTabSpacing);
             button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
             args.TabButtons[tab] = button;
