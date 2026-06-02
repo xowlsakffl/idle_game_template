@@ -20,6 +20,8 @@ namespace IdleGame.UI.Hero
 
     public static class HeroPanelView
     {
+        private const string HeroPageTabsPrefabPath = "UI/HeroPageTabs";
+
         public static void BuildHeader(Transform parent)
         {
             if (parent == null)
@@ -28,8 +30,12 @@ namespace IdleGame.UI.Hero
             }
 
             VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(20, 20, 14, 14);
-            layout.spacing = 6;
+            layout.padding = new RectOffset(
+                HudLayoutConfig.HeroHeaderHorizontalPadding,
+                HudLayoutConfig.HeroHeaderHorizontalPadding,
+                HudLayoutConfig.HeroHeaderVerticalPadding,
+                HudLayoutConfig.HeroHeaderVerticalPadding);
+            layout.spacing = HudLayoutConfig.HeroHeaderSpacing;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -54,30 +60,74 @@ namespace IdleGame.UI.Hero
             placeholderLayout.flexibleHeight = 1f;
             refs.PlaceholderText.gameObject.SetActive(false);
 
+            if (TryBuildPrefabTabs(args))
+            {
+                return refs;
+            }
+
             GameObject tabs = new GameObject("HeroPageTabs", typeof(RectTransform));
             tabs.transform.SetParent(args.Parent, false);
-            HorizontalLayoutGroup tabLayout = tabs.AddComponent<HorizontalLayoutGroup>();
-            tabLayout.spacing = 6;
-            tabLayout.childAlignment = TextAnchor.MiddleCenter;
-            tabLayout.childControlWidth = true;
-            tabLayout.childControlHeight = true;
-            tabLayout.childForceExpandWidth = false;
-            tabLayout.childForceExpandHeight = true;
             HudUiFactory.AddLayoutElement(tabs, -1, HudLayoutConfig.HeroPageTabsHeight);
 
-            CreateTabButton(args, tabs.transform, HeroPageTab.Formation, "편성");
-            CreateTabButton(args, tabs.transform, HeroPageTab.Trait, "특성");
-            CreateTabButton(args, tabs.transform, HeroPageTab.Statue, "토템");
-            CreateTabButton(args, tabs.transform, HeroPageTab.Seal, "룬");
+            CreateTabButton(args, tabs.transform, HeroPageTab.Formation, "편성", 0);
+            CreateTabButton(args, tabs.transform, HeroPageTab.Trait, "특성", 1);
+            CreateTabButton(args, tabs.transform, HeroPageTab.Statue, "토템", 2);
+            CreateTabButton(args, tabs.transform, HeroPageTab.Seal, "룬", 3);
             return refs;
         }
 
-        private static void CreateTabButton(HeroPanelViewBuildFooterArgs args, Transform parent, HeroPageTab tab, string label)
+        private static bool TryBuildPrefabTabs(HeroPanelViewBuildFooterArgs args)
+        {
+            GameObject prefab = Resources.Load<GameObject>(HeroPageTabsPrefabPath);
+            if (prefab == null)
+            {
+                return false;
+            }
+
+            GameObject instance = UnityEngine.Object.Instantiate(prefab, args.Parent, false);
+            instance.name = "HeroPageTabs";
+            HudFontProvider.ApplyToChildren(instance.transform);
+
+            HeroPageTabsPrefabView view = instance.GetComponent<HeroPageTabsPrefabView>();
+            if (view == null || !view.TryBind(args.OnTabClick, args.TabButtons))
+            {
+                UnityEngine.Object.Destroy(instance);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void CreateTabButton(HeroPanelViewBuildFooterArgs args, Transform parent, HeroPageTab tab, string label, int index)
         {
             Button button = HudUiFactory.CreateButton(label, parent, HudButtonStyle.HeroSubTab);
-            HudUiFactory.AddLayoutElement(button.gameObject, HudLayoutConfig.HeroPageTabButtonWidth, -1);
+            HudUiFactory.ApplySpriteButtonState(
+                button,
+                HudSpriteKind.SmallBlueSquareButton,
+                HudSpriteKind.SmallBlueSquareButtonPressed,
+                false);
+            ConfigureTabButtonRect(button, index, 4, HudLayoutConfig.HeroPageTabSpacing);
             button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
             args.TabButtons[tab] = button;
+        }
+
+        private static void ConfigureTabButtonRect(Button button, int index, int count, float spacing)
+        {
+            if (button == null || count <= 0)
+            {
+                return;
+            }
+
+            float minX = Mathf.Clamp01((float)index / count);
+            float maxX = Mathf.Clamp01((float)(index + 1) / count);
+            float halfSpacing = Mathf.Max(0f, spacing) * 0.5f;
+
+            RectTransform rect = button.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(minX, 0f);
+            rect.anchorMax = new Vector2(maxX, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = new Vector2(index == 0 ? 0f : halfSpacing, 0f);
+            rect.offsetMax = new Vector2(index == count - 1 ? 0f : -halfSpacing, 0f);
         }
     }
 }

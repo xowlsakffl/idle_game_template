@@ -1,6 +1,6 @@
 using System;
-using UnityEngine.UI;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace IdleGame.UI.Common
 {
@@ -10,8 +10,16 @@ namespace IdleGame.UI.Common
         {
             GameObject panel = new GameObject(name, typeof(RectTransform));
             panel.transform.SetParent(parent, false);
+
             Image image = panel.AddComponent<Image>();
             image.color = color;
+            return panel;
+        }
+
+        public static GameObject CreateSpritePanel(string name, Transform parent, HudSpriteKind spriteKind, Color fallbackColor)
+        {
+            GameObject panel = CreatePanel(name, parent, fallbackColor);
+            ApplySprite(panel.GetComponent<Image>(), spriteKind, Color.white);
             return panel;
         }
 
@@ -43,12 +51,7 @@ namespace IdleGame.UI.Common
             textObject.transform.SetParent(parent, false);
 
             Text text = textObject.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (text.font == null)
-            {
-                text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            }
-
+            HudFontProvider.Apply(text);
             text.fontSize = fontSize;
             text.fontStyle = fontStyle;
             text.alignment = alignment;
@@ -92,10 +95,9 @@ namespace IdleGame.UI.Common
 
         public static GameObject CreateNotificationDot(Transform parent, float size, Vector2 anchoredPosition)
         {
-            Text dot = CreateText("RedDot", parent, Mathf.RoundToInt(size), FontStyle.Bold, TextAnchor.MiddleCenter);
-            dot.text = "●";
-            dot.color = new Color(1f, 0.04f, 0.04f, 1f);
-            dot.raycastTarget = false;
+            GameObject dot = CreatePanel("RedDot", parent, new Color(1f, 0.04f, 0.04f, 1f));
+            Image image = dot.GetComponent<Image>();
+            image.raycastTarget = false;
 
             RectTransform rect = dot.GetComponent<RectTransform>();
             rect.anchorMin = Vector2.one;
@@ -104,8 +106,134 @@ namespace IdleGame.UI.Common
             rect.sizeDelta = new Vector2(size, size);
             rect.anchoredPosition = anchoredPosition;
 
-            dot.gameObject.SetActive(false);
-            return dot.gameObject;
+            dot.SetActive(false);
+            return dot;
+        }
+
+        public static Image CreateIcon(string name, Transform parent, HudSpriteKind spriteKind, Vector2 size)
+        {
+            GameObject iconObject = CreateSpritePanel(name, parent, spriteKind, Color.white);
+            Image image = iconObject.GetComponent<Image>();
+            image.raycastTarget = false;
+
+            RectTransform rect = iconObject.GetComponent<RectTransform>();
+            rect.sizeDelta = size;
+            return image;
+        }
+
+        public static Image CreateBarFill(string name, Transform parent, HudSpriteKind spriteKind, Color fallbackColor)
+        {
+            GameObject fillObject = CreatePanel(name, parent, fallbackColor);
+            Image fill = fillObject.GetComponent<Image>();
+            RectTransform rect = fill.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            fill.raycastTarget = false;
+            return fill;
+        }
+
+        public static void ApplySprite(Image image, HudSpriteKind spriteKind, Color color)
+        {
+            if (image == null)
+            {
+                return;
+            }
+
+            Sprite sprite = HudSpriteCatalog.Get(spriteKind);
+            if (sprite == null)
+            {
+                image.sprite = null;
+                image.color = color;
+                return;
+            }
+
+            image.sprite = sprite;
+            image.type = HasBorder(sprite) ? Image.Type.Sliced : Image.Type.Simple;
+            image.preserveAspect = false;
+            image.color = color;
+        }
+
+        public static void ApplyUntintedButtonSprite(Button button, HudSpriteKind spriteKind)
+        {
+            ApplyButtonSprite(button, spriteKind, Color.white);
+        }
+
+        public static void ApplyButtonSprite(Button button, HudSpriteKind spriteKind, Color color)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            Image image = button.GetComponent<Image>();
+            if (image == null)
+            {
+                return;
+            }
+
+            ApplySprite(image, spriteKind, color);
+            ColorBlock colors = button.colors;
+            colors.normalColor = color;
+            colors.highlightedColor = color;
+            colors.pressedColor = color;
+            colors.selectedColor = color;
+            colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
+            button.colors = colors;
+            button.transition = Selectable.Transition.None;
+            image.color = color;
+        }
+
+        public static void ApplySpriteButtonState(Button button, HudSpriteKind normalKind, HudSpriteKind pressedKind, bool pressed)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            Image image = button.GetComponent<Image>();
+            if (image == null)
+            {
+                return;
+            }
+
+            Sprite normalSprite = HudSpriteCatalog.Get(normalKind);
+            Sprite pressedSprite = HudSpriteCatalog.Get(pressedKind);
+            Sprite activeSprite = pressed && pressedSprite != null ? pressedSprite : normalSprite;
+            if (activeSprite == null)
+            {
+                image.sprite = null;
+                image.color = Color.white;
+                return;
+            }
+
+            image.sprite = activeSprite;
+            image.type = HasBorder(activeSprite) ? Image.Type.Sliced : Image.Type.Simple;
+            image.preserveAspect = false;
+            image.color = Color.white;
+
+            SpriteState spriteState = button.spriteState;
+            spriteState.highlightedSprite = pressedSprite != null ? pressedSprite : activeSprite;
+            spriteState.pressedSprite = pressedSprite != null ? pressedSprite : activeSprite;
+            spriteState.selectedSprite = pressedSprite != null ? pressedSprite : activeSprite;
+            button.spriteState = spriteState;
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = Color.white;
+            colors.pressedColor = Color.white;
+            colors.selectedColor = Color.white;
+            colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
+            colors.colorMultiplier = 1f;
+            button.colors = colors;
+            button.transition = Selectable.Transition.SpriteSwap;
+        }
+
+        private static bool HasBorder(Sprite sprite)
+        {
+            Vector4 border = sprite.border;
+            return border.x > 0f || border.y > 0f || border.z > 0f || border.w > 0f;
         }
 
         public static void ConfigureBestFitText(Text text, int minSize, int maxSize, float lineSpacing = 1f)
@@ -144,6 +272,11 @@ namespace IdleGame.UI.Common
                 return;
             }
 
+            if (HudPrefabStyleLock.BlocksColors(button))
+            {
+                return;
+            }
+
             ColorBlock colors = button.colors;
             colors.normalColor = color;
             colors.highlightedColor = color;
@@ -167,10 +300,13 @@ namespace IdleGame.UI.Common
                 return;
             }
 
-            SetButtonColor(button, style.Color);
+            if (!HudPrefabStyleLock.BlocksColors(button))
+            {
+                SetButtonColor(button, style.Color);
+            }
 
             Text label = button.GetComponentInChildren<Text>(true);
-            if (label != null)
+            if (label != null && !HudPrefabStyleLock.BlocksTextStyle(label))
             {
                 label.fontSize = style.FontSize;
             }

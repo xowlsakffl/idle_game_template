@@ -19,14 +19,19 @@ namespace IdleGame.Battlefield
                     int hitIndex = battleManager.IsBossFight ? 0 : battleManager.RecentHitEnemyIndex;
                     if (hitIndex >= 0 && hitIndex < enemyActors.Count)
                     {
-                        enemyActors[hitIndex].HitPulse = 0.20f;
+                        enemyActors[hitIndex].HitPulse = ActorHitPulseDuration;
                     }
 
                     SpawnDamageFloater(
                         hitPosition,
                         "-" + NumberFormatter.Format(battleManager.LastHitDamage),
                         battleManager.LastHitWasCritical ? new Color(1f, 0.92f, 0.16f, 1f) : new Color(1f, 0.42f, 0.18f, 1f),
-                        battleManager.LastHitWasCritical ? 1.25f : 1f);
+                        battleManager.LastHitWasCritical ? 0.78f : 0.62f);
+                    SpawnImpactEffect(
+                        hitPosition,
+                        battleManager.LastHitWasCritical ? 1 : 0,
+                        battleManager.LastHitWasCritical ? new Color(1f, 0.82f, 0.22f, 0.94f) : new Color(1f, 0.52f, 0.24f, 0.88f),
+                        battleManager.LastHitWasCritical ? 0.58f : 0.42f);
                 }
             }
 
@@ -36,7 +41,7 @@ namespace IdleGame.Battlefield
                 int attackingEnemyIndex = battleManager.RecentAttackingEnemyIndex;
                 if (attackingEnemyIndex >= 0 && attackingEnemyIndex < enemyActors.Count)
                 {
-                    enemyActors[attackingEnemyIndex].AttackPulse = 0.18f;
+                    enemyActors[attackingEnemyIndex].AttackPulse = EnemyAttackPulseDuration;
                 }
 
                 int damagedHeroIndex = battleManager.RecentDamagedHeroIndex;
@@ -44,16 +49,17 @@ namespace IdleGame.Battlefield
                 if (damagedHeroIndex >= 0 && damagedHeroIndex < deployedHeroes.Count
                     && heroActors.TryGetValue(deployedHeroes[damagedHeroIndex].Definition.Id, out WorldActor damagedHero))
                 {
-                    damagedHero.HitPulse = 0.20f;
+                    damagedHero.HitPulse = ActorHitPulseDuration;
                 }
 
-                SpawnDamageFloater(battleManager.LastMonsterHitPosition, "HIT", new Color(0.95f, 0.20f, 0.18f, 1f), 0.72f);
+                SpawnImpactEffect(battleManager.LastMonsterHitPosition, 3, new Color(0.82f, 0.76f, 0.64f, 0.72f), 0.34f);
             }
 
             if (battleManager.EnemyDefeatSequence != observedEnemyDefeatSequence)
             {
                 observedEnemyDefeatSequence = battleManager.EnemyDefeatSequence;
-                SpawnDamageFloater(battleManager.LastDefeatedEnemyPosition, "KO", new Color(1f, 0.86f, 0.24f, 1f), 1.05f);
+                SpawnDamageFloater(battleManager.LastDefeatedEnemyPosition, "KO", new Color(1f, 0.86f, 0.24f, 1f), 0.55f);
+                SpawnImpactEffect(battleManager.LastDefeatedEnemyPosition, 4, new Color(1f, 0.44f, 0.20f, 0.82f), 0.48f);
             }
 
             if (battleManager.HeroAttackBatchSequence != observedHeroAttackBatchSequence)
@@ -66,7 +72,7 @@ namespace IdleGame.Battlefield
                     {
                         if (heroActors.TryGetValue(attackIds[i], out WorldActor attackingHero))
                         {
-                            attackingHero.AttackPulse = 0.22f;
+                            attackingHero.AttackPulse = HeroAttackPulseDuration;
                         }
 
                         HeroState hero = FindDeployedHero(attackIds[i]);
@@ -84,15 +90,88 @@ namespace IdleGame.Battlefield
             }
         }
 
+        private void SpawnImpactEffect(Vector2 localPosition, int variant, Color color, float scale)
+        {
+            SpriteEffectVisual effect = GetSpriteEffect();
+            BattlefieldSpriteAnimation animation = BattlefieldSpriteCatalog.GetImpactAnimation(variant);
+            effect.Root.SetActive(true);
+            effect.Animation = animation;
+            effect.Body.sprite = animation != null && animation.IsValid ? animation.GetFrameClamped(0f) : squareSprite;
+            effect.Body.color = color;
+            effect.StartPosition = localPosition + new Vector2(0f, 0.08f);
+            effect.BaseColor = color;
+            effect.Duration = animation != null && animation.IsValid ? Mathf.Max(0.18f, animation.Duration) : 0.28f;
+            effect.Life = effect.Duration;
+            effect.StartScale = Mathf.Max(0.18f, scale * 0.44f);
+            effect.EndScale = Mathf.Max(0.34f, scale);
+            effect.RotationSpeed = variant % 2 == 0 ? 72f : -58f;
+            effect.Root.transform.position = ToWorld(effect.StartPosition);
+            effect.Root.transform.localScale = Vector3.one * effect.StartScale;
+            effect.Body.transform.localPosition = Vector3.zero;
+            effect.Body.transform.localScale = Vector3.one;
+            effect.Body.transform.localRotation = Quaternion.Euler(0f, 0f, -18f + variant * 11f);
+        }
+
+        private SpriteEffectVisual GetSpriteEffect()
+        {
+            for (int i = 0; i < spriteEffects.Count; i++)
+            {
+                if (!spriteEffects[i].Root.activeSelf)
+                {
+                    return spriteEffects[i];
+                }
+            }
+
+            GameObject root = new GameObject("ImpactEffect");
+            root.transform.SetParent(sceneRoot, false);
+            SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, squareSprite, Color.white, 62);
+            var effect = new SpriteEffectVisual(root, body);
+            spriteEffects.Add(effect);
+            return effect;
+        }
+
+        private void UpdateSpriteEffects(float deltaTime)
+        {
+            for (int i = 0; i < spriteEffects.Count; i++)
+            {
+                SpriteEffectVisual effect = spriteEffects[i];
+                if (!effect.Root.activeSelf)
+                {
+                    continue;
+                }
+
+                effect.Life = Mathf.Max(0f, effect.Life - deltaTime);
+                float progress = 1f - effect.Life / Mathf.Max(0.001f, effect.Duration);
+                float eased = EaseOut(progress);
+                float scale = Mathf.Lerp(effect.StartScale, effect.EndScale, eased);
+                float elapsed = effect.Duration - effect.Life;
+                effect.Root.transform.position = ToWorld(effect.StartPosition + new Vector2(0f, 0.12f * progress));
+                effect.Root.transform.localScale = Vector3.one * scale;
+                effect.Body.transform.localRotation *= Quaternion.Euler(0f, 0f, effect.RotationSpeed * deltaTime);
+                effect.Body.sprite = effect.Animation != null && effect.Animation.IsValid
+                    ? effect.Animation.GetFrameClamped(elapsed)
+                    : squareSprite;
+
+                Color color = effect.BaseColor;
+                color.a = Mathf.Clamp01(effect.BaseColor.a * (1f - progress));
+                effect.Body.color = color;
+
+                if (effect.Life <= 0f)
+                {
+                    effect.Root.SetActive(false);
+                }
+            }
+        }
+
         private void SpawnDamageFloater(Vector2 localPosition, string text, Color color, float scale)
         {
             DamageFloater floater = GetDamageFloater();
             floater.Root.SetActive(true);
-            floater.StartPosition = localPosition + new Vector2(0f, 0.34f);
-            floater.Life = 0.72f;
-            floater.Duration = 0.72f;
+            floater.StartPosition = localPosition + new Vector2(0f, 0.22f);
+            floater.Life = 0.46f;
+            floater.Duration = 0.46f;
             floater.Text.text = text;
-            floater.Text.characterSize = 0.105f * scale;
+            floater.Text.characterSize = 0.058f * scale;
             floater.BaseColor = color;
             floater.Root.transform.position = ToWorld(floater.StartPosition);
             floater.Root.transform.localScale = Vector3.one;
@@ -126,7 +205,7 @@ namespace IdleGame.Battlefield
 
                 floater.Life = Mathf.Max(0f, floater.Life - deltaTime);
                 float progress = 1f - floater.Life / Mathf.Max(0.001f, floater.Duration);
-                Vector2 position = floater.StartPosition + new Vector2(0f, 0.62f * progress);
+                Vector2 position = floater.StartPosition + new Vector2(0f, 0.34f * progress);
                 floater.Root.transform.position = ToWorld(position);
                 Color color = floater.BaseColor;
                 color.a = Mathf.Clamp01(1f - progress);
@@ -149,21 +228,21 @@ namespace IdleGame.Battlefield
             switch (hero.Trait)
             {
                 case HeroTrait.Ranged:
-                    SpawnProjectile(startPosition + new Vector2(0.18f, 0.12f), targetPosition, new Color(1f, 0.86f, 0.34f, 1f), 0.24f, 0.20f);
+                    SpawnProjectile(startPosition + new Vector2(0.18f, 0.12f), targetPosition, new Color(1f, 0.90f, 0.40f, 1f), 0.34f, 0.34f, BattlefieldSpriteCatalog.GetArrowSprite());
                     break;
                 case HeroTrait.Support:
-                    SpawnProjectile(startPosition + new Vector2(0.10f, 0.22f), targetPosition, Color.Lerp(GetRarityColor(hero.Rarity), Color.white, 0.18f), 0.30f, 0.24f);
+                    SpawnProjectile(startPosition + new Vector2(0.10f, 0.22f), targetPosition, Color.Lerp(GetRarityColor(hero.Rarity), Color.white, 0.18f), 0.34f, 0.30f, null);
                     break;
                 case HeroTrait.Defense:
-                    SpawnProjectile(startPosition, targetPosition, new Color(0.66f, 0.86f, 1f, 1f), 0.20f, 0.18f);
+                    SpawnProjectile(startPosition, targetPosition, new Color(0.66f, 0.86f, 1f, 1f), 0.26f, 0.26f, null);
                     break;
                 default:
-                    SpawnProjectile(startPosition, targetPosition, new Color(1f, 0.95f, 0.74f, 1f), 0.16f, 0.18f);
+                    SpawnProjectile(startPosition, targetPosition, new Color(1f, 0.95f, 0.74f, 1f), 0.24f, 0.24f, null);
                     break;
             }
         }
 
-        private void SpawnProjectile(Vector2 startPosition, Vector2 targetPosition, Color color, float duration, float size)
+        private void SpawnProjectile(Vector2 startPosition, Vector2 targetPosition, Color color, float duration, float size, Sprite sprite)
         {
             ProjectileVisual projectile = GetProjectile();
             projectile.Root.SetActive(true);
@@ -172,8 +251,10 @@ namespace IdleGame.Battlefield
             projectile.Duration = Mathf.Max(0.05f, duration);
             projectile.Life = projectile.Duration;
             projectile.BaseColor = color;
+            projectile.Sprite = sprite;
             projectile.Size = size;
             projectile.Body.color = color;
+            projectile.Body.sprite = sprite != null ? sprite : squareSprite;
             projectile.Root.transform.position = ToWorld(startPosition);
             projectile.Root.transform.localScale = Vector3.one;
         }
@@ -190,7 +271,7 @@ namespace IdleGame.Battlefield
 
             GameObject root = new GameObject("Projectile");
             root.transform.SetParent(sceneRoot, false);
-            SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, squareSprite, Color.white, 55);
+            SpriteRenderer body = CreateSpriteRenderer("Body", root.transform, squareSprite, Color.white, 66);
             var projectile = new ProjectileVisual(root, body);
             projectiles.Add(projectile);
             return projectile;
@@ -214,11 +295,14 @@ namespace IdleGame.Battlefield
                 Vector2 direction = projectile.TargetPosition - projectile.StartPosition;
                 float angle = direction.sqrMagnitude > 0.001f ? Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg : 0f;
                 Color color = projectile.BaseColor;
-                color.a = Mathf.Clamp01(1f - progress * 0.78f);
+                color.a = Mathf.Clamp01(1f - progress * 0.45f);
                 projectile.Body.color = color;
-                projectile.Body.sprite = squareSprite;
+                bool usesAssetSprite = projectile.Sprite != null;
+                projectile.Body.sprite = usesAssetSprite ? projectile.Sprite : squareSprite;
                 projectile.Body.transform.localPosition = Vector3.zero;
-                projectile.Body.transform.localScale = new Vector3(Mathf.Max(0.12f, projectile.Size * 1.20f), Mathf.Max(0.035f, projectile.Size * 0.18f), 1f);
+                projectile.Body.transform.localScale = usesAssetSprite
+                    ? Vector3.one * Mathf.Max(0.72f, projectile.Size * 2.8f)
+                    : new Vector3(Mathf.Max(0.12f, projectile.Size * 1.20f), Mathf.Max(0.035f, projectile.Size * 0.18f), 1f);
                 projectile.Body.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
 
                 if (projectile.Life <= 0f)

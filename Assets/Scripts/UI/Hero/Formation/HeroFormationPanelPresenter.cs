@@ -49,8 +49,6 @@ namespace IdleGame.UI.Hero.Formation
 
     public static class HeroFormationPanelPresenter
     {
-        private static readonly Color SelectedPageTabColor = HudButtonStyle.TabSelected.Color;
-        private static readonly Color NormalPageTabColor = HudButtonStyle.Tab.Color;
         private static readonly Color SelectedPresetColor = HudButtonStyle.SmallPresetSelected.Color;
         private static readonly Color NormalPresetColor = HudButtonStyle.SmallPreset.Color;
         public static HeroFormationPanelRefreshResult Refresh(HeroFormationPanelPresenterArgs args)
@@ -100,11 +98,9 @@ namespace IdleGame.UI.Hero.Formation
 
         private static void ApplyPageButtons(HeroFormationPanelPresenterArgs args)
         {
-            HeroFormationView.ApplySelectedButtonColors(
+            HeroFormationView.ApplySelectedMenuButtonSprites(
                 args.PageTabButtons,
-                args.ActivePageTab,
-                SelectedPageTabColor,
-                NormalPageTabColor);
+                args.ActivePageTab);
 
             HeroFormationView.ApplySelectedButtonColors(
                 args.PresetButtons,

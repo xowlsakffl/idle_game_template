@@ -37,12 +37,12 @@ namespace IdleGame.UI.Header
 
             if (args.ResourceText != null && args.Wallet != null)
             {
-                args.ResourceText.text = "금화 " + Format(args, args.Wallet.Gold);
+                args.ResourceText.text = Format(args, args.Wallet.Gold);
             }
 
             if (args.RubyResourceText != null && args.Wallet != null)
             {
-                args.RubyResourceText.text = "보석 " + Format(args, args.Wallet.Ruby);
+                args.RubyResourceText.text = Format(args, args.Wallet.Ruby);
             }
 
             if (args.StageText != null)

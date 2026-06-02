@@ -39,6 +39,7 @@ namespace IdleGame.UI.Fortress
             if (refs.ExpFill != null)
             {
                 refs.ExpFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(state.ExpFillRatio), 1f);
+                refs.ExpFill.color = new Color(0.38f, 0.78f, 1f, 1f);
             }
 
             if (refs.ExpText != null)
@@ -95,12 +96,10 @@ namespace IdleGame.UI.Fortress
 
             GameObject expBar = HudUiFactory.CreatePanel("FortressExpBar", card.transform, new Color(0.06f, 0.08f, 0.12f, 1f));
             HudUiFactory.AddLayoutElement(expBar, -1, 38);
-            refs.ExpFill = HudUiFactory.CreatePanel("FortressExpFill", expBar.transform, new Color(0.38f, 0.78f, 1f, 1f)).GetComponent<Image>();
+            refs.ExpFill = HudUiFactory.CreateBarFill("FortressExpFill", expBar.transform, HudSpriteKind.BigBarFill, new Color(0.38f, 0.78f, 1f, 1f));
             RectTransform expFillRect = refs.ExpFill.GetComponent<RectTransform>();
-            expFillRect.anchorMin = Vector2.zero;
-            expFillRect.anchorMax = new Vector2(0f, 1f);
-            expFillRect.offsetMin = Vector2.zero;
-            expFillRect.offsetMax = Vector2.zero;
+            expFillRect.offsetMin = new Vector2(0f, 6f);
+            expFillRect.offsetMax = new Vector2(0f, -6f);
 
             refs.ExpText = HudUiFactory.CreateText("FortressExpText", expBar.transform, 20, FontStyle.Bold, TextAnchor.MiddleCenter);
             HudUiFactory.StretchToParent(refs.ExpText.gameObject);
@@ -114,7 +113,7 @@ namespace IdleGame.UI.Fortress
 
             refs.NoticeText = HudUiFactory.CreateText("FortressNotice", args.Parent, 24, FontStyle.Bold, TextAnchor.UpperLeft);
             refs.NoticeText.color = new Color(0.95f, 0.78f, 0.42f, 1f);
-            refs.NoticeText.text = "전투 중 요새는 중앙에서 자동 공격합니다. 원거리/지원 영웅은 요새 안쪽에서 공격하고, 근접/방어 영웅만 밖에서 맞붙습니다.";
+            refs.NoticeText.text = "전투 중 요새는 중앙에서 자동 공격합니다. 원거리 영웅은 요새 안쪽에서 공격하고, 근접/방어 영웅은 밖에서 맞붙습니다.";
             HudUiFactory.AddLayoutElement(refs.NoticeText.gameObject, -1, 100);
             return refs;
         }

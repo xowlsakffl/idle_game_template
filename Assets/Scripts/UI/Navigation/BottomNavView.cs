@@ -47,8 +47,8 @@ namespace IdleGame.UI.Navigation
             HudUiFactory.AddLayoutElement(panel, -1, HudLayoutConfig.BottomNavHeight);
 
             HorizontalLayoutGroup layout = panel.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.spacing = 6;
+            layout.padding = new RectOffset(6, 6, 6, 6);
+            layout.spacing = 5;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -84,6 +84,7 @@ namespace IdleGame.UI.Navigation
 
                 bool activeAndOpen = args.ContentPanelOpen && comparer.Equals(pair.Key, args.ActiveTab);
                 bool heroDetailCloseTab = args.HeroDetailPanelOpen && comparer.Equals(pair.Key, args.HeroTab);
+                bool selected = activeAndOpen || heroDetailCloseTab;
                 string label = args.TabButtonLabels != null && args.TabButtonLabels.TryGetValue(pair.Key, out string savedLabel)
                     ? savedLabel
                     : text.text;
@@ -101,13 +102,15 @@ namespace IdleGame.UI.Navigation
                     text.text = label;
                 }
 
-                text.color = activeAndOpen || heroDetailCloseTab ? new Color(1f, 0.91f, 0.40f, 1f) : Color.white;
+                text.color = Color.white;
+                ApplyMenuButtonSprite(pair.Value, selected);
             }
         }
 
         private static void CreateTabButton<TTab>(BottomNavViewBuildArgs<TTab> args, Transform parent, TTab tab, string label)
         {
             Button button = HudUiFactory.CreateButton(label, parent, HudLayoutConfig.BottomNavFontSize, new Color(0.13f, 0.17f, 0.25f, 1f));
+            ApplyMenuButtonSprite(button, false);
             Text text = button.GetComponentInChildren<Text>(true);
             if (text != null)
             {
@@ -120,6 +123,20 @@ namespace IdleGame.UI.Navigation
             button.onClick.AddListener(() => args.OnTabClick?.Invoke(tab));
             args.TabButtons[tab] = button;
             args.TabButtonLabels[tab] = label;
+        }
+
+        private static void ApplyMenuButtonSprite(Button button, bool selected)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            HudUiFactory.ApplySpriteButtonState(
+                button,
+                HudSpriteKind.SmallBlueSquareButton,
+                HudSpriteKind.SmallBlueSquareButtonPressed,
+                selected);
         }
 
         private static void RegisterNotificationDot<TTab>(Dictionary<TTab, List<GameObject>> dotsByTab, TTab tab, GameObject dot)

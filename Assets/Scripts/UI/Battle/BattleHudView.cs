@@ -4,7 +4,6 @@ using UnityEngine;
 using IdleGame.Battlefield;
 using IdleGame.Data;
 using IdleGame.UI.Common;
-using IdleGame.UI.Hero;
 
 namespace IdleGame.UI.Battle
 {
@@ -70,18 +69,18 @@ namespace IdleGame.UI.Battle
             portalRect.pivot = new Vector2(0.5f, 0.5f);
             portalRect.sizeDelta = new Vector2(120f, 120f);
             portalRect.anchoredPosition = Vector2.zero;
-            refs.CenterSpawnText.text = "●";
+            refs.CenterSpawnText.text = "◎";
             refs.CenterSpawnText.color = new Color(0.95f, 0.12f, 0.10f, 0.85f);
 
-            GameObject stagePill = HudUiFactory.CreatePanel("FieldStagePill", field.transform, new Color(0.88f, 0.90f, 0.92f, 0.94f));
+            GameObject stagePill = HudUiFactory.CreatePanel("FieldStagePill", field.transform, new Color(0.08f, 0.10f, 0.14f, 0.90f));
             RectTransform pillRect = stagePill.GetComponent<RectTransform>();
             pillRect.anchorMin = new Vector2(0.5f, 1f);
             pillRect.anchorMax = new Vector2(0.5f, 1f);
             pillRect.pivot = new Vector2(0.5f, 1f);
-            pillRect.sizeDelta = new Vector2(210f, 58f);
-            pillRect.anchoredPosition = new Vector2(0f, -10f);
-            refs.FieldStagePillText = HudUiFactory.CreateText("FieldStagePillText", stagePill.transform, 27, FontStyle.Bold, TextAnchor.MiddleCenter);
-            refs.FieldStagePillText.color = new Color(0.04f, 0.05f, 0.07f, 1f);
+            pillRect.sizeDelta = new Vector2(170f, 44f);
+            pillRect.anchoredPosition = new Vector2(0f, -8f);
+            refs.FieldStagePillText = HudUiFactory.CreateText("FieldStagePillText", stagePill.transform, 21, FontStyle.Bold, TextAnchor.MiddleCenter);
+            refs.FieldStagePillText.color = Color.white;
             HudUiFactory.StretchToParent(refs.FieldStagePillText.gameObject);
 
             refs.DamagePopupText = HudUiFactory.CreateText("DamagePopup", field.transform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
@@ -97,9 +96,9 @@ namespace IdleGame.UI.Battle
             damageMeterRect.anchorMin = new Vector2(1f, 0f);
             damageMeterRect.anchorMax = new Vector2(1f, 0f);
             damageMeterRect.pivot = new Vector2(1f, 0f);
-            damageMeterRect.sizeDelta = new Vector2(270f, 248f);
+            damageMeterRect.sizeDelta = new Vector2(230f, 206f);
             damageMeterRect.anchoredPosition = new Vector2(-12f, 244f);
-            refs.DamageMeterText = HudUiFactory.CreateText("DamageMeterTitle", damageMeter.transform, 20, FontStyle.Bold, TextAnchor.MiddleLeft);
+            refs.DamageMeterText = HudUiFactory.CreateText("DamageMeterTitle", damageMeter.transform, 17, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform damageMeterTextRect = refs.DamageMeterText.GetComponent<RectTransform>();
             damageMeterTextRect.anchorMin = new Vector2(0f, 1f);
             damageMeterTextRect.anchorMax = new Vector2(1f, 1f);
@@ -182,15 +181,13 @@ namespace IdleGame.UI.Battle
                 enemyHpRect.anchorMin = new Vector2(0.5f, 1f);
                 enemyHpRect.anchorMax = new Vector2(0.5f, 1f);
                 enemyHpRect.pivot = new Vector2(0.5f, 0f);
-                enemyHpRect.sizeDelta = new Vector2(54f, 8f);
+                enemyHpRect.sizeDelta = new Vector2(62f, 10f);
                 enemyHpRect.anchoredPosition = new Vector2(0f, 4f);
 
-                Image enemyHpFill = HudUiFactory.CreatePanel("EnemyHpFill" + i, enemyHpBar.transform, new Color(0.35f, 0.93f, 0.28f, 1f)).GetComponent<Image>();
+                Image enemyHpFill = HudUiFactory.CreateBarFill("EnemyHpFill" + i, enemyHpBar.transform, HudSpriteKind.SmallBarFill, new Color(0.95f, 0.20f, 0.16f, 1f));
                 RectTransform enemyHpFillRect = enemyHpFill.GetComponent<RectTransform>();
-                enemyHpFillRect.anchorMin = Vector2.zero;
-                enemyHpFillRect.anchorMax = Vector2.one;
-                enemyHpFillRect.offsetMin = Vector2.zero;
-                enemyHpFillRect.offsetMax = Vector2.zero;
+                enemyHpFillRect.offsetMin = new Vector2(0f, 2f);
+                enemyHpFillRect.offsetMax = new Vector2(0f, -2f);
 
                 args.EnemyBattleRects.Add(enemy.GetComponent<RectTransform>());
                 args.EnemyBattleImages.Add(image);
@@ -204,22 +201,20 @@ namespace IdleGame.UI.Battle
         private static void CreateDamageMeterRow(BattleHudViewBuildArgs args, Transform parent, int index)
         {
             GameObject row = HudUiFactory.CreatePanel("DamageMeterRow" + index, parent, new Color(0.08f, 0.10f, 0.15f, 0.92f));
-            Image fill = HudUiFactory.CreatePanel("DamageMeterFill" + index, row.transform, new Color(0.42f, 0.62f, 0.32f, 0.78f)).GetComponent<Image>();
+            Image fill = HudUiFactory.CreateBarFill("DamageMeterFill" + index, row.transform, HudSpriteKind.SmallBarFill, new Color(0.95f, 0.20f, 0.16f, 1f));
             RectTransform fillRect = fill.GetComponent<RectTransform>();
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = new Vector2(0f, 1f);
-            fillRect.offsetMin = Vector2.zero;
-            fillRect.offsetMax = Vector2.zero;
+            fillRect.offsetMin = new Vector2(0f, 2f);
+            fillRect.offsetMax = new Vector2(0f, -2f);
 
-            Text text = HudUiFactory.CreateText("DamageMeterRowText" + index, row.transform, 16, FontStyle.Bold, TextAnchor.MiddleLeft);
+            Text text = HudUiFactory.CreateText("DamageMeterRowText" + index, row.transform, 13, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform textRect = text.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = new Vector2(8f, 0f);
             textRect.offsetMax = new Vector2(-8f, 0f);
             text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 11;
-            text.resizeTextMaxSize = 16;
+            text.resizeTextMinSize = 9;
+            text.resizeTextMaxSize = 13;
 
             args.DamageMeterRows.Add(row);
             args.DamageMeterFills.Add(fill);
@@ -240,6 +235,5 @@ namespace IdleGame.UI.Battle
             rect.anchoredPosition = Vector2.zero;
             return actor;
         }
-
     }
 }

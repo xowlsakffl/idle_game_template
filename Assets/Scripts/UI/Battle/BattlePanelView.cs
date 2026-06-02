@@ -107,30 +107,28 @@ namespace IdleGame.UI.Battle
             killProgressRect.anchorMin = new Vector2(0.5f, 1f);
             killProgressRect.anchorMax = new Vector2(0.5f, 1f);
             killProgressRect.pivot = new Vector2(0.5f, 1f);
-            killProgressRect.sizeDelta = new Vector2(430f, 34f);
-            killProgressRect.anchoredPosition = new Vector2(0f, -108f);
+            killProgressRect.sizeDelta = new Vector2(300f, 26f);
+            killProgressRect.anchoredPosition = new Vector2(0f, -92f);
 
-            refs.KillProgressFill = HudUiFactory.CreatePanel("KillProgressFill", killProgressBar.transform, new Color(0.95f, 0.63f, 0.17f, 1f)).GetComponent<Image>();
+            refs.KillProgressFill = HudUiFactory.CreateBarFill("KillProgressFill", killProgressBar.transform, HudSpriteKind.BigBarFill, new Color(0.95f, 0.63f, 0.17f, 1f));
             RectTransform fillRect = refs.KillProgressFill.GetComponent<RectTransform>();
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.one;
-            fillRect.offsetMin = Vector2.zero;
-            fillRect.offsetMax = Vector2.zero;
+            fillRect.offsetMin = new Vector2(0f, 6f);
+            fillRect.offsetMax = new Vector2(0f, -6f);
 
-            refs.KillProgressText = HudUiFactory.CreateText("KillProgressText", killProgressBar.transform, 25, FontStyle.Bold, TextAnchor.MiddleCenter);
+            refs.KillProgressText = HudUiFactory.CreateText("KillProgressText", killProgressBar.transform, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
             RectTransform killProgressTextRect = refs.KillProgressText.GetComponent<RectTransform>();
             killProgressTextRect.anchorMin = Vector2.zero;
             killProgressTextRect.anchorMax = Vector2.one;
             killProgressTextRect.offsetMin = Vector2.zero;
             killProgressTextRect.offsetMax = Vector2.zero;
 
-            refs.ProgressText = HudUiFactory.CreateText("Progress", refs.Panel.transform, 30, FontStyle.Bold, TextAnchor.MiddleCenter);
+            refs.ProgressText = HudUiFactory.CreateText("Progress", refs.Panel.transform, 19, FontStyle.Bold, TextAnchor.MiddleCenter);
             RectTransform progressRect = refs.ProgressText.GetComponent<RectTransform>();
             progressRect.anchorMin = new Vector2(0.5f, 1f);
             progressRect.anchorMax = new Vector2(0.5f, 1f);
             progressRect.pivot = new Vector2(0.5f, 1f);
-            progressRect.sizeDelta = new Vector2(450f, 42f);
-            progressRect.anchoredPosition = new Vector2(0f, -148f);
+            progressRect.sizeDelta = new Vector2(300f, 30f);
+            progressRect.anchoredPosition = new Vector2(0f, -120f);
 
             refs.SupportText = HudUiFactory.CreateText("Support", refs.Panel.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform supportRect = refs.SupportText.GetComponent<RectTransform>();

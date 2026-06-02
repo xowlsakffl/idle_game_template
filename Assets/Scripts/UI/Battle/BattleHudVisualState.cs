@@ -91,8 +91,7 @@ namespace IdleGame.UI.Battle
             }
 
             float move = Mathf.Max(0.1f, hero.MoveSpeed);
-            float attackDash = isAttackSource ? (90f + hero.AttackSpeed * 45f) * Mathf.Clamp01(flashRatio) : 0f;
-            float pixelsPerSecond = 82f + move * 54f + attackDash;
+            float pixelsPerSecond = 82f + move * 54f;
             Vector2 nextPosition = Vector2.MoveTowards(currentPosition, targetPosition, pixelsPerSecond * visualDeltaTime);
             displayedHeroPositions[heroId] = nextPosition;
             return nextPosition;

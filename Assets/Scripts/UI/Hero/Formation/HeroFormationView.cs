@@ -72,9 +72,12 @@ namespace IdleGame.UI.Hero.Formation
             actionLayout.childForceExpandHeight = true;
             HudUiFactory.AddLayoutElement(actionRow, -1, HudLayoutConfig.HeroFormationActionRowHeight);
 
-            Button autoArrangeButton = HudUiFactory.CreateButton("자동 배치", actionRow.transform, HudButtonStyle.Primary);
+            var primaryActionStyle = new HudButtonVisualStyle(HudLayoutConfig.HeroFormationActionButtonFontSize, HudButtonStyle.Primary.Color);
+            var secondaryActionStyle = new HudButtonVisualStyle(HudLayoutConfig.HeroFormationActionButtonFontSize, HudButtonStyle.Secondary.Color);
+
+            Button autoArrangeButton = HudUiFactory.CreateButton("자동 배치", actionRow.transform, primaryActionStyle);
             autoArrangeButton.onClick.AddListener(() => args.OnAutoArrange?.Invoke());
-            Button bulkStarUpButton = HudUiFactory.CreateButton("일괄 승급", actionRow.transform, HudButtonStyle.Secondary);
+            Button bulkStarUpButton = HudUiFactory.CreateButton("일괄 승급", actionRow.transform, secondaryActionStyle);
             bulkStarUpButton.onClick.AddListener(() => args.OnBulkStarUp?.Invoke());
 
             return refs;
@@ -138,6 +141,32 @@ namespace IdleGame.UI.Hero.Formation
             foreach (KeyValuePair<TKey, Button> pair in buttons)
             {
                 HudUiFactory.SetButtonColor(pair.Value, comparer.Equals(pair.Key, selectedKey) ? selectedColor : normalColor);
+            }
+        }
+
+        public static void ApplySelectedMenuButtonSprites<TKey>(
+            Dictionary<TKey, Button> buttons,
+            TKey selectedKey)
+        {
+            if (buttons == null)
+            {
+                return;
+            }
+
+            EqualityComparer<TKey> comparer = EqualityComparer<TKey>.Default;
+            foreach (KeyValuePair<TKey, Button> pair in buttons)
+            {
+                if (pair.Value == null)
+                {
+                    continue;
+                }
+
+                bool selected = comparer.Equals(pair.Key, selectedKey);
+                HudUiFactory.ApplySpriteButtonState(
+                    pair.Value,
+                    HudSpriteKind.SmallBlueSquareButton,
+                    HudSpriteKind.SmallBlueSquareButtonPressed,
+                    selected);
             }
         }
 

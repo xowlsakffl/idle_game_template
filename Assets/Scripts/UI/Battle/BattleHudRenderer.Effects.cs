@@ -5,7 +5,6 @@ using IdleGame.Battle;
 using IdleGame.Battlefield;
 using IdleGame.Data;
 using IdleGame.Progression;
-using IdleGame.UI.Hero;
 
 namespace IdleGame.UI.Battle
 {
@@ -129,6 +128,5 @@ namespace IdleGame.UI.Battle
                 ? new Color(0.95f, 0.18f, 0.15f, 1f)
                 : Color.Lerp(new Color(0.95f, 0.23f, 0.16f, 1f), new Color(0.35f, 0.93f, 0.28f, 1f), clampedRatio);
         }
-
     }
 }

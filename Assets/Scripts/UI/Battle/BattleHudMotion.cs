@@ -96,45 +96,7 @@ namespace IdleGame.UI.Battle
 
         public static Vector2 GetHeroTraitMotionOffset(HeroState hero, int heroIndex, float time, bool isLastSource, float flashRatio)
         {
-            float phase = heroIndex * 0.73f;
-            float move = Mathf.Max(0.1f, hero.MoveSpeed);
-            float attack = Mathf.Max(0.1f, hero.AttackSpeed);
-            float hit = isLastSource ? Mathf.Clamp01(flashRatio) : 0f;
-
-            switch (hero.Definition.Trait)
-            {
-                case HeroTrait.Melee:
-                {
-                    float tempo = 3.4f + move * 0.55f + attack * 0.35f;
-                    float lunge = Mathf.Max(0f, Mathf.Sin(time * tempo + phase)) * (14f + move * 3.4f);
-                    float sideStep = Mathf.Sin(time * (1.7f + move * 0.12f) + phase) * (8f + move);
-                    return new Vector2(sideStep, 8f + lunge + 34f * hit);
-                }
-                case HeroTrait.Ranged:
-                {
-                    float strafe = Mathf.Sin(time * (1.45f + move * 0.16f) + phase) * (20f + move * 1.5f);
-                    float aimBob = Mathf.Sin(time * (2.3f + attack * 0.3f) + phase) * 4f;
-                    return new Vector2(strafe, -22f + aimBob - 22f * hit);
-                }
-                case HeroTrait.Support:
-                {
-                    float orbitSpeed = 1.25f + move * 0.12f;
-                    float orbitX = Mathf.Cos(time * orbitSpeed + phase) * (15f + move * 1.1f);
-                    float orbitY = Mathf.Sin(time * (orbitSpeed + 0.32f) + phase) * (12f + move);
-                    return new Vector2(orbitX, orbitY + 26f * hit);
-                }
-                case HeroTrait.Defense:
-                {
-                    float brace = Mathf.Sin(time * (1.05f + move * 0.08f) + phase) * 3.5f;
-                    float guardStep = Mathf.Max(0f, Mathf.Sin(time * (2f + attack * 0.2f) + phase)) * 7f;
-                    return new Vector2(Mathf.Sin(time * 0.8f + phase) * 4f, -8f + brace + guardStep + 16f * hit);
-                }
-                default:
-                {
-                    float bob = Mathf.Sin(time * (3.2f + move * 0.45f) + phase) * (4f + move);
-                    return new Vector2(0f, bob + 28f * hit);
-                }
-            }
+            return Vector2.zero;
         }
 
         public static float GetHeroTraitScale(HeroState hero, bool isLastSource, float flashRatio, float time, int heroIndex)
@@ -176,8 +138,6 @@ namespace IdleGame.UI.Battle
             Vector2 tangent = new Vector2(-direction.y, direction.x);
             float phase = heroIndex * 0.91f;
             float move = Mathf.Max(0.1f, hero.MoveSpeed);
-            float attack = Mathf.Max(0.1f, hero.AttackSpeed);
-            float hit = isAttackSource ? Mathf.Clamp01(flashRatio) : 0f;
             float distance = toEnemy.magnitude;
 
             switch (hero.Definition.Trait)
@@ -185,34 +145,33 @@ namespace IdleGame.UI.Battle
                 case HeroTrait.Melee:
                 {
                     float chase = Mathf.Min(distance - 34f, 74f + move * 7f);
-                    float lunge = hit * (38f + attack * 12f);
                     float weave = Mathf.Sin(time * (2.4f + move * 0.18f) + phase) * 10f;
-                    return direction * Mathf.Max(0f, chase + lunge) + tangent * weave;
+                    return direction * Mathf.Max(0f, chase) + tangent * weave;
                 }
                 case HeroTrait.Ranged:
                 {
                     float preferredDistance = 158f;
                     float adjust = Mathf.Clamp(distance - preferredDistance, -36f, 46f);
                     float strafe = Mathf.Sin(time * (1.5f + move * 0.11f) + phase) * (24f + move * 2f);
-                    return direction * (adjust + hit * 16f) + tangent * strafe;
+                    return direction * adjust + tangent * strafe;
                 }
                 case HeroTrait.Support:
                 {
                     float preferredDistance = 118f;
                     float adjust = Mathf.Clamp(distance - preferredDistance, -28f, 36f);
                     float orbit = Mathf.Sin(time * (1.15f + move * 0.08f) + phase) * 22f;
-                    return direction * (adjust + hit * 18f) + tangent * orbit;
+                    return direction * adjust + tangent * orbit;
                 }
                 case HeroTrait.Defense:
                 {
                     float chase = Mathf.Min(distance - 54f, 42f + move * 4f);
                     float guard = Mathf.Sin(time * (0.95f + move * 0.06f) + phase) * 8f;
-                    return direction * Mathf.Max(0f, chase + hit * 18f) + tangent * guard;
+                    return direction * Mathf.Max(0f, chase) + tangent * guard;
                 }
                 default:
                 {
                     float chase = Mathf.Clamp(distance - 92f, 0f, 52f + move * 4f);
-                    return direction * (chase + hit * 24f);
+                    return direction * chase;
                 }
             }
         }

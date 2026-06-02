@@ -76,7 +76,7 @@ namespace IdleGame.UI.Battle
 
                 if (args.ProgressText != null)
                 {
-                    args.ProgressText.text = "Boss Timer: " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "s";
+                    args.ProgressText.text = "보스 제한시간 " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초";
                 }
 
                 return;

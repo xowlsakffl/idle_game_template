@@ -13,12 +13,16 @@ namespace IdleGame.Battlefield
         private const float FieldHalfWidth = 3.85f;
         private const float FieldHalfHeight = 5.15f;
         private const float OriginX = 1000f;
+        private const float HeroAttackPulseDuration = 0.52f;
+        private const float EnemyAttackPulseDuration = 0.62f;
+        private const float ActorHitPulseDuration = 0.20f;
 
         private static Sprite squareSprite;
 
         private readonly Dictionary<string, WorldActor> heroActors = new Dictionary<string, WorldActor>();
         private readonly List<WorldActor> enemyActors = new List<WorldActor>();
         private readonly List<DamageFloater> damageFloaters = new List<DamageFloater>();
+        private readonly List<SpriteEffectVisual> spriteEffects = new List<SpriteEffectVisual>();
         private readonly List<ProjectileVisual> projectiles = new List<ProjectileVisual>();
         private readonly Dictionary<string, Vector2> heroLocalPositions = new Dictionary<string, Vector2>();
         private readonly List<Vector2> enemyLocalPositions = new List<Vector2>();
@@ -79,6 +83,7 @@ namespace IdleGame.Battlefield
             UpdateEnemies(deltaTime);
             PlayHitBursts();
             UpdateProjectiles(deltaTime);
+            UpdateSpriteEffects(deltaTime);
             UpdateDamageFloaters(deltaTime);
         }
 
@@ -106,6 +111,7 @@ namespace IdleGame.Battlefield
             public Vector2 StartPosition { get; set; }
             public Vector2 TargetPosition { get; set; }
             public Color BaseColor { get; set; }
+            public Sprite Sprite { get; set; }
             public float Life { get; set; }
             public float Duration { get; set; }
             public float Size { get; set; }
@@ -134,6 +140,8 @@ namespace IdleGame.Battlefield
             public float AttackPulse { get; set; }
             public float HitPulse { get; set; }
             public float SpawnPulse { get; set; }
+            public string AnimationKey { get; set; }
+            public float AnimationTime { get; set; }
         }
 
         private sealed class DamageFloater
@@ -151,6 +159,27 @@ namespace IdleGame.Battlefield
             public Color BaseColor { get; set; }
             public float Life { get; set; }
             public float Duration { get; set; }
+        }
+
+        private sealed class SpriteEffectVisual
+        {
+            public SpriteEffectVisual(GameObject root, SpriteRenderer body)
+            {
+                Root = root;
+                Body = body;
+                Root.SetActive(false);
+            }
+
+            public GameObject Root { get; }
+            public SpriteRenderer Body { get; }
+            public Vector2 StartPosition { get; set; }
+            public Color BaseColor { get; set; }
+            public BattlefieldSpriteAnimation Animation { get; set; }
+            public float Life { get; set; }
+            public float Duration { get; set; }
+            public float StartScale { get; set; }
+            public float EndScale { get; set; }
+            public float RotationSpeed { get; set; }
         }
     }
 }

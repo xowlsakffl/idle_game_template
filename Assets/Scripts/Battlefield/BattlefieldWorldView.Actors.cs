@@ -43,8 +43,10 @@ namespace IdleGame.Battlefield
                     currentPosition = targetPosition;
                 }
 
+                Vector2 previousPosition = currentPosition;
                 float moveSpeed = 4.8f + Mathf.Max(0.1f, hero.MoveSpeed) * 0.65f;
                 currentPosition = Vector2.MoveTowards(currentPosition, targetPosition, moveSpeed * deltaTime);
+                bool isMoving = (currentPosition - previousPosition).sqrMagnitude > 0.0001f;
                 heroLocalPositions[hero.Definition.Id] = currentPosition;
 
                 actor.LocalPosition = currentPosition;
@@ -52,7 +54,7 @@ namespace IdleGame.Battlefield
                 actor.Root.transform.position = ToWorld(renderPosition);
                 bool alive = battleManager.IsHeroBattleAlive(hero.Definition.Id);
                 bool hit = actor.HitPulse > 0f;
-                ConfigureHeroActorVisuals(actor, hero.Definition, alive, hit);
+                ConfigureHeroActorVisuals(actor, hero.Definition, alive, hit, isAttacking, isMoving, deltaTime);
                 actor.HpRoot.SetActive(true);
                 SetActorHp(actor, battleManager.GetHeroHpRatio(hero.Definition.Id), alive ? new Color(0.42f, 0.95f, 0.34f, 1f) : new Color(0.55f, 0.58f, 0.64f, 1f));
 
@@ -64,12 +66,12 @@ namespace IdleGame.Battlefield
 
                 if (isAttacking)
                 {
-                    scale += GetPulseRatio(actor.AttackPulse, 0.22f) * 0.16f;
+                    scale += GetPulseRatio(actor.AttackPulse, HeroAttackPulseDuration) * 0.16f;
                 }
 
                 if (hit)
                 {
-                    scale += GetPulseRatio(actor.HitPulse, 0.20f) * 0.10f;
+                    scale += GetPulseRatio(actor.HitPulse, ActorHitPulseDuration) * 0.10f;
                 }
 
                 actor.Root.transform.localScale = new Vector3(scale, scale, 1f);
@@ -130,23 +132,24 @@ namespace IdleGame.Battlefield
 
                 actor.Root.SetActive(true);
 
+                Vector2 previousPosition = actor.LocalPosition;
                 float speed = battleManager.IsBossFight ? 5.0f : 6.4f + (spawnSequence % 4) * 0.24f;
                 actor.LocalPosition = Vector2.MoveTowards(actor.LocalPosition, desiredPosition, speed * deltaTime);
+                bool isMoving = (actor.LocalPosition - previousPosition).sqrMagnitude > 0.0001f;
                 enemyLocalPositions[i] = actor.LocalPosition;
                 Vector2 renderPosition = actor.LocalPosition + GetEnemyAnimationOffset(actor, actor.LocalPosition);
                 actor.Root.transform.position = ToWorld(renderPosition);
 
-                bool isRecentHit = battleManager.IsBossFight ? i == 0 : i == battleManager.RecentHitEnemyIndex;
-                float hitPulse = actor.HitPulse > 0f ? GetPulseRatio(actor.HitPulse, 0.20f) * 0.18f : 0f;
+                float hitPulse = actor.HitPulse > 0f ? GetPulseRatio(actor.HitPulse, ActorHitPulseDuration) * 0.06f : 0f;
                 float spawnScale = actor.SpawnPulse > 0f ? Mathf.Lerp(0.35f, 1f, 1f - actor.SpawnPulse / 0.30f) : 1f;
-                float scale = battleManager.IsBossFight ? 1.72f : 0.82f + (i % 3) * 0.04f;
+                float scale = battleManager.IsBossFight ? 2.18f : 1.08f + (i % 3) * 0.06f;
                 if (actor.AttackPulse > 0f)
                 {
-                    scale += GetPulseRatio(actor.AttackPulse, 0.18f) * 0.11f;
+                    scale += GetPulseRatio(actor.AttackPulse, EnemyAttackPulseDuration) * 0.11f;
                 }
 
                 actor.Root.transform.localScale = new Vector3((scale + hitPulse) * spawnScale, (scale + hitPulse) * spawnScale, 1f);
-                ConfigureEnemyActorVisuals(actor, i, battleManager.IsBossFight, actor.HitPulse > 0f);
+                ConfigureEnemyActorVisuals(actor, i, battleManager.IsBossFight, actor.HitPulse > 0f, actor.AttackPulse > 0f, isMoving, deltaTime);
                 actor.HpRoot.SetActive(true);
                 SetActorHp(actor, battleManager.GetVisibleEnemyHpRatio(i), battleManager.IsBossFight ? new Color(1f, 0.20f, 0.16f, 1f) : new Color(0.40f, 0.95f, 0.24f, 1f));
             }
@@ -207,7 +210,7 @@ namespace IdleGame.Battlefield
 
             GameObject hpRoot = new GameObject("HpRoot");
             hpRoot.transform.SetParent(root.transform, false);
-            hpRoot.transform.localPosition = new Vector3(0f, 0.63f, 0f);
+            hpRoot.transform.localPosition = hero ? new Vector3(0f, 0.78f, 0f) : new Vector3(0f, 1.02f, 0f);
 
             SpriteRenderer hpBack = CreateSpriteRenderer("HpBack", hpRoot.transform, squareSprite, new Color(0.02f, 0.025f, 0.03f, 0.95f), hero ? 7 : 17);
             hpBack.transform.localScale = new Vector3(0.86f, 0.07f, 1f);
@@ -218,28 +221,67 @@ namespace IdleGame.Battlefield
             return root;
         }
 
-        private void ConfigureHeroActorVisuals(WorldActor actor, HeroDefinition hero, bool alive, bool hit)
+        private void ConfigureHeroActorVisuals(WorldActor actor, HeroDefinition hero, bool alive, bool hit, bool attacking, bool moving, float deltaTime)
         {
             Color rarityColor = GetRarityColor(hero.Rarity);
             float alpha = alive ? 1f : 0.42f;
-            Color bodyColor = hit ? Color.white : WithAlpha(rarityColor, alpha);
+            Color bodyColor = WithAlpha(rarityColor, alpha);
+            BattlefieldAnimationState state = attacking ? BattlefieldAnimationState.Attack : moving ? BattlefieldAnimationState.Run : BattlefieldAnimationState.Idle;
+            BattlefieldSpriteAnimation animation = BattlefieldSpriteCatalog.GetHeroAnimation(hero, state);
+            bool usesAssetSprite = animation != null && animation.IsValid;
 
             actor.Body.gameObject.SetActive(true);
-            actor.Body.sprite = squareSprite;
-            actor.Body.color = bodyColor;
-            SetRendererPart(actor.Body, Vector3.zero, Vector3.one * 0.58f, 0f);
+            actor.Body.sprite = usesAssetSprite ? GetActorAnimationFrame(actor, animation, deltaTime) : squareSprite;
+            actor.Body.color = usesAssetSprite
+                ? new Color(1f, 1f, 1f, alpha)
+                : bodyColor;
+
+            float bodyScale = usesAssetSprite
+                ? (hero.Trait == HeroTrait.Defense ? 1.04f : 0.96f)
+                : 0.58f;
+            float hitRatio = hit ? GetPulseRatio(actor.HitPulse, ActorHitPulseDuration) : 0f;
+            Vector3 bodyPosition = usesAssetSprite ? new Vector3(0f, -0.10f - hitRatio * 0.025f, 0f) : Vector3.zero;
+            Vector3 bodyScaleVector = new Vector3(bodyScale * (1f + hitRatio * 0.035f), bodyScale * (1f - hitRatio * 0.025f), 1f);
+            SetRendererPart(actor.Body, bodyPosition, bodyScaleVector, 0f);
         }
 
-        private void ConfigureEnemyActorVisuals(WorldActor actor, int index, bool boss, bool hit)
+        private void ConfigureEnemyActorVisuals(WorldActor actor, int index, bool boss, bool hit, bool attacking, bool moving, float deltaTime)
         {
             Color baseColor = boss
                 ? new Color(0.86f, 0.18f, 0.14f, 1f)
                 : Color.Lerp(new Color(0.58f, 0.12f, 0.10f, 1f), new Color(0.95f, 0.38f, 0.12f, 1f), index / (float)Mathf.Max(1, GameData.MaxVisibleEnemies - 1));
+            BattlefieldAnimationState state = attacking ? BattlefieldAnimationState.Attack : moving ? BattlefieldAnimationState.Run : BattlefieldAnimationState.Idle;
+            BattlefieldSpriteAnimation animation = BattlefieldSpriteCatalog.GetEnemyAnimation(index, boss, state);
+            bool usesAssetSprite = animation != null && animation.IsValid;
 
             actor.Body.gameObject.SetActive(true);
-            actor.Body.sprite = squareSprite;
-            actor.Body.color = hit ? Color.white : baseColor;
-            SetRendererPart(actor.Body, Vector3.zero, boss ? Vector3.one * 0.72f : Vector3.one * 0.54f, 0f);
+            actor.Body.sprite = usesAssetSprite ? GetActorAnimationFrame(actor, animation, deltaTime) : squareSprite;
+            actor.Body.color = usesAssetSprite
+                ? Color.white
+                : baseColor;
+
+            float bodyScale = usesAssetSprite
+                ? (boss ? 1.62f : 1.42f)
+                : (boss ? 0.72f : 0.54f);
+            float hitRatio = hit ? GetPulseRatio(actor.HitPulse, ActorHitPulseDuration) : 0f;
+            Vector3 bodyPosition = usesAssetSprite ? new Vector3(0f, -0.08f, 0f) : Vector3.zero;
+            Vector3 bodyScaleVector = new Vector3(bodyScale * (1f + hitRatio * 0.018f), bodyScale * (1f - hitRatio * 0.010f), 1f);
+            SetRendererPart(actor.Body, bodyPosition, bodyScaleVector, 0f);
+        }
+
+        private static Sprite GetActorAnimationFrame(WorldActor actor, BattlefieldSpriteAnimation animation, float deltaTime)
+        {
+            if (actor.AnimationKey != animation.Key)
+            {
+                actor.AnimationKey = animation.Key;
+                actor.AnimationTime = 0f;
+            }
+            else
+            {
+                actor.AnimationTime += Mathf.Max(0f, deltaTime);
+            }
+
+            return animation.GetFrame(actor.AnimationTime);
         }
 
         private static void SetRendererPart(SpriteRenderer renderer, Vector3 localPosition, Vector3 localScale, float zRotation)
