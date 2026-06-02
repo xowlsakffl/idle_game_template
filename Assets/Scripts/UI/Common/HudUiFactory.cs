@@ -192,6 +192,8 @@ namespace IdleGame.UI.Common
                 return;
             }
 
+            ApplyUntintedSpriteSwapColors(button);
+
             Image image = button.GetComponent<Image>();
             if (image == null)
             {
@@ -204,7 +206,11 @@ namespace IdleGame.UI.Common
             if (activeSprite == null)
             {
                 image.sprite = null;
-                image.color = Color.white;
+                image.type = Image.Type.Simple;
+                image.color = pressed
+                    ? new Color(0.28f, 0.42f, 0.55f, 1f)
+                    : new Color(0.31f, 0.63f, 0.69f, 1f);
+                button.transition = Selectable.Transition.None;
                 return;
             }
 
@@ -219,6 +225,11 @@ namespace IdleGame.UI.Common
             spriteState.selectedSprite = pressedSprite != null ? pressedSprite : activeSprite;
             button.spriteState = spriteState;
 
+            button.transition = Selectable.Transition.SpriteSwap;
+        }
+
+        private static void ApplyUntintedSpriteSwapColors(Button button)
+        {
             ColorBlock colors = button.colors;
             colors.normalColor = Color.white;
             colors.highlightedColor = Color.white;
@@ -227,7 +238,6 @@ namespace IdleGame.UI.Common
             colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
             colors.colorMultiplier = 1f;
             button.colors = colors;
-            button.transition = Selectable.Transition.SpriteSwap;
         }
 
         private static bool HasBorder(Sprite sprite)

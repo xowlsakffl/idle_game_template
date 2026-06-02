@@ -20,8 +20,6 @@ namespace IdleGame.UI.Hero
 
     public static class HeroPanelView
     {
-        private const string HeroPageTabsPrefabPath = "UI/HeroPageTabs";
-
         public static void BuildHeader(Transform parent)
         {
             if (parent == null)
@@ -60,11 +58,6 @@ namespace IdleGame.UI.Hero
             placeholderLayout.flexibleHeight = 1f;
             refs.PlaceholderText.gameObject.SetActive(false);
 
-            if (TryBuildPrefabTabs(args))
-            {
-                return refs;
-            }
-
             GameObject tabs = new GameObject("HeroPageTabs", typeof(RectTransform));
             tabs.transform.SetParent(args.Parent, false);
             HudUiFactory.AddLayoutElement(tabs, -1, HudLayoutConfig.HeroPageTabsHeight);
@@ -74,28 +67,6 @@ namespace IdleGame.UI.Hero
             CreateTabButton(args, tabs.transform, HeroPageTab.Statue, "토템", 2);
             CreateTabButton(args, tabs.transform, HeroPageTab.Seal, "룬", 3);
             return refs;
-        }
-
-        private static bool TryBuildPrefabTabs(HeroPanelViewBuildFooterArgs args)
-        {
-            GameObject prefab = Resources.Load<GameObject>(HeroPageTabsPrefabPath);
-            if (prefab == null)
-            {
-                return false;
-            }
-
-            GameObject instance = UnityEngine.Object.Instantiate(prefab, args.Parent, false);
-            instance.name = "HeroPageTabs";
-            HudFontProvider.ApplyToChildren(instance.transform);
-
-            HeroPageTabsPrefabView view = instance.GetComponent<HeroPageTabsPrefabView>();
-            if (view == null || !view.TryBind(args.OnTabClick, args.TabButtons))
-            {
-                UnityEngine.Object.Destroy(instance);
-                return false;
-            }
-
-            return true;
         }
 
         private static void CreateTabButton(HeroPanelViewBuildFooterArgs args, Transform parent, HeroPageTab tab, string label, int index)

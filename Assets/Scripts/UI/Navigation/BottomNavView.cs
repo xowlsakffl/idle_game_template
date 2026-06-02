@@ -109,7 +109,7 @@ namespace IdleGame.UI.Navigation
 
         private static void CreateTabButton<TTab>(BottomNavViewBuildArgs<TTab> args, Transform parent, TTab tab, string label)
         {
-            Button button = HudUiFactory.CreateButton(label, parent, HudLayoutConfig.BottomNavFontSize, new Color(0.13f, 0.17f, 0.25f, 1f));
+            Button button = HudUiFactory.CreateButton(label, parent, HudLayoutConfig.BottomNavFontSize, Color.white);
             ApplyMenuButtonSprite(button, false);
             Text text = button.GetComponentInChildren<Text>(true);
             if (text != null)
