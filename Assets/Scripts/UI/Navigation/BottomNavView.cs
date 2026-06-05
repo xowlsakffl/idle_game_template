@@ -43,12 +43,12 @@ namespace IdleGame.UI.Navigation
                 return;
             }
 
-            GameObject panel = HudUiFactory.CreatePanel("BottomNav", args.Parent, new Color(0.08f, 0.11f, 0.17f, 1f));
+            GameObject panel = HudUiFactory.CreatePanel("BottomNav", args.Parent, new Color(0.05f, 0.09f, 0.15f, 1f));
             HudUiFactory.AddLayoutElement(panel, -1, HudLayoutConfig.BottomNavHeight);
 
             HorizontalLayoutGroup layout = panel.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(3, 3, 3, 3);
-            layout.spacing = 2;
+            layout.padding = new RectOffset(4, 4, 5, 5);
+            layout.spacing = 4;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -135,8 +135,8 @@ namespace IdleGame.UI.Navigation
 
             HudUiFactory.ApplySpriteButtonState(
                 button,
-                HudSpriteKind.SmallBlueSquareButton,
-                HudSpriteKind.SmallBlueSquareButtonPressed,
+                HudSpriteKind.BlueMenuButton,
+                HudSpriteKind.BlueMenuButtonPressed,
                 selected);
         }
 

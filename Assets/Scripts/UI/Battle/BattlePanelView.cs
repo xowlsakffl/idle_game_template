@@ -102,7 +102,8 @@ namespace IdleGame.UI.Battle
             targetRect.anchoredPosition = new Vector2(0f, -88f);
             refs.TargetText.gameObject.SetActive(false);
 
-            GameObject killProgressBar = HudUiFactory.CreatePanel("KillProgressBar", refs.Panel.transform, new Color(0.03f, 0.04f, 0.05f, 1f));
+            GameObject killProgressBar = HudUiFactory.CreatePanel("KillProgressBar", refs.Panel.transform, Color.white);
+            HudUiFactory.ApplySprite(killProgressBar.GetComponent<Image>(), HudSpriteKind.BigBarBase, new Color(0.72f, 0.80f, 0.88f, 1f));
             RectTransform killProgressRect = killProgressBar.GetComponent<RectTransform>();
             killProgressRect.anchorMin = new Vector2(0.5f, 1f);
             killProgressRect.anchorMax = new Vector2(0.5f, 1f);
@@ -173,7 +174,8 @@ namespace IdleGame.UI.Battle
             }
 
             button.interactable = true;
-            HudUiFactory.SetButtonColor(button, enabled ? enabledColor : disabledColor);
+            HudUiFactory.ApplyButtonSprite(button, enabled ? HudSpriteKind.BlueMenuButton : HudSpriteKind.DisabledPanel,
+                enabled ? new Color(0.84f, 0.98f, 1f, 1f) : new Color(0.54f, 0.60f, 0.68f, 1f));
 
             Text text = button.GetComponentInChildren<Text>(true);
             if (text != null)
@@ -190,11 +192,12 @@ namespace IdleGame.UI.Battle
             }
 
             button.interactable = true;
-            HudUiFactory.SetButtonColor(button, currentSpeed == GameSpeedManager.PremiumSpeed
-                ? new Color(0.60f, 0.40f, 0.16f, 1f)
-                : currentSpeed == GameSpeedManager.FreeSpeed
-                    ? new Color(0.34f, 0.44f, 0.20f, 1f)
-                    : new Color(0.18f, 0.24f, 0.32f, 1f));
+            HudUiFactory.ApplyButtonSprite(button, currentSpeed > 1 ? HudSpriteKind.BlueMenuButton : HudSpriteKind.DisabledPanel,
+                currentSpeed == GameSpeedManager.PremiumSpeed
+                    ? new Color(1f, 0.82f, 0.48f, 1f)
+                    : currentSpeed == GameSpeedManager.FreeSpeed
+                        ? new Color(0.84f, 0.98f, 1f, 1f)
+                        : new Color(0.54f, 0.60f, 0.68f, 1f));
 
             Text text = button.GetComponentInChildren<Text>(true);
             if (text != null)
@@ -233,7 +236,8 @@ namespace IdleGame.UI.Battle
 
         private static Button CreateAutoControlButton(string label, Transform parent)
         {
-            Button button = HudUiFactory.CreateButton(label, parent, 21, new Color(0.25f, 0.25f, 0.20f, 1f));
+            Button button = HudUiFactory.CreateButton(label, parent, 21, Color.white);
+            HudUiFactory.ApplyButtonSprite(button, HudSpriteKind.DisabledPanel, new Color(0.60f, 0.66f, 0.74f, 1f));
             Text text = button.GetComponentInChildren<Text>(true);
             if (text != null)
             {

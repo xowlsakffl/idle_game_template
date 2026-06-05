@@ -89,7 +89,8 @@ namespace IdleGame.UI.Hero.Formation
 
         private static void CreateRuneRow(HeroFormationViewBuildArgs args, Transform parent)
         {
-            GameObject formationRuneRow = HudUiFactory.CreatePanel("FormationRuneRow", parent, new Color(0.27f, 0.35f, 0.50f, 1f));
+            GameObject formationRuneRow = HudUiFactory.CreatePanel("FormationRuneRow", parent, Color.white);
+            HudUiFactory.ApplySprite(formationRuneRow.GetComponent<Image>(), HudSpriteKind.ParchmentPanel, new Color(0.52f, 0.64f, 0.78f, 1f));
             HorizontalLayoutGroup formationRuneLayout = formationRuneRow.AddComponent<HorizontalLayoutGroup>();
             formationRuneLayout.padding = new RectOffset(10, 10, 7, 7);
             formationRuneLayout.spacing = 8;
@@ -124,7 +125,8 @@ namespace IdleGame.UI.Hero.Formation
         private static void CreateRoster(HeroFormationViewBuildArgs args, HeroFormationViewRefs refs, Transform parent)
         {
             IReadOnlyList<HeroDefinition> rosterHeroes = args.RosterHeroes ?? Array.Empty<HeroDefinition>();
-            GameObject rosterScroll = HudUiFactory.CreatePanel("HeroRosterScroll", parent, new Color(0.15f, 0.19f, 0.28f, 1f));
+            GameObject rosterScroll = HudUiFactory.CreatePanel("HeroRosterScroll", parent, Color.white);
+            HudUiFactory.ApplyNinePatchPanel(rosterScroll, HudSpriteKind.WoodPanel, new Color(0.70f, 0.68f, 0.58f, 1f));
             LayoutElement rosterScrollLayout = HudUiFactory.AddLayoutElement(rosterScroll, -1, HudLayoutConfig.HeroRosterMinHeight);
             rosterScrollLayout.flexibleHeight = 1f;
 

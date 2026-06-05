@@ -38,7 +38,8 @@ namespace IdleGame.UI.Hero.Formation
                 TextAnchor.MiddleLeft);
             HudUiFactory.AddLayoutElement(refs.SummaryText.gameObject, -1, HudLayoutConfig.HeroFormationSummaryHeight);
 
-            GameObject formationArea = HudUiFactory.CreatePanel("FormationArea", content.transform, new Color(0.33f, 0.42f, 0.58f, 1f));
+            GameObject formationArea = HudUiFactory.CreatePanel("FormationArea", content.transform, Color.white);
+            HudUiFactory.ApplySprite(formationArea.GetComponent<Image>(), HudSpriteKind.CarvedPanel, new Color(0.54f, 0.66f, 0.82f, 1f));
             HudUiFactory.AddLayoutElement(formationArea, -1, HudLayoutConfig.HeroFormationAreaHeight);
             HorizontalLayoutGroup formationAreaLayout = formationArea.AddComponent<HorizontalLayoutGroup>();
             formationAreaLayout.padding = new RectOffset(10, 10, 10, 10);
@@ -164,8 +165,8 @@ namespace IdleGame.UI.Hero.Formation
                 bool selected = comparer.Equals(pair.Key, selectedKey);
                 HudUiFactory.ApplySpriteButtonState(
                     pair.Value,
-                    HudSpriteKind.SmallBlueSquareButton,
-                    HudSpriteKind.SmallBlueSquareButtonPressed,
+                    HudSpriteKind.BlueMenuButton,
+                    HudSpriteKind.BlueMenuButtonPressed,
                     selected);
             }
         }

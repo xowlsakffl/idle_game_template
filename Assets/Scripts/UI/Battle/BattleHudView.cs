@@ -72,7 +72,8 @@ namespace IdleGame.UI.Battle
             refs.CenterSpawnText.text = "◎";
             refs.CenterSpawnText.color = new Color(0.95f, 0.12f, 0.10f, 0.85f);
 
-            GameObject stagePill = HudUiFactory.CreatePanel("FieldStagePill", field.transform, new Color(0.08f, 0.10f, 0.14f, 0.90f));
+            GameObject stagePill = HudUiFactory.CreatePanel("FieldStagePill", field.transform, Color.white);
+            HudUiFactory.ApplySprite(stagePill.GetComponent<Image>(), HudSpriteKind.BlueRibbon, new Color(0.92f, 1f, 1f, 1f));
             RectTransform pillRect = stagePill.GetComponent<RectTransform>();
             pillRect.anchorMin = new Vector2(0.5f, 1f);
             pillRect.anchorMax = new Vector2(0.5f, 1f);
@@ -91,7 +92,8 @@ namespace IdleGame.UI.Battle
             damageRect.sizeDelta = new Vector2(260f, 92f);
             damageRect.anchoredPosition = new Vector2(0f, 18f);
 
-            GameObject damageMeter = HudUiFactory.CreatePanel("DamageMeter", field.transform, new Color(0.02f, 0.025f, 0.035f, 0.76f));
+            GameObject damageMeter = HudUiFactory.CreatePanel("DamageMeter", field.transform, Color.white);
+            HudUiFactory.ApplySprite(damageMeter.GetComponent<Image>(), HudSpriteKind.CarvedPanel, new Color(0.46f, 0.56f, 0.70f, 0.94f));
             RectTransform damageMeterRect = damageMeter.GetComponent<RectTransform>();
             damageMeterRect.anchorMin = new Vector2(1f, 0f);
             damageMeterRect.anchorMax = new Vector2(1f, 0f);
@@ -126,7 +128,8 @@ namespace IdleGame.UI.Battle
                 CreateDamageMeterRow(args, meterRows.transform, i);
             }
 
-            GameObject guideQuest = HudUiFactory.CreatePanel("GuideQuestCard", field.transform, new Color(0.03f, 0.04f, 0.06f, 0.78f));
+            GameObject guideQuest = HudUiFactory.CreatePanel("GuideQuestCard", field.transform, Color.white);
+            HudUiFactory.ApplySprite(guideQuest.GetComponent<Image>(), HudSpriteKind.ParchmentPanel, new Color(0.54f, 0.66f, 0.80f, 0.94f));
             RectTransform guideRect = guideQuest.GetComponent<RectTransform>();
             guideRect.anchorMin = new Vector2(1f, 1f);
             guideRect.anchorMax = new Vector2(1f, 1f);
@@ -176,7 +179,8 @@ namespace IdleGame.UI.Battle
                 HudUiFactory.StretchToParent(label.gameObject);
                 label.text = string.Empty;
 
-                GameObject enemyHpBar = HudUiFactory.CreatePanel("EnemyHpBar" + i, enemy.transform, new Color(0.02f, 0.025f, 0.03f, 0.92f));
+                GameObject enemyHpBar = HudUiFactory.CreatePanel("EnemyHpBar" + i, enemy.transform, Color.white);
+                HudUiFactory.ApplySprite(enemyHpBar.GetComponent<Image>(), HudSpriteKind.SmallBarBase, new Color(0.78f, 0.82f, 0.86f, 1f));
                 RectTransform enemyHpRect = enemyHpBar.GetComponent<RectTransform>();
                 enemyHpRect.anchorMin = new Vector2(0.5f, 1f);
                 enemyHpRect.anchorMax = new Vector2(0.5f, 1f);
@@ -200,7 +204,8 @@ namespace IdleGame.UI.Battle
 
         private static void CreateDamageMeterRow(BattleHudViewBuildArgs args, Transform parent, int index)
         {
-            GameObject row = HudUiFactory.CreatePanel("DamageMeterRow" + index, parent, new Color(0.08f, 0.10f, 0.15f, 0.92f));
+            GameObject row = HudUiFactory.CreatePanel("DamageMeterRow" + index, parent, Color.white);
+            HudUiFactory.ApplySprite(row.GetComponent<Image>(), HudSpriteKind.SmallBarBase, new Color(0.92f, 0.96f, 1f, 0.95f));
             Image fill = HudUiFactory.CreateBarFill("DamageMeterFill" + index, row.transform, HudSpriteKind.SmallBarFill, new Color(0.95f, 0.20f, 0.16f, 1f));
             RectTransform fillRect = fill.GetComponent<RectTransform>();
             fillRect.offsetMin = new Vector2(0f, 2f);

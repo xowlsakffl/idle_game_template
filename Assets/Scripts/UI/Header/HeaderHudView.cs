@@ -32,10 +32,12 @@ namespace IdleGame.UI.Header
             }
 
             HeaderHudViewRefs refs = new HeaderHudViewRefs();
-            GameObject panel = HudUiFactory.CreatePanel("Header", args.Parent, new Color(0.06f, 0.19f, 0.33f, 0.98f));
+            GameObject panel = HudUiFactory.CreatePanel("Header", args.Parent, Color.white);
+            HudUiFactory.ApplyNinePatchPanel(panel, HudSpriteKind.Banner, new Color(0.92f, 0.92f, 0.76f, 1f));
             HudUiFactory.AddLayoutElement(panel, -1, 160);
 
-            GameObject avatar = HudUiFactory.CreatePanel("PlayerAvatar", panel.transform, new Color(0.10f, 0.48f, 0.72f, 1f));
+            GameObject avatar = HudUiFactory.CreatePanel("PlayerAvatar", panel.transform, Color.white);
+            HudUiFactory.ApplySprite(avatar.GetComponent<Image>(), HudSpriteKind.SmallBlueSquareButtonPressed, Color.white);
             RectTransform avatarRect = avatar.GetComponent<RectTransform>();
             avatarRect.anchorMin = new Vector2(0f, 0.5f);
             avatarRect.anchorMax = new Vector2(0f, 0.5f);
@@ -70,7 +72,8 @@ namespace IdleGame.UI.Header
             modeRect.sizeDelta = new Vector2(390f, 42f);
             modeRect.anchoredPosition = new Vector2(184f, 8f);
 
-            GameObject accountExpBar = HudUiFactory.CreatePanel("AccountExpBar", panel.transform, new Color(0.03f, 0.08f, 0.15f, 1f));
+            GameObject accountExpBar = HudUiFactory.CreatePanel("AccountExpBar", panel.transform, Color.white);
+            HudUiFactory.ApplySprite(accountExpBar.GetComponent<Image>(), HudSpriteKind.BigBarBase, new Color(0.98f, 1f, 0.94f, 1f));
             RectTransform accountBarRect = accountExpBar.GetComponent<RectTransform>();
             accountBarRect.anchorMin = new Vector2(0f, 0.5f);
             accountBarRect.anchorMax = new Vector2(0f, 0.5f);
@@ -78,7 +81,7 @@ namespace IdleGame.UI.Header
             accountBarRect.sizeDelta = new Vector2(430f, 30f);
             accountBarRect.anchoredPosition = new Vector2(146f, -38f);
 
-            refs.AccountExpFill = HudUiFactory.CreateBarFill("AccountExpFill", accountExpBar.transform, HudSpriteKind.BigBarFill, new Color(0.10f, 0.79f, 0.96f, 1f));
+            refs.AccountExpFill = HudUiFactory.CreateBarFill("AccountExpFill", accountExpBar.transform, HudSpriteKind.BigBarFill, new Color(0.16f, 0.82f, 0.90f, 1f));
             RectTransform accountFillRect = refs.AccountExpFill.GetComponent<RectTransform>();
             accountFillRect.offsetMin = new Vector2(0f, 6f);
             accountFillRect.offsetMax = new Vector2(0f, -6f);
@@ -86,7 +89,8 @@ namespace IdleGame.UI.Header
             refs.AccountLevelText = HudUiFactory.CreateText("AccountLevelText", accountExpBar.transform, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
             HudUiFactory.StretchToParent(refs.AccountLevelText.gameObject);
 
-            GameObject resourcePill = HudUiFactory.CreatePanel("ResourcePill", panel.transform, new Color(0.03f, 0.09f, 0.16f, 0.96f));
+            GameObject resourcePill = HudUiFactory.CreatePanel("ResourcePill", panel.transform, Color.white);
+            HudUiFactory.ApplyNinePatchPanel(resourcePill, HudSpriteKind.WoodPanel, new Color(0.92f, 0.88f, 0.76f, 1f));
             RectTransform resourceRect = resourcePill.GetComponent<RectTransform>();
             resourceRect.anchorMin = new Vector2(1f, 0.5f);
             resourceRect.anchorMax = new Vector2(1f, 0.5f);
@@ -109,7 +113,12 @@ namespace IdleGame.UI.Header
 
             if (args.ShowDebugGrantButton)
             {
-                Button debugGrantButton = HudUiFactory.CreateButton("DBG", panel.transform, 24, new Color(0.26f, 0.18f, 0.12f, 1f));
+                Button debugGrantButton = HudUiFactory.CreateButton("DBG", panel.transform, 24, Color.white);
+                HudUiFactory.ApplySpriteButtonState(
+                    debugGrantButton,
+                    HudSpriteKind.BlueMenuButton,
+                    HudSpriteKind.BlueMenuButtonPressed,
+                    false);
                 RectTransform debugRect = debugGrantButton.GetComponent<RectTransform>();
                 debugRect.anchorMin = new Vector2(1f, 0.5f);
                 debugRect.anchorMax = new Vector2(1f, 0.5f);
@@ -119,7 +128,12 @@ namespace IdleGame.UI.Header
                 debugGrantButton.onClick.AddListener(() => args.OnDebugGrant?.Invoke());
             }
 
-            Button menuButton = HudUiFactory.CreateButton("MENU", panel.transform, 19, new Color(0.12f, 0.16f, 0.22f, 1f));
+            Button menuButton = HudUiFactory.CreateButton("MENU", panel.transform, 19, Color.white);
+            HudUiFactory.ApplySpriteButtonState(
+                menuButton,
+                HudSpriteKind.BlueMenuButton,
+                HudSpriteKind.BlueMenuButtonPressed,
+                false);
             RectTransform menuRect = menuButton.GetComponent<RectTransform>();
             menuRect.anchorMin = new Vector2(1f, 0.5f);
             menuRect.anchorMax = new Vector2(1f, 0.5f);

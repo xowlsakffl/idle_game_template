@@ -36,25 +36,41 @@ namespace IdleGame.UI.Growth
             }
 
             VerticalLayoutGroup layout = args.Parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(24, 24, 22, 22);
-            layout.spacing = 6;
+            layout.padding = new RectOffset(22, 22, 18, 20);
+            layout.spacing = 7;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            Text title = HudUiFactory.CreateText("GrowthTitle", args.Parent, 32, FontStyle.Bold, TextAnchor.MiddleLeft);
+            GameObject titleBar = HudUiFactory.CreatePanel("GrowthTitleBar", args.Parent, Color.white);
+            HudUiFactory.ApplySprite(titleBar.GetComponent<Image>(), HudSpriteKind.BlueRibbon, new Color(0.88f, 1f, 1f, 1f));
+            HudUiFactory.AddLayoutElement(titleBar, -1, 44);
+
+            Text title = HudUiFactory.CreateText("GrowthTitle", titleBar.transform, 30, FontStyle.Bold, TextAnchor.MiddleLeft);
             title.text = "성장";
-            HudUiFactory.AddLayoutElement(title.gameObject, -1, 38);
+            RectTransform titleRect = title.GetComponent<RectTransform>();
+            titleRect.anchorMin = Vector2.zero;
+            titleRect.anchorMax = Vector2.one;
+            titleRect.offsetMin = new Vector2(22f, 2f);
+            titleRect.offsetMax = new Vector2(-22f, -2f);
 
             GrowthPanelViewRefs refs = new GrowthPanelViewRefs();
-            refs.TotalCombatPowerText = HudUiFactory.CreateText("TotalCombatPower", args.Parent, 28, FontStyle.Bold, TextAnchor.MiddleLeft);
+            GameObject powerBar = HudUiFactory.CreatePanel("GrowthPowerBar", args.Parent, Color.white);
+            HudUiFactory.ApplySprite(powerBar.GetComponent<Image>(), HudSpriteKind.CarvedPanel, new Color(0.56f, 0.66f, 0.78f, 1f));
+            HudUiFactory.AddLayoutElement(powerBar, -1, 44);
+
+            refs.TotalCombatPowerText = HudUiFactory.CreateText("TotalCombatPower", powerBar.transform, 27, FontStyle.Bold, TextAnchor.MiddleLeft);
             refs.TotalCombatPowerText.text = "종합 전투력 0";
-            HudUiFactory.AddLayoutElement(refs.TotalCombatPowerText.gameObject, -1, 42);
+            RectTransform powerTextRect = refs.TotalCombatPowerText.GetComponent<RectTransform>();
+            powerTextRect.anchorMin = Vector2.zero;
+            powerTextRect.anchorMax = Vector2.one;
+            powerTextRect.offsetMin = new Vector2(22f, 2f);
+            powerTextRect.offsetMax = new Vector2(-22f, -2f);
 
             refs.GrowthNoticeText = HudUiFactory.CreateText("GrowthNotice", args.Parent, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
             refs.GrowthNoticeText.color = new Color(1f, 0.55f, 0.34f, 1f);
-            HudUiFactory.AddLayoutElement(refs.GrowthNoticeText.gameObject, -1, 30);
+            HudUiFactory.AddLayoutElement(refs.GrowthNoticeText.gameObject, -1, 26);
 
             CreateStepRow(args);
             CreateAbilityRows(args);
@@ -66,17 +82,22 @@ namespace IdleGame.UI.Growth
             GameObject stepRow = new GameObject("GrowthStepRow", typeof(RectTransform));
             stepRow.transform.SetParent(args.Parent, false);
             HorizontalLayoutGroup stepLayout = stepRow.AddComponent<HorizontalLayoutGroup>();
-            stepLayout.spacing = 10;
+            stepLayout.spacing = 6;
             stepLayout.childControlWidth = true;
             stepLayout.childControlHeight = true;
             stepLayout.childForceExpandWidth = true;
             stepLayout.childForceExpandHeight = true;
-            HudUiFactory.AddLayoutElement(stepRow, -1, 50);
+            HudUiFactory.AddLayoutElement(stepRow, -1, 56);
 
             int[] steps = { 1, 10, 100, 1000 };
             foreach (int step in steps)
             {
-                Button stepButton = HudUiFactory.CreateButton(step + "x", stepRow.transform, 24, new Color(0.18f, 0.24f, 0.38f, 1f));
+                Button stepButton = HudUiFactory.CreateButton(step + "x", stepRow.transform, 24, Color.white);
+                HudUiFactory.ApplySpriteButtonState(
+                    stepButton,
+                    HudSpriteKind.BlueMenuButton,
+                    HudSpriteKind.BlueMenuButtonPressed,
+                    false);
                 int capturedStep = step;
                 stepButton.onClick.AddListener(() => args.OnSelectLevelStep?.Invoke(capturedStep));
                 args.GrowthStepButtons[step] = stepButton;
@@ -92,8 +113,9 @@ namespace IdleGame.UI.Growth
 
             foreach (AbilityState ability in args.Abilities)
             {
-                Button button = HudUiFactory.CreateButton(ability.Definition.DisplayName, args.Parent, 22, new Color(0.48f, 0.54f, 0.66f, 1f));
-                HudUiFactory.AddLayoutElement(button.gameObject, -1, 64);
+                Button button = HudUiFactory.CreateButton(ability.Definition.DisplayName, args.Parent, 22, Color.white);
+                HudUiFactory.ApplyButtonSprite(button, HudSpriteKind.ParchmentPanel, new Color(0.58f, 0.70f, 0.82f, 1f));
+                HudUiFactory.AddLayoutElement(button.gameObject, -1, 70);
 
                 AbilityKind kind = ability.Definition.Kind;
                 HudUiFactory.ConfigureHoldRepeat(button, () => args.OnLevelUpAbility?.Invoke(kind), () => args.CanLevelUpAbility == null || args.CanLevelUpAbility(kind));
@@ -103,14 +125,15 @@ namespace IdleGame.UI.Growth
                 RectTransform rowTextRect = rowText.GetComponent<RectTransform>();
                 rowTextRect.anchorMin = Vector2.zero;
                 rowTextRect.anchorMax = new Vector2(0.70f, 1f);
-                rowTextRect.offsetMin = new Vector2(24f, 4f);
-                rowTextRect.offsetMax = new Vector2(-8f, -4f);
+                rowTextRect.offsetMin = new Vector2(28f, 6f);
+                rowTextRect.offsetMax = new Vector2(-10f, -6f);
                 args.AbilityButtonTexts[kind] = rowText;
 
-                GameObject costBadge = HudUiFactory.CreatePanel(ability.Definition.Id + "CostBadge", button.transform, new Color(0.56f, 0.88f, 0.24f, 1f));
+                GameObject costBadge = HudUiFactory.CreatePanel(ability.Definition.Id + "CostBadge", button.transform, Color.white);
+                HudUiFactory.ApplySprite(costBadge.GetComponent<Image>(), HudSpriteKind.BigBlueButton, new Color(0.96f, 1f, 0.86f, 1f));
                 RectTransform costBadgeRect = costBadge.GetComponent<RectTransform>();
-                costBadgeRect.anchorMin = new Vector2(0.73f, 0.14f);
-                costBadgeRect.anchorMax = new Vector2(0.98f, 0.86f);
+                costBadgeRect.anchorMin = new Vector2(0.72f, 0.12f);
+                costBadgeRect.anchorMax = new Vector2(0.985f, 0.88f);
                 costBadgeRect.offsetMin = Vector2.zero;
                 costBadgeRect.offsetMax = Vector2.zero;
 

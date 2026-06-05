@@ -70,14 +70,16 @@ namespace IdleGame.UI.Growth
             foreach (KeyValuePair<int, Button> pair in args.GrowthStepButtons)
             {
                 bool selected = pair.Key == args.SelectedGrowthLevelStep;
-                HudUiFactory.SetButtonColor(
+                HudUiFactory.ApplySpriteButtonState(
                     pair.Value,
-                    selected ? new Color(0.32f, 0.29f, 0.18f, 1f) : new Color(0.18f, 0.24f, 0.38f, 1f));
+                    HudSpriteKind.BlueMenuButton,
+                    HudSpriteKind.BlueMenuButtonPressed,
+                    selected);
 
                 Text text = pair.Value != null ? pair.Value.GetComponentInChildren<Text>(true) : null;
                 if (text != null)
                 {
-                    text.text = selected ? "[" + pair.Key + "x]" : pair.Key + "x";
+                    text.text = pair.Key + "x";
                     text.color = selected ? new Color(1f, 0.91f, 0.40f, 1f) : Color.white;
                 }
             }
@@ -107,9 +109,9 @@ namespace IdleGame.UI.Growth
             Button rowButton = text.GetComponentInParent<Button>();
             if (rowButton != null)
             {
-                HudUiFactory.SetButtonColor(rowButton, ability.IsMaxed
-                    ? new Color(0.26f, 0.30f, 0.39f, 1f)
-                    : canBuySelected ? new Color(0.48f, 0.54f, 0.66f, 1f) : new Color(0.24f, 0.26f, 0.30f, 1f));
+                HudUiFactory.ApplyButtonSprite(rowButton, HudSpriteKind.ParchmentPanel, ability.IsMaxed
+                    ? new Color(0.58f, 0.68f, 0.78f, 1f)
+                    : canBuySelected ? new Color(0.72f, 0.90f, 0.96f, 1f) : new Color(0.46f, 0.56f, 0.68f, 1f));
             }
 
             RefreshCostBadge(args, ability, costText, canBuySelected);
@@ -136,9 +138,10 @@ namespace IdleGame.UI.Growth
             Image badgeImage = costBadgeText.GetComponentInParent<Image>();
             if (badgeImage != null)
             {
-                badgeImage.color = ability.IsMaxed
-                    ? new Color(0.14f, 0.19f, 0.31f, 1f)
-                    : canBuySelected ? new Color(0.56f, 0.88f, 0.24f, 1f) : new Color(0.20f, 0.24f, 0.33f, 1f);
+                HudUiFactory.ApplySprite(badgeImage, ability.IsMaxed ? HudSpriteKind.DisabledPanel : HudSpriteKind.BigBlueButton,
+                    ability.IsMaxed
+                        ? new Color(0.58f, 0.64f, 0.72f, 1f)
+                        : canBuySelected ? new Color(0.96f, 1f, 0.86f, 1f) : new Color(0.56f, 0.64f, 0.76f, 1f));
             }
         }
 

@@ -74,8 +74,8 @@ namespace IdleGame.UI.Hero
             Button button = HudUiFactory.CreateButton(label, parent, HudButtonStyle.HeroSubTab);
             HudUiFactory.ApplySpriteButtonState(
                 button,
-                HudSpriteKind.SmallBlueSquareButton,
-                HudSpriteKind.SmallBlueSquareButtonPressed,
+                HudSpriteKind.BlueMenuButton,
+                HudSpriteKind.BlueMenuButtonPressed,
                 false);
             HudUiFactory.MoveButtonText(button, new Vector2(0f, 2f));
             ConfigureTabButtonRect(button, index, 4, HudLayoutConfig.HeroPageTabSpacing);

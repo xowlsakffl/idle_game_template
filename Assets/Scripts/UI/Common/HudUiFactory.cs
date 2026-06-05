@@ -19,7 +19,7 @@ namespace IdleGame.UI.Common
         public static GameObject CreateSpritePanel(string name, Transform parent, HudSpriteKind spriteKind, Color fallbackColor)
         {
             GameObject panel = CreatePanel(name, parent, fallbackColor);
-            ApplySprite(panel.GetComponent<Image>(), spriteKind, Color.white);
+            ApplySprite(panel.GetComponent<Image>(), spriteKind, fallbackColor);
             return panel;
         }
 
@@ -27,7 +27,6 @@ namespace IdleGame.UI.Common
         {
             GameObject buttonObject = CreatePanel(label + "Button", parent, color);
             Button button = buttonObject.AddComponent<Button>();
-            SetButtonColor(button, color);
 
             Text text = CreateText(label + "Text", buttonObject.transform, fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
             RectTransform textRect = text.GetComponent<RectTransform>();
@@ -37,6 +36,7 @@ namespace IdleGame.UI.Common
             textRect.offsetMax = new Vector2(-10f, -6f);
             text.text = label;
 
+            ApplyButtonSprite(button, HudSpriteKind.BlueMenuButton, color);
             return button;
         }
 
@@ -59,6 +59,10 @@ namespace IdleGame.UI.Common
             text.supportRichText = true;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Truncate;
+
+            Outline outline = textObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.03f, 0.04f, 0.06f, 0.92f);
+            outline.effectDistance = new Vector2(2f, -2f);
 
             RectTransform rect = text.GetComponent<RectTransform>();
             rect.sizeDelta = new Vector2(0f, fontSize + 22f);
@@ -97,6 +101,7 @@ namespace IdleGame.UI.Common
         {
             GameObject dot = CreatePanel("RedDot", parent, new Color(1f, 0.04f, 0.04f, 1f));
             Image image = dot.GetComponent<Image>();
+            ApplySprite(image, HudSpriteKind.TinyRoundRedButton, Color.white);
             image.raycastTarget = false;
 
             RectTransform rect = dot.GetComponent<RectTransform>();
@@ -125,6 +130,7 @@ namespace IdleGame.UI.Common
         {
             GameObject fillObject = CreatePanel(name, parent, fallbackColor);
             Image fill = fillObject.GetComponent<Image>();
+            ApplySprite(fill, spriteKind, fallbackColor);
             RectTransform rect = fill.GetComponent<RectTransform>();
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = new Vector2(0f, 1f);
@@ -153,6 +159,22 @@ namespace IdleGame.UI.Common
             image.type = HasBorder(sprite) ? Image.Type.Sliced : Image.Type.Simple;
             image.preserveAspect = false;
             image.color = color;
+        }
+
+        public static void ApplyNinePatchPanel(GameObject target, HudSpriteKind spriteKind, Color color)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            HudNinePatchPanel panel = target.GetComponent<HudNinePatchPanel>();
+            if (panel == null)
+            {
+                panel = target.AddComponent<HudNinePatchPanel>();
+            }
+
+            panel.Configure(spriteKind, color);
         }
 
         public static void ApplyUntintedButtonSprite(Button button, HudSpriteKind spriteKind)
@@ -220,9 +242,9 @@ namespace IdleGame.UI.Common
             image.color = Color.white;
 
             SpriteState spriteState = button.spriteState;
-            spriteState.highlightedSprite = pressedSprite != null ? pressedSprite : activeSprite;
+            spriteState.highlightedSprite = activeSprite;
             spriteState.pressedSprite = pressedSprite != null ? pressedSprite : activeSprite;
-            spriteState.selectedSprite = pressedSprite != null ? pressedSprite : activeSprite;
+            spriteState.selectedSprite = activeSprite;
             button.spriteState = spriteState;
 
             button.transition = Selectable.Transition.SpriteSwap;
@@ -317,6 +339,11 @@ namespace IdleGame.UI.Common
             Image image = button.GetComponent<Image>();
             if (image != null)
             {
+                if (image.sprite == null)
+                {
+                    ApplySprite(image, HudSpriteKind.BlueMenuButton, color);
+                }
+
                 image.color = color;
             }
         }
