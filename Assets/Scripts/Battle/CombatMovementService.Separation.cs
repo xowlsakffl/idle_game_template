@@ -23,6 +23,11 @@ namespace IdleGame.Battle
             for (int i = 0; i < deployedHeroes.Count; i++)
             {
                 HeroState hero = deployedHeroes[i];
+                if (IsFortressProtectedHero(hero))
+                {
+                    continue;
+                }
+
                 if (heroRuntimeStates.TryGetValue(hero.Definition.Id, out BattleHeroRuntimeState state) && state.IsAlive)
                 {
                     states.Add(state);

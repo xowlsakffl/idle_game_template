@@ -59,12 +59,12 @@ namespace IdleGame.Data
             new HeroDefinition("H030", "태엽 의무병 코코", "기계 지원", HeroRarity.Epic, HeroTrait.Support, 10, 150, 0.82f, 3.1f, 5, 29, HeroPassiveStat.MaxHp, 14f),
             new HeroDefinition("H031", "번개 창 아스", "돌파 공격", HeroRarity.Legendary, HeroTrait.Melee, 18, 132, 1.12f, 4.2f, 7, 26, HeroPassiveStat.AttackPower, 17f),
             new HeroDefinition("H032", "성녀 이리스", "고급 지원", HeroRarity.Legendary, HeroTrait.Support, 11, 170, 0.76f, 3.4f, 5, 34, HeroPassiveStat.AttackSpeed, 16f),
-            new HeroDefinition("H033", "용기사 라그", "신화 돌격", HeroRarity.Mythic, HeroTrait.Melee, 28, 180, 0.95f, 3.8f, 11, 36, HeroPassiveStat.AttackPower, 22f),
-            new HeroDefinition("H034", "별마녀 셀린", "신화 원거리", HeroRarity.Mythic, HeroTrait.Ranged, 30, 105, 0.86f, 3.5f, 12, 21, HeroPassiveStat.AttackPower, 24f),
-            new HeroDefinition("H035", "불멸 수호자 오르", "신화 방어", HeroRarity.Mythic, HeroTrait.Defense, 18, 320, 0.60f, 2.8f, 8, 58, HeroPassiveStat.MaxHp, 24f),
-            new HeroDefinition("H036", "시간술사 네브", "신화 지원", HeroRarity.Mythic, HeroTrait.Support, 16, 160, 1.05f, 3.9f, 7, 32, HeroPassiveStat.AttackSpeed, 22f),
-            new HeroDefinition("H037", "천공검 아리아", "신화 연격", HeroRarity.Mythic, HeroTrait.Melee, 26, 145, 1.32f, 4.4f, 10, 29, HeroPassiveStat.AttackSpeed, 23f),
-            new HeroDefinition("H038", "공허 현자 벨", "신화 증폭", HeroRarity.Mythic, HeroTrait.Support, 18, 185, 0.88f, 3.6f, 8, 37, HeroPassiveStat.MaxHp, 21f)
+            new HeroDefinition("H033", "용기사 라그", "신화 돌격", HeroRarity.Mythic, HeroTrait.Melee, 28, 180, 0.95f, 3.8f, 11, 36, HeroPassiveStat.AttackPower, 22f, eventOnlySummon: true),
+            new HeroDefinition("H034", "별마녀 셀린", "신화 원거리", HeroRarity.Mythic, HeroTrait.Ranged, 30, 105, 0.86f, 3.5f, 12, 21, HeroPassiveStat.AttackPower, 24f, eventOnlySummon: true),
+            new HeroDefinition("H035", "불멸 수호자 오르", "신화 방어", HeroRarity.Mythic, HeroTrait.Defense, 18, 320, 0.60f, 2.8f, 8, 58, HeroPassiveStat.MaxHp, 24f, eventOnlySummon: true),
+            new HeroDefinition("H036", "시간술사 네브", "신화 지원", HeroRarity.Mythic, HeroTrait.Support, 16, 160, 1.05f, 3.9f, 7, 32, HeroPassiveStat.AttackSpeed, 22f, eventOnlySummon: true),
+            new HeroDefinition("H037", "천공검 아리아", "신화 연격", HeroRarity.Mythic, HeroTrait.Melee, 26, 145, 1.32f, 4.4f, 10, 29, HeroPassiveStat.AttackSpeed, 23f, eventOnlySummon: true),
+            new HeroDefinition("H038", "공허 현자 벨", "신화 증폭", HeroRarity.Mythic, HeroTrait.Support, 18, 185, 0.88f, 3.6f, 8, 37, HeroPassiveStat.MaxHp, 21f, eventOnlySummon: true)
         };
 
         private static readonly EnemyDefinition[] enemies =

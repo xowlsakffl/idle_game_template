@@ -14,19 +14,19 @@ namespace IdleGame.Battle
                 switch (heroIndex % GameData.MaxPartyHeroes)
                 {
                     case 0:
-                        return new Vector2(-0.36f, -0.08f);
+                        return new Vector2(-1.14f, 0.74f);
                     case 1:
-                        return new Vector2(0.36f, -0.08f);
+                        return new Vector2(1.14f, 0.74f);
                     case 2:
-                        return new Vector2(-0.34f, 0.42f);
+                        return new Vector2(-0.58f, 1.04f);
                     case 3:
-                        return new Vector2(0.34f, 0.42f);
+                        return new Vector2(0.58f, 1.04f);
                     case 4:
-                        return new Vector2(0f, -0.52f);
+                        return new Vector2(0f, 1.16f);
                     case 5:
-                        return new Vector2(-0.58f, 0.18f);
+                        return new Vector2(-1.54f, 0.44f);
                     case 6:
-                        return new Vector2(0.58f, 0.18f);
+                        return new Vector2(1.54f, 0.44f);
                     default:
                         return new Vector2(0f, 0.70f);
                 }

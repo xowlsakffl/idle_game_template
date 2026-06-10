@@ -168,5 +168,17 @@ namespace IdleGame.Economy
             Save();
             NotifyChanged();
         }
+
+        public void AddDungeonTicket(long amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            DungeonTicket = GameData.ClampCount(DungeonTicket + amount);
+            Save();
+            NotifyChanged();
+        }
     }
 }

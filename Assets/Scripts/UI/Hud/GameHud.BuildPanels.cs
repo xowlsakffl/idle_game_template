@@ -1,4 +1,6 @@
 using UnityEngine;
+using IdleGame.Gacha;
+using IdleGame.Progression;
 using IdleGame.Data;
 using IdleGame.Speed;
 using IdleGame.UI.Battle;
@@ -8,6 +10,7 @@ using IdleGame.UI.Facility;
 using IdleGame.UI.Fortress;
 using IdleGame.UI.Growth;
 using IdleGame.UI.Navigation;
+using IdleGame.UI.Summon;
 
 namespace IdleGame.UI.Hud
 {
@@ -33,7 +36,9 @@ namespace IdleGame.UI.Hud
                 DamageMeterRowTexts = battleHud.DamageMeterRowTexts,
                 OnToggleSkillAuto = () => battleManager?.ToggleSkillAuto(),
                 OnToggleFeverAuto = () => battleManager?.ToggleFeverAuto(),
-                OnCycleSpeed = () => speedManager?.CycleSpeed()
+                OnCycleSpeed = () => speedManager?.CycleSpeed(),
+                OnToggleDungeonRepeat = () => battleManager?.ToggleDungeonRepeatDuringRun(),
+                OnExitDungeon = ExitDungeonFromHud
             });
 
             battleHud.Panel = refs.Panel;
@@ -48,6 +53,8 @@ namespace IdleGame.UI.Hud
             battleHud.SkillAutoButton = refs.SkillAutoButton;
             battleHud.FeverAutoButton = refs.FeverAutoButton;
             battleHud.SpeedCycleButton = refs.SpeedCycleButton;
+            battleHud.DungeonRepeatButton = refs.DungeonRepeatButton;
+            battleHud.DungeonExitButton = refs.DungeonExitButton;
             battleHud.BattlefieldRect = refs.BattlefieldRect;
             battleHud.BattlefieldWorldImage = refs.BattlefieldWorldImage;
             battleHud.CenterSpawnText = refs.CenterSpawnText;
@@ -82,7 +89,7 @@ namespace IdleGame.UI.Hud
             CreateHeroPanel(heroHud.Panel.transform);
             CreateFortressPanelV2(fortressPanel.transform);
             CreateHeroFacilityContent(facilityPanel.transform);
-            CreateStagePanel(stagePanel.transform);
+            CreateDungeonPanel(stagePanel.transform);
             CreateSummonPanel(summonPanel.transform);
             CreateShopPanel(shopPanel.transform);
             CreateSupportPanel(supportPanel.transform);
@@ -159,27 +166,177 @@ namespace IdleGame.UI.Hud
             facilityRewardPopupListText = refs.ListText;
         }
 
-        private void CreateStagePanel(Transform parent)
+        private void CreateDungeonPanel(Transform parent)
         {
-            SecondaryPanelView.BuildStagePanel(new StagePanelViewBuildArgs
+            dungeonViewRefs = SecondaryPanelView.BuildDungeonPanel(new DungeonPanelViewBuildArgs
             {
                 Parent = parent,
-                Stages = GameData.Stages,
-                OnResumeAutoProgress = progressManager.ResumeAutoProgress,
-                OnSelectStage = stageId => progressManager.SelectStage(stageId),
-                StageButtons = stageButtons
+                Wallet = wallet,
+                DungeonManager = dungeonProgressManager,
+                GetSelectedDungeon = () => selectedDungeonKind,
+                GetSelectedDungeonLevel = () => selectedDungeonLevel,
+                GetRepeatDungeon = () => dungeonRepeatChallenge,
+                OnOpenDungeon = OpenDungeonDetail,
+                OnChangeDungeonLevel = ChangeSelectedDungeonLevel,
+                OnToggleRepeatDungeon = ToggleDungeonRepeatChallenge,
+                OnEnterDungeon = EnterSelectedDungeon,
+                OnSweepDungeon = SweepSelectedDungeon,
+                OnCloseDungeon = CloseDungeonDetail,
+                FormatGameNumber = value => FormatShortNumber(value),
+                FormatCountNumber = FormatCountNumber
             });
+        }
+
+        private void OpenDungeonDetail(DungeonKind kind)
+        {
+            selectedDungeonKind = kind;
+            selectedDungeonLevel = dungeonProgressManager != null
+                ? dungeonProgressManager.GetMaxSelectableLevel(kind)
+                : 1;
+            dungeonDetailOpen = true;
+            QueueHudRefresh(HudDirtyFlags.Stage);
+        }
+
+        private void ChangeSelectedDungeonLevel(int delta)
+        {
+            if (!dungeonDetailOpen)
+            {
+                return;
+            }
+
+            int nextLevel = selectedDungeonLevel + delta;
+            selectedDungeonLevel = dungeonProgressManager != null
+                ? dungeonProgressManager.ClampSelectableLevel(selectedDungeonKind, nextLevel)
+                : Mathf.Max(1, nextLevel);
+            QueueHudRefresh(HudDirtyFlags.Stage);
+        }
+
+        private void ToggleDungeonRepeatChallenge()
+        {
+            dungeonRepeatChallenge = !dungeonRepeatChallenge;
+            QueueHudRefresh(HudDirtyFlags.Stage);
+        }
+
+        private void EnterSelectedDungeon()
+        {
+            if (battleManager == null || dungeonProgressManager == null)
+            {
+                return;
+            }
+
+            selectedDungeonLevel = dungeonProgressManager.ClampSelectableLevel(selectedDungeonKind, selectedDungeonLevel);
+            if (!battleManager.TryEnterDungeon(selectedDungeonKind, selectedDungeonLevel, dungeonRepeatChallenge))
+            {
+                QueueHudRefresh(HudDirtyFlags.Stage);
+                return;
+            }
+
+            dungeonDetailOpen = false;
+            contentPanelOpen = false;
+            QueueHudRefresh(HudDirtyFlags.Header | HudDirtyFlags.Battle | HudDirtyFlags.Stage | HudDirtyFlags.Navigation);
+        }
+
+        private void ExitDungeonFromHud()
+        {
+            if (battleManager == null || !battleManager.IsDungeonRunActive)
+            {
+                return;
+            }
+
+            DungeonKind exitingKind = battleManager.ActiveDungeonKind;
+            battleManager.ExitDungeonWithRefund();
+            selectedDungeonKind = exitingKind;
+            selectedDungeonLevel = dungeonProgressManager != null
+                ? dungeonProgressManager.GetMaxSelectableLevel(selectedDungeonKind)
+                : 1;
+            dungeonDetailOpen = true;
+            activeTab = HudTab.Stage;
+            contentPanelOpen = true;
+            QueueHudRefresh(HudDirtyFlags.Header | HudDirtyFlags.Battle | HudDirtyFlags.Stage | HudDirtyFlags.Navigation);
+        }
+
+        private void SweepSelectedDungeon()
+        {
+            if (dungeonProgressManager == null)
+            {
+                return;
+            }
+
+            selectedDungeonLevel = dungeonProgressManager.ClampSelectableLevel(selectedDungeonKind, selectedDungeonLevel);
+            if (dungeonProgressManager.TrySweepDungeon(selectedDungeonKind, selectedDungeonLevel, out string rewardText))
+            {
+                OpenDungeonClearPopup(selectedDungeonKind, selectedDungeonLevel, rewardText, true, false, false);
+            }
+
+            QueueHudRefresh(HudDirtyFlags.Header | HudDirtyFlags.Stage | HudDirtyFlags.Navigation);
+        }
+
+        private void CloseDungeonDetail()
+        {
+            dungeonDetailOpen = false;
+            QueueHudRefresh(HudDirtyFlags.Stage);
         }
 
         private void CreateSummonPanel(Transform parent)
         {
-            SummonPanelViewRefs refs = SecondaryPanelView.BuildSummonPanel(new SummonPanelViewBuildArgs
+            summonViewRefs = SummonPanelView.Build(new SummonScreenBuildArgs
             {
                 Parent = parent,
-                OnRollHeroes = gachaManager.RollHeroes,
-                OnRollEquipment = gachaManager.RollEquipment
+                GetSelectedPool = () => selectedSummonPool,
+                GetSelectedEventTargetId = GetSelectedEventSummonTargetId,
+                OnSelectPool = SelectSummonPool,
+                OnSelectEventTarget = SelectEventSummonTarget,
+                OnRoll = (pool, count, eventTargetId) => gachaManager.Roll(pool, count, eventTargetId),
+                OnCloseResultPopup = CloseSummonResultPopup
             });
-            gachaText = refs.ResultText;
+            gachaText = summonViewRefs.ResultText;
+        }
+
+        private string GetSelectedEventSummonTargetId()
+        {
+            if (GachaEventTargetDefinitions.Get(selectedEventSummonTargetId) != null)
+            {
+                return selectedEventSummonTargetId;
+            }
+
+            GachaEventTargetDefinition target = GachaEventTargetDefinitions.Default;
+            selectedEventSummonTargetId = target != null ? target.Id : string.Empty;
+            return selectedEventSummonTargetId;
+        }
+
+        private void SelectEventSummonTarget(string targetId)
+        {
+            GachaEventTargetDefinition target = GachaEventTargetDefinitions.Get(targetId);
+            string normalizedId = target != null ? target.Id : string.Empty;
+            if (selectedEventSummonTargetId == normalizedId)
+            {
+                return;
+            }
+
+            selectedEventSummonTargetId = normalizedId;
+            QueueHudRefresh(HudDirtyFlags.Summon);
+        }
+
+        private void SelectSummonPool(GachaPoolKind pool)
+        {
+            if (selectedSummonPool == pool)
+            {
+                return;
+            }
+
+            selectedSummonPool = pool;
+            QueueHudRefresh(HudDirtyFlags.Summon);
+        }
+
+        private void CloseSummonResultPopup()
+        {
+            if (!summonResultPopupOpen)
+            {
+                return;
+            }
+
+            summonResultPopupOpen = false;
+            QueueHudRefresh(HudDirtyFlags.Summon);
         }
 
         private void CreateShopPanel(Transform parent)
@@ -234,6 +391,7 @@ namespace IdleGame.UI.Hud
             wallet.AddHeroTranscendStone(300);
             wallet.AddHeroSummonTicket(50);
             wallet.AddEquipmentSummonTicket(50);
+            wallet.AddDungeonTicket(20);
             accountProgressManager.DebugAddLevels(25);
             accountProgressManager.DebugAddTalentPoints(200);
             UpdateView();
@@ -251,7 +409,7 @@ namespace IdleGame.UI.Hud
                     new BottomNavItem<HudTab> { Tab = HudTab.Fortress, Label = "요새" },
                     new BottomNavItem<HudTab> { Tab = HudTab.Facility, Label = "시설" },
                     new BottomNavItem<HudTab> { Tab = HudTab.Summon, Label = "소환" },
-                    new BottomNavItem<HudTab> { Tab = HudTab.Stage, Label = "배틀" },
+                    new BottomNavItem<HudTab> { Tab = HudTab.Stage, Label = "던전" },
                     new BottomNavItem<HudTab> { Tab = HudTab.Shop, Label = "상점" }
                 },
                 OnTabClick = RequestTabChange,

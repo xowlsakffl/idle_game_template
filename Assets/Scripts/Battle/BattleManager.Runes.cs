@@ -98,6 +98,24 @@ namespace IdleGame.Battle
             return TryPromoteRune(runeId);
         }
 
+        public void AddRuneCount(string runeId, RuneGrade grade, int amount)
+        {
+            if (!IsReady() || amount <= 0)
+            {
+                return;
+            }
+
+            RuneState state = GetRuneState(runeId);
+            if (state == null)
+            {
+                return;
+            }
+
+            state.AddCount(grade, amount);
+            SaveRuneState(state, true);
+            NotifyChanged(BattleChangeFlags.Combat | BattleChangeFlags.TotemRune);
+        }
+
         public int TryPromoteAllRunes()
         {
             if (!IsReady())

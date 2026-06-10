@@ -17,6 +17,9 @@ namespace IdleGame.Save
         public const string HeroTranscendStone = "heroTranscendStone";
         public const string HeroSummonTicket = "heroSummonTicket";
         public const string EquipmentSummonTicket = "equipmentSummonTicket";
+        public const string DungeonTicket = "dungeonTicket";
+        public const string DungeonFreeEntryDate = "dungeon.freeEntryDate";
+        public const string DungeonFreeEntriesUsed = "dungeon.freeEntriesUsed";
         public const string AccountLevel = "accountLevel";
         public const string AccountExperience = "accountExperience";
         public const string DebugTalentPointBonus = "debugTalentPointBonus";
@@ -34,6 +37,26 @@ namespace IdleGame.Save
         public const string HeroFormationPreset = "heroFormationPreset";
         public const string FortressLevel = "fortress.level";
         public const string FortressExperience = "fortress.experience";
+
+        public static string GachaTotalPulls(string poolId)
+        {
+            return "gacha." + poolId + ".totalPulls";
+        }
+
+        public static string DungeonHighestClearLevel(string dungeonId)
+        {
+            return "dungeon." + dungeonId + ".highestClearLevel";
+        }
+
+        public static string GachaPityCount(string poolId)
+        {
+            return "gacha." + poolId + ".pityCount";
+        }
+
+        public static string GachaPityCount(string poolId, string targetId)
+        {
+            return "gacha." + poolId + "." + targetId + ".pityCount";
+        }
 
         public static string HeroLevel(string heroId)
         {

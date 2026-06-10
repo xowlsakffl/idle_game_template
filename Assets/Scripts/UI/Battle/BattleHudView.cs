@@ -93,7 +93,7 @@ namespace IdleGame.UI.Battle
             damageRect.anchoredPosition = new Vector2(0f, 18f);
 
             GameObject damageMeter = HudUiFactory.CreatePanel("DamageMeter", field.transform, Color.white);
-            HudUiFactory.ApplySprite(damageMeter.GetComponent<Image>(), HudSpriteKind.CarvedPanel, new Color(0.46f, 0.56f, 0.70f, 0.94f));
+            HudUiFactory.ApplySprite(damageMeter.GetComponent<Image>(), HudSpriteKind.CarvedPanel, Color.white);
             RectTransform damageMeterRect = damageMeter.GetComponent<RectTransform>();
             damageMeterRect.anchorMin = new Vector2(1f, 0f);
             damageMeterRect.anchorMax = new Vector2(1f, 0f);
@@ -129,7 +129,7 @@ namespace IdleGame.UI.Battle
             }
 
             GameObject guideQuest = HudUiFactory.CreatePanel("GuideQuestCard", field.transform, Color.white);
-            HudUiFactory.ApplySprite(guideQuest.GetComponent<Image>(), HudSpriteKind.ParchmentPanel, new Color(0.54f, 0.66f, 0.80f, 0.94f));
+            HudUiFactory.ApplySprite(guideQuest.GetComponent<Image>(), HudSpriteKind.ParchmentPanel, Color.white);
             RectTransform guideRect = guideQuest.GetComponent<RectTransform>();
             guideRect.anchorMin = new Vector2(1f, 1f);
             guideRect.anchorMax = new Vector2(1f, 1f);

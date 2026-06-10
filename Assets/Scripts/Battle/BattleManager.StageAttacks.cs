@@ -77,6 +77,11 @@ namespace IdleGame.Battle
 
         private int SelectVisibleEnemyIndexForHero(HeroState hero)
         {
+            if (IsBossFight)
+            {
+                return hero != null && IsHeroAlive(hero.Definition.Id) ? 0 : -1;
+            }
+
             return CombatTargetingService.SelectVisibleEnemyIndexForHero(
                 hero,
                 visibleEnemies,
@@ -87,6 +92,11 @@ namespace IdleGame.Battle
 
         private int SelectVisibleEnemyIndexForSkill(CombatSkillState skill)
         {
+            if (IsBossFight)
+            {
+                return 0;
+            }
+
             int skillIndex = skills.IndexOf(skill);
             return SelectVisibleEnemyIndexForLockedSource(
                 skill.Definition.Id,
@@ -96,6 +106,11 @@ namespace IdleGame.Battle
 
         private int SelectVisibleEnemyIndexForPet(PetState pet)
         {
+            if (IsBossFight)
+            {
+                return 0;
+            }
+
             int petIndex = pets.IndexOf(pet);
             return SelectVisibleEnemyIndexForLockedSource(
                 pet.Definition.Id,

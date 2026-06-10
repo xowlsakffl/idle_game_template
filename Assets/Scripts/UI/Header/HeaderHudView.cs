@@ -33,7 +33,7 @@ namespace IdleGame.UI.Header
 
             HeaderHudViewRefs refs = new HeaderHudViewRefs();
             GameObject panel = HudUiFactory.CreatePanel("Header", args.Parent, Color.white);
-            HudUiFactory.ApplyNinePatchPanel(panel, HudSpriteKind.Banner, new Color(0.92f, 0.92f, 0.76f, 1f));
+            HudUiFactory.ApplyNinePatchPanel(panel, HudSpriteKind.Banner, Color.white);
             HudUiFactory.AddLayoutElement(panel, -1, 160);
 
             GameObject avatar = HudUiFactory.CreatePanel("PlayerAvatar", panel.transform, Color.white);
@@ -45,9 +45,16 @@ namespace IdleGame.UI.Header
             avatarRect.sizeDelta = new Vector2(104f, 104f);
             avatarRect.anchoredPosition = new Vector2(22f, 2f);
 
-            Text avatarText = HudUiFactory.CreateText("AvatarText", avatar.transform, 38, FontStyle.Bold, TextAnchor.MiddleCenter);
-            avatarText.text = "G";
-            HudUiFactory.StretchToParent(avatarText.gameObject);
+            Image avatarPortrait = HudUiFactory.CreateIcon(
+                "PlayerAvatarPortrait",
+                avatar.transform,
+                HudSpriteKind.PlayerAvatar,
+                new Vector2(88f, 88f));
+            RectTransform portraitRect = avatarPortrait.GetComponent<RectTransform>();
+            portraitRect.anchorMin = new Vector2(0.5f, 0.5f);
+            portraitRect.anchorMax = new Vector2(0.5f, 0.5f);
+            portraitRect.pivot = new Vector2(0.5f, 0.5f);
+            portraitRect.anchoredPosition = Vector2.zero;
 
             refs.StageText = HudUiFactory.CreateText("Stage", panel.transform, 25, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform stageRect = refs.StageText.GetComponent<RectTransform>();
@@ -90,7 +97,7 @@ namespace IdleGame.UI.Header
             HudUiFactory.StretchToParent(refs.AccountLevelText.gameObject);
 
             GameObject resourcePill = HudUiFactory.CreatePanel("ResourcePill", panel.transform, Color.white);
-            HudUiFactory.ApplyNinePatchPanel(resourcePill, HudSpriteKind.WoodPanel, new Color(0.92f, 0.88f, 0.76f, 1f));
+            HudUiFactory.ApplyNinePatchPanel(resourcePill, HudSpriteKind.WoodPanel, Color.white);
             RectTransform resourceRect = resourcePill.GetComponent<RectTransform>();
             resourceRect.anchorMin = new Vector2(1f, 0.5f);
             resourceRect.anchorMax = new Vector2(1f, 0.5f);
@@ -134,6 +141,19 @@ namespace IdleGame.UI.Header
                 HudSpriteKind.BlueMenuButton,
                 HudSpriteKind.BlueMenuButtonPressed,
                 false);
+            Text menuText = menuButton.GetComponentInChildren<Text>(true);
+            if (menuText != null)
+            {
+                menuText.text = string.Empty;
+            }
+
+            Image menuIcon = HudUiFactory.CreateIcon("MenuIcon", menuButton.transform, HudSpriteKind.IconMenu, new Vector2(38f, 38f));
+            RectTransform menuIconRect = menuIcon.GetComponent<RectTransform>();
+            menuIconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            menuIconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            menuIconRect.pivot = new Vector2(0.5f, 0.5f);
+            menuIconRect.anchoredPosition = Vector2.zero;
+
             RectTransform menuRect = menuButton.GetComponent<RectTransform>();
             menuRect.anchorMin = new Vector2(1f, 0.5f);
             menuRect.anchorMax = new Vector2(1f, 0.5f);

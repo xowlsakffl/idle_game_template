@@ -147,6 +147,25 @@ namespace IdleGame.UI.Common
                 return;
             }
 
+            if (HudSpriteCatalog.TryGetNinePatchDefinition(spriteKind, out _))
+            {
+                HudNinePatchPanel patch = image.GetComponent<HudNinePatchPanel>();
+                if (patch == null)
+                {
+                    patch = image.gameObject.AddComponent<HudNinePatchPanel>();
+                }
+
+                patch.Configure(spriteKind, color, image.GetComponent<Selectable>() != null);
+                return;
+            }
+
+            HudNinePatchPanel ninePatch = image.GetComponent<HudNinePatchPanel>();
+            if (ninePatch != null)
+            {
+                ninePatch.HidePatch();
+                image.enabled = true;
+            }
+
             Sprite sprite = HudSpriteCatalog.Get(spriteKind);
             if (sprite == null)
             {
@@ -168,13 +187,21 @@ namespace IdleGame.UI.Common
                 return;
             }
 
-            HudNinePatchPanel panel = target.GetComponent<HudNinePatchPanel>();
-            if (panel == null)
+            Image image = target.GetComponent<Image>();
+            if (image != null)
             {
-                panel = target.AddComponent<HudNinePatchPanel>();
+                ApplySprite(image, spriteKind, color);
+            }
+        }
+
+        public static void ApplyNinePatchButton(Button button, HudSpriteKind spriteKind, Color color)
+        {
+            if (button == null)
+            {
+                return;
             }
 
-            panel.Configure(spriteKind, color);
+            ApplyButtonSprite(button, spriteKind, color);
         }
 
         public static void ApplyUntintedButtonSprite(Button button, HudSpriteKind spriteKind)
@@ -204,7 +231,12 @@ namespace IdleGame.UI.Common
             colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
             button.colors = colors;
             button.transition = Selectable.Transition.None;
-            image.color = color;
+
+            HudNinePatchPanel patch = image.GetComponent<HudNinePatchPanel>();
+            if (patch == null || !patch.IsConfigured)
+            {
+                image.color = color;
+            }
         }
 
         public static void ApplySpriteButtonState(Button button, HudSpriteKind normalKind, HudSpriteKind pressedKind, bool pressed)
@@ -220,6 +252,27 @@ namespace IdleGame.UI.Common
             if (image == null)
             {
                 return;
+            }
+
+            HudSpriteKind activeKind = pressed ? pressedKind : normalKind;
+            if (HudSpriteCatalog.TryGetNinePatchDefinition(activeKind, out _))
+            {
+                HudNinePatchPanel patch = button.GetComponent<HudNinePatchPanel>();
+                if (patch == null)
+                {
+                    patch = button.gameObject.AddComponent<HudNinePatchPanel>();
+                }
+
+                patch.Configure(activeKind, Color.white, true);
+                button.transition = Selectable.Transition.None;
+                return;
+            }
+
+            HudNinePatchPanel ninePatch = button.GetComponent<HudNinePatchPanel>();
+            if (ninePatch != null)
+            {
+                ninePatch.HidePatch();
+                image.enabled = true;
             }
 
             Sprite normalSprite = HudSpriteCatalog.Get(normalKind);
@@ -339,9 +392,21 @@ namespace IdleGame.UI.Common
             Image image = button.GetComponent<Image>();
             if (image != null)
             {
+                HudNinePatchPanel patch = image.GetComponent<HudNinePatchPanel>();
+                if (patch != null && patch.IsConfigured)
+                {
+                    patch.SetTint(color);
+                    return;
+                }
+
                 if (image.sprite == null)
                 {
                     ApplySprite(image, HudSpriteKind.BlueMenuButton, color);
+                    patch = image.GetComponent<HudNinePatchPanel>();
+                    if (patch != null && patch.IsConfigured)
+                    {
+                        return;
+                    }
                 }
 
                 image.color = color;

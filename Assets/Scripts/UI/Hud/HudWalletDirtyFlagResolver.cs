@@ -16,6 +16,7 @@ namespace IdleGame.UI.Hud
                     | HudDirtyFlags.Hero
                     | HudDirtyFlags.HeroDetail
                     | HudDirtyFlags.Facility
+                    | HudDirtyFlags.Stage
                     | HudDirtyFlags.Summon
                     | HudDirtyFlags.Debug
                     | HudDirtyFlags.Navigation;
@@ -73,9 +74,15 @@ namespace IdleGame.UI.Hud
                 anyChanged = true;
             }
 
+            if (previous.DungeonTicket != current.DungeonTicket)
+            {
+                flags |= HudDirtyFlags.Stage | HudDirtyFlags.Navigation;
+                anyChanged = true;
+            }
+
             if (anyChanged)
             {
-                flags |= HudDirtyFlags.Debug;
+                flags |= HudDirtyFlags.Stage | HudDirtyFlags.Debug;
             }
 
             return flags;

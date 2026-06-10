@@ -44,7 +44,7 @@ namespace IdleGame.UI.Growth
             layout.childForceExpandHeight = false;
 
             GameObject titleBar = HudUiFactory.CreatePanel("GrowthTitleBar", args.Parent, Color.white);
-            HudUiFactory.ApplySprite(titleBar.GetComponent<Image>(), HudSpriteKind.BlueRibbon, new Color(0.88f, 1f, 1f, 1f));
+            HudUiFactory.ApplySprite(titleBar.GetComponent<Image>(), HudSpriteKind.BlueRibbon, Color.white);
             HudUiFactory.AddLayoutElement(titleBar, -1, 44);
 
             Text title = HudUiFactory.CreateText("GrowthTitle", titleBar.transform, 30, FontStyle.Bold, TextAnchor.MiddleLeft);
@@ -57,11 +57,11 @@ namespace IdleGame.UI.Growth
 
             GrowthPanelViewRefs refs = new GrowthPanelViewRefs();
             GameObject powerBar = HudUiFactory.CreatePanel("GrowthPowerBar", args.Parent, Color.white);
-            HudUiFactory.ApplySprite(powerBar.GetComponent<Image>(), HudSpriteKind.CarvedPanel, new Color(0.56f, 0.66f, 0.78f, 1f));
+            HudUiFactory.ApplySprite(powerBar.GetComponent<Image>(), HudSpriteKind.CarvedPanel, Color.white);
             HudUiFactory.AddLayoutElement(powerBar, -1, 44);
 
             refs.TotalCombatPowerText = HudUiFactory.CreateText("TotalCombatPower", powerBar.transform, 27, FontStyle.Bold, TextAnchor.MiddleLeft);
-            refs.TotalCombatPowerText.text = "종합 전투력 0";
+            refs.TotalCombatPowerText.text = "총합 전투력 0";
             RectTransform powerTextRect = refs.TotalCombatPowerText.GetComponent<RectTransform>();
             powerTextRect.anchorMin = Vector2.zero;
             powerTextRect.anchorMax = Vector2.one;
@@ -93,11 +93,7 @@ namespace IdleGame.UI.Growth
             foreach (int step in steps)
             {
                 Button stepButton = HudUiFactory.CreateButton(step + "x", stepRow.transform, 24, Color.white);
-                HudUiFactory.ApplySpriteButtonState(
-                    stepButton,
-                    HudSpriteKind.BlueMenuButton,
-                    HudSpriteKind.BlueMenuButtonPressed,
-                    false);
+                HudUiFactory.ApplyNinePatchButton(stepButton, HudSpriteKind.BlueMenuButton, Color.white);
                 int capturedStep = step;
                 stepButton.onClick.AddListener(() => args.OnSelectLevelStep?.Invoke(capturedStep));
                 args.GrowthStepButtons[step] = stepButton;
@@ -114,7 +110,7 @@ namespace IdleGame.UI.Growth
             foreach (AbilityState ability in args.Abilities)
             {
                 Button button = HudUiFactory.CreateButton(ability.Definition.DisplayName, args.Parent, 22, Color.white);
-                HudUiFactory.ApplyButtonSprite(button, HudSpriteKind.ParchmentPanel, new Color(0.58f, 0.70f, 0.82f, 1f));
+                HudUiFactory.ApplyNinePatchButton(button, HudSpriteKind.SpecialPaperPanel, Color.white);
                 HudUiFactory.AddLayoutElement(button.gameObject, -1, 70);
 
                 AbilityKind kind = ability.Definition.Kind;
@@ -130,7 +126,7 @@ namespace IdleGame.UI.Growth
                 args.AbilityButtonTexts[kind] = rowText;
 
                 GameObject costBadge = HudUiFactory.CreatePanel(ability.Definition.Id + "CostBadge", button.transform, Color.white);
-                HudUiFactory.ApplySprite(costBadge.GetComponent<Image>(), HudSpriteKind.BigBlueButton, new Color(0.96f, 1f, 0.86f, 1f));
+                HudUiFactory.ApplyNinePatchPanel(costBadge, HudSpriteKind.BigBlueButton, Color.white);
                 RectTransform costBadgeRect = costBadge.GetComponent<RectTransform>();
                 costBadgeRect.anchorMin = new Vector2(0.72f, 0.12f);
                 costBadgeRect.anchorMax = new Vector2(0.985f, 0.88f);

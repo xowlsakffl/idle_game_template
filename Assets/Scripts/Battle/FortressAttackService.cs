@@ -14,6 +14,7 @@ namespace IdleGame.Battle
             bool isBossFight,
             IReadOnlyList<VisibleEnemyState> visibleEnemies,
             ref float attackCooldown,
+            int attackSequence,
             float deltaTime,
             float attackInterval,
             float attackRange,
@@ -29,7 +30,7 @@ namespace IdleGame.Battle
                     attackInterval,
                     () => CombatTargetingService.FindNearestAttackableEnemyInRange(
                         visibleEnemies,
-                        Vector2.zero,
+                        GetAttackOrigin(attackSequence),
                         attackRange),
                     retryCooldown,
                     out int targetIndex))
@@ -45,6 +46,13 @@ namespace IdleGame.Battle
                 FortressSourceName,
                 false,
                 null);
+        }
+
+        private static Vector2 GetAttackOrigin(int attackSequence)
+        {
+            return attackSequence % 2 == 0
+                ? new Vector2(-0.72f, 0.62f)
+                : new Vector2(0.72f, 0.62f);
         }
     }
 }

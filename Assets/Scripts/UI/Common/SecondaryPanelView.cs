@@ -3,7 +3,9 @@ using System;
 using UnityEngine.UI;
 using UnityEngine;
 using IdleGame.Data;
+using IdleGame.Economy;
 using IdleGame.Gacha;
+using IdleGame.Progression;
 using IdleGame.UI.Support;
 
 namespace IdleGame.UI.Common
@@ -25,6 +27,42 @@ namespace IdleGame.UI.Common
         public Action OnResumeAutoProgress;
         public Action<string> OnSelectStage;
         public Dictionary<string, Button> StageButtons;
+    }
+
+    public sealed class DungeonPanelViewRefs
+    {
+        public Text SummaryText;
+        public readonly Dictionary<DungeonKind, Button> DungeonButtons = new Dictionary<DungeonKind, Button>();
+        public readonly Dictionary<DungeonKind, Text> DungeonTexts = new Dictionary<DungeonKind, Text>();
+        public GameObject DetailPopupRoot;
+        public Text DetailTitleText;
+        public Text DetailLevelText;
+        public Text DetailRewardText;
+        public Text DetailEntryText;
+        public Button DetailPrevButton;
+        public Button DetailNextButton;
+        public Button DetailRepeatButton;
+        public Button DetailSweepButton;
+        public Button DetailEnterButton;
+        public Button DetailCloseButton;
+    }
+
+    public sealed class DungeonPanelViewBuildArgs
+    {
+        public Transform Parent;
+        public CurrencyWallet Wallet;
+        public DungeonProgressManager DungeonManager;
+        public Func<DungeonKind> GetSelectedDungeon;
+        public Func<int> GetSelectedDungeonLevel;
+        public Func<bool> GetRepeatDungeon;
+        public Action<DungeonKind> OnOpenDungeon;
+        public Action<int> OnChangeDungeonLevel;
+        public Action OnToggleRepeatDungeon;
+        public Action OnEnterDungeon;
+        public Action OnSweepDungeon;
+        public Action OnCloseDungeon;
+        public Func<GameNumber, string> FormatGameNumber;
+        public Func<long, string> FormatCountNumber;
     }
 
     public sealed class SummonPanelViewBuildArgs
@@ -90,6 +128,48 @@ namespace IdleGame.UI.Common
             }
         }
 
+        public static DungeonPanelViewRefs BuildDungeonPanel(DungeonPanelViewBuildArgs args)
+        {
+            var refs = new DungeonPanelViewRefs();
+            if (args == null || args.Parent == null)
+            {
+                return refs;
+            }
+
+            ConfigurePanelLayout(args.Parent, 12);
+            CreateTitle(args.Parent, "DungeonTitle", "던전", 36, 54);
+
+            refs.SummaryText = HudUiFactory.CreateText("DungeonSummary", args.Parent, 22, FontStyle.Bold, TextAnchor.MiddleLeft);
+            HudUiFactory.AddLayoutElement(refs.SummaryText.gameObject, -1, 42);
+
+            GameObject gridObject = new GameObject("DungeonGrid", typeof(RectTransform));
+            gridObject.transform.SetParent(args.Parent, false);
+            GridLayoutGroup grid = gridObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(430f, 150f);
+            grid.spacing = new Vector2(18f, 18f);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 2;
+            HudUiFactory.AddLayoutElement(gridObject, -1, 330);
+
+            CreateDungeonCard(refs, gridObject.transform, DungeonKind.Ruby, new Color(0.28f, 0.16f, 0.38f, 1f), args);
+            CreateDungeonCard(refs, gridObject.transform, DungeonKind.Gold, new Color(0.30f, 0.24f, 0.12f, 1f), args);
+            CreateDungeonCard(refs, gridObject.transform, DungeonKind.TotemEssence, new Color(0.24f, 0.20f, 0.32f, 1f), args);
+            CreateDungeonCard(refs, gridObject.transform, DungeonKind.HeroTranscendStone, new Color(0.34f, 0.18f, 0.26f, 1f), args);
+
+            BuildDungeonDetailPopup(args.Parent, refs, args);
+            ApplyDungeonPanelState(
+                refs,
+                args.Wallet,
+                args.DungeonManager,
+                GetSelectedDungeon(args),
+                GetSelectedDungeonLevel(args),
+                GetRepeatDungeon(args),
+                false,
+                args.FormatGameNumber,
+                args.FormatCountNumber);
+            return refs;
+        }
+
         public static SummonPanelViewRefs BuildSummonPanel(SummonPanelViewBuildArgs args)
         {
             if (args == null || args.Parent == null)
@@ -147,6 +227,38 @@ namespace IdleGame.UI.Common
 
             Button ticketProduct = HudUiFactory.CreateButton("Ticket", args.Parent, 30, new Color(0.24f, 0.30f, 0.42f, 1f));
             HudUiFactory.AddLayoutElement(ticketProduct.gameObject, -1, 96);
+        }
+
+        public static void ApplyDungeonPanelState(
+            DungeonPanelViewRefs refs,
+            CurrencyWallet wallet,
+            DungeonProgressManager dungeonManager,
+            DungeonKind selectedDungeon,
+            int selectedLevel,
+            bool repeat,
+            bool detailOpen,
+            Func<GameNumber, string> formatGameNumber,
+            Func<long, string> formatCountNumber)
+        {
+            if (refs == null)
+            {
+                return;
+            }
+
+            if (refs.SummaryText != null)
+            {
+                int freeLeft = dungeonManager != null ? dungeonManager.FreeEntriesRemaining : 0;
+                long tickets = wallet != null ? wallet.DungeonTicket : 0;
+                refs.SummaryText.text = "오늘 무료 " + freeLeft + "/" + DungeonProgressManager.DailyFreeEntryLimit
+                    + "   티켓 " + FormatCount(formatCountNumber, tickets)
+                    + "   실패 시 반환";
+            }
+
+            SetDungeonText(refs, DungeonKind.Ruby, dungeonManager, "보유 " + FormatCount(formatCountNumber, wallet != null ? wallet.Ruby : 0));
+            SetDungeonText(refs, DungeonKind.Gold, dungeonManager, "보유 " + FormatGameNumber(formatGameNumber, wallet != null ? wallet.Gold : GameNumber.Zero));
+            SetDungeonText(refs, DungeonKind.TotemEssence, dungeonManager, "보유 " + FormatCount(formatCountNumber, wallet != null ? wallet.TotemEssence : 0));
+            SetDungeonText(refs, DungeonKind.HeroTranscendStone, dungeonManager, "보유 " + FormatCount(formatCountNumber, wallet != null ? wallet.HeroTranscendStone : 0));
+            ApplyDungeonDetailState(refs, wallet, dungeonManager, selectedDungeon, selectedLevel, repeat, detailOpen, formatCountNumber);
         }
 
         public static SupportPanelViewRefs BuildSupportPanel(SupportPanelViewBuildArgs args)
@@ -262,6 +374,236 @@ namespace IdleGame.UI.Common
             title.text = text;
             HudUiFactory.AddLayoutElement(title.gameObject, -1, height);
             return title;
+        }
+
+        private static void CreateDungeonCard(DungeonPanelViewRefs refs, Transform parent, DungeonKind kind, Color color, DungeonPanelViewBuildArgs args)
+        {
+            Button card = HudUiFactory.CreateButton(DungeonProgressManager.GetTitle(kind), parent, 22, color);
+            HudUiFactory.ApplyButtonSprite(card, HudSpriteKind.BluePanel, color);
+            Text text = card.GetComponentInChildren<Text>(true);
+            RectTransform rect = text.GetComponent<RectTransform>();
+            rect.offsetMin = new Vector2(16f, 10f);
+            rect.offsetMax = new Vector2(-14f, -10f);
+            text.alignment = TextAnchor.MiddleLeft;
+            text.lineSpacing = 0.86f;
+            HudUiFactory.ConfigureBestFitText(text, 12, 22, 0.86f);
+            DungeonKind selectedKind = kind;
+            card.onClick.AddListener(() => args.OnOpenDungeon?.Invoke(selectedKind));
+            refs.DungeonButtons[kind] = card;
+            refs.DungeonTexts[kind] = text;
+        }
+
+        private static void SetDungeonText(DungeonPanelViewRefs refs, DungeonKind kind, DungeonProgressManager dungeonManager, string value)
+        {
+            if (refs == null || !refs.DungeonTexts.TryGetValue(kind, out Text text) || text == null)
+            {
+                return;
+            }
+
+            int highest = dungeonManager != null ? dungeonManager.GetHighestClearLevel(kind) : 0;
+            int next = dungeonManager != null ? dungeonManager.GetMaxSelectableLevel(kind) : 1;
+            string reward = dungeonManager != null ? dungeonManager.GetRewardText(kind, next) : "0";
+            text.text = DungeonProgressManager.HasSelectableLevel(kind)
+                ? DungeonProgressManager.GetTitle(kind)
+                    + "\n최고 Lv." + highest + "   다음 Lv." + next
+                    + "\n다음 보상 " + reward
+                    + "\n" + value
+                : DungeonProgressManager.GetTitle(kind)
+                    + "\n최고 보스 " + highest
+                    + "\n처치 수 누적 보상"
+                    + "\n" + value;
+        }
+
+        private static void BuildDungeonDetailPopup(Transform root, DungeonPanelViewRefs refs, DungeonPanelViewBuildArgs args)
+        {
+            refs.DetailPopupRoot = HudUiFactory.CreatePanel("DungeonDetailPopup", root, new Color(0f, 0f, 0f, 0.72f));
+            HudUiFactory.StretchToParent(refs.DetailPopupRoot);
+            refs.DetailPopupRoot.SetActive(false);
+
+            GameObject modal = HudUiFactory.CreateSpritePanel("DungeonDetailPanel", refs.DetailPopupRoot.transform, HudSpriteKind.BluePanel, new Color(0.35f, 0.44f, 0.62f, 1f));
+            SetPopupRect(modal, new Vector2(760f, 820f), new Vector2(0f, -30f));
+
+            GameObject title = HudUiFactory.CreateSpritePanel("DungeonDetailTitle", modal.transform, HudSpriteKind.BlueRibbon, Color.white);
+            SetPopupRect(title, new Vector2(560f, 76f), new Vector2(0f, 350f));
+            refs.DetailTitleText = HudUiFactory.CreateText("DungeonDetailTitleText", title.transform, 34, FontStyle.Bold, TextAnchor.MiddleCenter);
+            HudUiFactory.StretchToParent(refs.DetailTitleText.gameObject);
+
+            refs.DetailPrevButton = HudUiFactory.CreateButton("<", modal.transform, 42, new Color(0.36f, 0.58f, 0.78f, 1f));
+            SetPopupRect(refs.DetailPrevButton.gameObject, new Vector2(88f, 96f), new Vector2(-260f, 115f));
+            refs.DetailPrevButton.onClick.AddListener(() => args.OnChangeDungeonLevel?.Invoke(-1));
+
+            refs.DetailNextButton = HudUiFactory.CreateButton(">", modal.transform, 42, new Color(0.36f, 0.58f, 0.78f, 1f));
+            SetPopupRect(refs.DetailNextButton.gameObject, new Vector2(88f, 96f), new Vector2(260f, 115f));
+            refs.DetailNextButton.onClick.AddListener(() => args.OnChangeDungeonLevel?.Invoke(1));
+
+            GameObject levelBadge = HudUiFactory.CreateSpritePanel("DungeonLevelBadge", modal.transform, HudSpriteKind.SmallRedSquareButton, new Color(0.82f, 0.18f, 0.82f, 1f));
+            SetPopupRect(levelBadge, new Vector2(190f, 190f), new Vector2(0f, 115f));
+            refs.DetailLevelText = HudUiFactory.CreateText("DungeonLevelText", levelBadge.transform, 36, FontStyle.Bold, TextAnchor.MiddleCenter);
+            HudUiFactory.StretchToParent(refs.DetailLevelText.gameObject);
+
+            GameObject rewardBox = HudUiFactory.CreateSpritePanel("DungeonRewardBox", modal.transform, HudSpriteKind.CarvedPanel, new Color(0.27f, 0.33f, 0.46f, 1f));
+            SetPopupRect(rewardBox, new Vector2(640f, 170f), new Vector2(0f, -95f));
+            refs.DetailRewardText = HudUiFactory.CreateText("DungeonRewardText", rewardBox.transform, 32, FontStyle.Bold, TextAnchor.MiddleCenter);
+            HudUiFactory.StretchToParent(refs.DetailRewardText.gameObject);
+
+            refs.DetailEntryText = HudUiFactory.CreateText("DungeonEntryText", modal.transform, 25, FontStyle.Bold, TextAnchor.MiddleCenter);
+            SetPopupRect(refs.DetailEntryText.gameObject, new Vector2(640f, 64f), new Vector2(0f, -220f));
+            refs.DetailEntryText.lineSpacing = 0.86f;
+            HudUiFactory.ConfigureBestFitText(refs.DetailEntryText, 16, 25, 0.86f);
+
+            refs.DetailRepeatButton = HudUiFactory.CreateButton("☐ 연속 도전", modal.transform, 24, new Color(0.25f, 0.32f, 0.46f, 1f));
+            SetPopupRect(refs.DetailRepeatButton.gameObject, new Vector2(430f, 62f), new Vector2(0f, -285f));
+            refs.DetailRepeatButton.onClick.AddListener(() => args.OnToggleRepeatDungeon?.Invoke());
+
+            refs.DetailSweepButton = HudUiFactory.CreateButton("소탕하기", modal.transform, 30, new Color(0.38f, 0.38f, 0.38f, 1f));
+            SetPopupRect(refs.DetailSweepButton.gameObject, new Vector2(270f, 84f), new Vector2(-165f, -380f));
+            refs.DetailSweepButton.onClick.AddListener(() => args.OnSweepDungeon?.Invoke());
+
+            refs.DetailEnterButton = HudUiFactory.CreateButton("입장하기", modal.transform, 30, new Color(0.48f, 0.78f, 0.12f, 1f));
+            SetPopupRect(refs.DetailEnterButton.gameObject, new Vector2(270f, 84f), new Vector2(165f, -380f));
+            refs.DetailEnterButton.onClick.AddListener(() => args.OnEnterDungeon?.Invoke());
+
+            refs.DetailCloseButton = HudUiFactory.CreateButton("X", refs.DetailPopupRoot.transform, 34, new Color(0.35f, 0.46f, 0.66f, 1f));
+            SetPopupRect(refs.DetailCloseButton.gameObject, new Vector2(86f, 76f), new Vector2(0f, -470f));
+            refs.DetailCloseButton.onClick.AddListener(() => args.OnCloseDungeon?.Invoke());
+        }
+
+        private static void ApplyDungeonDetailState(
+            DungeonPanelViewRefs refs,
+            CurrencyWallet wallet,
+            DungeonProgressManager dungeonManager,
+            DungeonKind selectedDungeon,
+            int selectedLevel,
+            bool repeat,
+            bool detailOpen,
+            Func<long, string> formatCountNumber)
+        {
+            if (refs.DetailPopupRoot != null)
+            {
+                refs.DetailPopupRoot.SetActive(detailOpen);
+            }
+
+            if (!detailOpen)
+            {
+                return;
+            }
+
+            bool hasSelectableLevel = DungeonProgressManager.HasSelectableLevel(selectedDungeon);
+            int level = dungeonManager != null ? dungeonManager.ClampSelectableLevel(selectedDungeon, selectedLevel) : Mathf.Max(1, selectedLevel);
+            bool canEnter = dungeonManager != null && dungeonManager.CanEnter;
+            bool canSweep = hasSelectableLevel && dungeonManager != null && dungeonManager.CanSweep(selectedDungeon, level);
+            int maxLevel = dungeonManager != null ? dungeonManager.GetMaxSelectableLevel(selectedDungeon) : 1;
+            if (refs.DetailTitleText != null)
+            {
+                refs.DetailTitleText.text = DungeonProgressManager.GetTitle(selectedDungeon);
+            }
+
+            if (refs.DetailLevelText != null)
+            {
+                refs.DetailLevelText.text = hasSelectableLevel
+                    ? "레벨\n" + level
+                    : "보스\n무한";
+            }
+
+            if (refs.DetailRewardText != null)
+            {
+                string reward = dungeonManager != null ? dungeonManager.GetRewardText(selectedDungeon, level) : "0";
+                refs.DetailRewardText.text = hasSelectableLevel
+                    ? "클리어 보상\n" + reward
+                    : "제한시간 누적 보상\n처치한 보스만큼 토템석 지급";
+            }
+
+            if (refs.DetailEntryText != null)
+            {
+                int freeLeft = dungeonManager != null ? dungeonManager.FreeEntriesRemaining : 0;
+                long tickets = wallet != null ? wallet.DungeonTicket : 0;
+                string nextCost = freeLeft > 0 ? "이번 입장 무료" : tickets > 0 ? "이번 입장 티켓 1장" : "입장권 부족";
+                if (hasSelectableLevel)
+                {
+                    string sweepState = canSweep ? "소탕 가능" : "클리어한 레벨만 소탕";
+                    refs.DetailEntryText.text = "오늘 무료 " + freeLeft + "/" + DungeonProgressManager.DailyFreeEntryLimit
+                        + "   티켓 " + FormatCount(formatCountNumber, tickets)
+                        + "\n" + nextCost + "   " + sweepState;
+                }
+                else
+                {
+                    int best = dungeonManager != null ? dungeonManager.GetHighestClearLevel(selectedDungeon) : 0;
+                    refs.DetailEntryText.text = "오늘 무료 " + freeLeft + "/" + DungeonProgressManager.DailyFreeEntryLimit
+                        + "   티켓 " + FormatCount(formatCountNumber, tickets)
+                        + "\n" + nextCost + "   제한시간 " + Mathf.RoundToInt(DungeonProgressManager.GetTimeLimitSeconds(selectedDungeon))
+                        + "초   최고 보스 " + best;
+                }
+            }
+
+            SetButtonVisible(refs.DetailPrevButton, hasSelectableLevel);
+            SetButtonVisible(refs.DetailNextButton, hasSelectableLevel);
+            SetButtonVisible(refs.DetailSweepButton, hasSelectableLevel);
+            if (refs.DetailEnterButton != null)
+            {
+                SetPopupRect(
+                    refs.DetailEnterButton.gameObject,
+                    hasSelectableLevel ? new Vector2(270f, 84f) : new Vector2(430f, 84f),
+                    hasSelectableLevel ? new Vector2(165f, -380f) : new Vector2(0f, -380f));
+            }
+
+            SetButtonEnabled(refs.DetailPrevButton, hasSelectableLevel && level > 1);
+            SetButtonEnabled(refs.DetailNextButton, hasSelectableLevel && level < maxLevel);
+            SetButtonEnabled(refs.DetailEnterButton, canEnter);
+            SetButtonEnabled(refs.DetailSweepButton, canSweep);
+            HudUiFactory.SetButtonText(refs.DetailEnterButton, canEnter ? (dungeonManager != null && dungeonManager.FreeEntriesRemaining > 0 ? "무료 입장" : "티켓 입장") : "입장 불가");
+            HudUiFactory.SetButtonText(refs.DetailSweepButton, canSweep ? "소탕하기" : "소탕 잠김");
+            HudUiFactory.SetButtonText(refs.DetailRepeatButton, repeat ? "☑ 연속 도전" : "☐ 연속 도전");
+        }
+
+        private static DungeonKind GetSelectedDungeon(DungeonPanelViewBuildArgs args)
+        {
+            return args != null && args.GetSelectedDungeon != null ? args.GetSelectedDungeon() : DungeonKind.Ruby;
+        }
+
+        private static int GetSelectedDungeonLevel(DungeonPanelViewBuildArgs args)
+        {
+            return args != null && args.GetSelectedDungeonLevel != null ? args.GetSelectedDungeonLevel() : 1;
+        }
+
+        private static bool GetRepeatDungeon(DungeonPanelViewBuildArgs args)
+        {
+            return args != null && args.GetRepeatDungeon != null && args.GetRepeatDungeon();
+        }
+
+        private static void SetButtonEnabled(Button button, bool enabled)
+        {
+            if (button != null)
+            {
+                button.interactable = enabled;
+            }
+        }
+
+        private static void SetButtonVisible(Button button, bool visible)
+        {
+            if (button != null)
+            {
+                button.gameObject.SetActive(visible);
+            }
+        }
+
+        private static void SetPopupRect(GameObject target, Vector2 size, Vector2 position)
+        {
+            RectTransform rect = target.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
+        }
+
+        private static string FormatGameNumber(Func<GameNumber, string> formatter, GameNumber value)
+        {
+            return formatter != null ? formatter(value) : NumberFormatter.Format(value);
+        }
+
+        private static string FormatCount(Func<long, string> formatter, long value)
+        {
+            return formatter != null ? formatter(value) : GameData.ClampCount(value).ToString("#,0");
         }
 
         private static GameObject CreateButtonRow(Transform parent, string name, float height)

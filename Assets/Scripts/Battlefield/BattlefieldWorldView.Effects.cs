@@ -62,6 +62,15 @@ namespace IdleGame.Battlefield
                 SpawnImpactEffect(battleManager.LastDefeatedEnemyPosition, 4, new Color(1f, 0.44f, 0.20f, 0.82f), 0.48f);
             }
 
+            if (battleManager.FortressAttackSequence != observedFortressAttackSequence)
+            {
+                observedFortressAttackSequence = battleManager.FortressAttackSequence;
+                if (battleManager.FortressAttackSequence > 0 && battleManager.LastHitSourceName == "요새")
+                {
+                    SpawnFortressCannonVisual(battleManager.LastHitPosition, battleManager.FortressAttackSequence);
+                }
+            }
+
             if (battleManager.HeroAttackBatchSequence != observedHeroAttackBatchSequence)
             {
                 observedHeroAttackBatchSequence = battleManager.HeroAttackBatchSequence;
@@ -88,6 +97,33 @@ namespace IdleGame.Battlefield
                     }
                 }
             }
+        }
+
+        private void SpawnFortressCannonVisual(Vector2 targetPosition, int attackSequence)
+        {
+            int attackIndex = Mathf.Max(0, attackSequence - 1);
+            float side = attackIndex % 2 == 0 ? -1f : 1f;
+            Vector2 startPosition = GetFortressMuzzlePosition(side, battleManager.FortressLevel);
+            if ((targetPosition - startPosition).sqrMagnitude <= 0.001f)
+            {
+                targetPosition = startPosition + Vector2.up * 0.85f;
+            }
+
+            SpawnProjectile(
+                startPosition,
+                targetPosition,
+                new Color(0.08f, 0.08f, 0.07f, 1f),
+                0.42f,
+                0.16f,
+                circleSprite);
+            SpawnImpactEffect(startPosition + (targetPosition - startPosition).normalized * 0.16f, 2, new Color(0.88f, 0.66f, 0.34f, 0.52f), 0.26f);
+        }
+
+        private static Vector2 GetFortressMuzzlePosition(float side, int fortressLevel)
+        {
+            int tier = fortressLevel >= 180 ? 3 : fortressLevel >= 90 ? 2 : fortressLevel >= 25 ? 1 : 0;
+            float normalizedSide = side < 0f ? -1f : 1f;
+            return new Vector2(normalizedSide * (0.68f + tier * 0.16f), 0.64f + tier * 0.06f);
         }
 
         private void SpawnImpactEffect(Vector2 localPosition, int variant, Color color, float scale)
@@ -301,7 +337,7 @@ namespace IdleGame.Battlefield
                 projectile.Body.sprite = usesAssetSprite ? projectile.Sprite : squareSprite;
                 projectile.Body.transform.localPosition = Vector3.zero;
                 projectile.Body.transform.localScale = usesAssetSprite
-                    ? Vector3.one * Mathf.Max(0.72f, projectile.Size * 2.8f)
+                    ? Vector3.one * Mathf.Max(0.18f, projectile.Size * 2.8f)
                     : new Vector3(Mathf.Max(0.12f, projectile.Size * 1.20f), Mathf.Max(0.035f, projectile.Size * 0.18f), 1f);
                 projectile.Body.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
 

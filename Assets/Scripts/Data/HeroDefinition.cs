@@ -29,7 +29,8 @@ namespace IdleGame.Data
             int hpPerLevel,
             HeroPassiveStat passiveStat,
             float passiveValuePercent,
-            bool startUnlocked = false)
+            bool startUnlocked = false,
+            bool eventOnlySummon = false)
         {
             Id = id;
             DisplayName = displayName;
@@ -45,6 +46,7 @@ namespace IdleGame.Data
             PassiveStat = passiveStat;
             PassiveValuePercent = GetBalancedPassiveValue(rarity, passiveValuePercent);
             StartUnlocked = startUnlocked;
+            EventOnlySummon = eventOnlySummon;
         }
 
         public string Id { get; }
@@ -62,6 +64,7 @@ namespace IdleGame.Data
         public HeroPassiveStat PassiveStat { get; }
         public float PassiveValuePercent { get; }
         public bool StartUnlocked { get; }
+        public bool EventOnlySummon { get; }
         public string RarityLabel => GetRarityLabel(Rarity);
         public string PassiveLabel => GetPassiveLabel(PassiveStat) + " +" + PassiveValuePercent.ToString("0.#") + "%";
 

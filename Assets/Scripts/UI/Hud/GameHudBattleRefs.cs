@@ -50,6 +50,8 @@ namespace IdleGame.UI.Hud
         public Button SkillAutoButton;
         public Button FeverAutoButton;
         public Button SpeedCycleButton;
+        public Button DungeonRepeatButton;
+        public Button DungeonExitButton;
 
         public void Reset()
         {
@@ -72,6 +74,8 @@ namespace IdleGame.UI.Hud
             SkillAutoButton = null;
             FeverAutoButton = null;
             SpeedCycleButton = null;
+            DungeonRepeatButton = null;
+            DungeonExitButton = null;
 
             Renderer.ResetRuntimeState();
             HeroImages.Clear();

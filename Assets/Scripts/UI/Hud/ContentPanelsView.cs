@@ -62,7 +62,7 @@ namespace IdleGame.UI.Hud
         private static GameObject CreateTabPanel(Transform parent, string name, Color color)
         {
             GameObject panel = HudUiFactory.CreatePanel(name, parent, color);
-            HudUiFactory.ApplyNinePatchPanel(panel, HudSpriteKind.SpecialPaperPanel, new Color(0.74f, 0.80f, 0.88f, 0.98f));
+            HudUiFactory.ApplyNinePatchPanel(panel, HudSpriteKind.SpecialPaperPanel, Color.white);
             HudUiFactory.StretchToParent(panel);
             return panel;
         }

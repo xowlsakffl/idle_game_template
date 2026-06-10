@@ -21,9 +21,11 @@ namespace IdleGame.Battle
         private const float HeroReviveSeconds = 3f;
         private const float HeroSeparationRadius = 0.72f;
         private const float EnemySeparationRadius = 0.42f;
+        private const float DungeonRepeatRewardPauseSeconds = 0.6f;
         private const int FortressMaxLevelValue = 300;
         private readonly System.Random random = new System.Random();
         private StageProgressManager progressManager;
+        private DungeonProgressManager dungeonProgressManager;
         private CurrencyWallet wallet;
         private SaveManager saveManager;
         private AbilityManager abilityManager;
@@ -62,6 +64,20 @@ namespace IdleGame.Battle
         private bool skillAutoEnabled = true;
         private bool feverAutoEnabled = true;
         private bool initialized;
+        private bool dungeonRunActive;
+        private DungeonKind activeDungeonKind;
+        private int activeDungeonLevel;
+        private bool activeDungeonRepeat;
+        private bool activeDungeonStartedWithRepeat;
+        private DungeonEntryReceipt activeDungeonReceipt;
+        private bool dungeonRepeatWaitingForNextRun;
+        private int dungeonClearResultSequence;
+        private DungeonKind lastDungeonClearKind;
+        private int lastDungeonClearLevel;
+        private string lastDungeonClearRewardText = string.Empty;
+        private bool lastDungeonClearEndedRepeat;
+        private bool lastDungeonClearContinuesRepeat;
+        private Coroutine dungeonRepeatStartCoroutine;
 
         public event Action<BattleChangeFlags> ChangedWithFlags;
 
@@ -122,6 +138,16 @@ namespace IdleGame.Battle
         public float PetGoldBonusPercent => (CombatRewardService.GetPetGoldBonusMultiplier(pets) - 1f) * 100f;
         public bool SkillAutoEnabled => skillAutoEnabled;
         public bool FeverAutoEnabled => feverAutoEnabled;
+        public bool IsDungeonRunActive => dungeonRunActive;
+        public bool IsDungeonRepeatActive => dungeonRunActive && activeDungeonRepeat;
+        public DungeonKind ActiveDungeonKind => activeDungeonKind;
+        public int ActiveDungeonLevel => activeDungeonLevel;
+        public int DungeonClearResultSequence => dungeonClearResultSequence;
+        public DungeonKind LastDungeonClearKind => lastDungeonClearKind;
+        public int LastDungeonClearLevel => lastDungeonClearLevel;
+        public string LastDungeonClearRewardText => lastDungeonClearRewardText;
+        public bool LastDungeonClearEndedRepeat => lastDungeonClearEndedRepeat;
+        public bool LastDungeonClearContinuesRepeat => lastDungeonClearContinuesRepeat;
 
         public void Initialize(
             StageProgressManager progress,
@@ -167,6 +193,71 @@ namespace IdleGame.Battle
             progressManager.Changed += StartStage;
             initialized = true;
             StartStage();
+        }
+
+        public void InitializeDungeon(DungeonProgressManager dungeon)
+        {
+            dungeonProgressManager = dungeon;
+        }
+
+        public void StopDungeonRepeat()
+        {
+            if (!dungeonRunActive || !activeDungeonRepeat)
+            {
+                return;
+            }
+
+            activeDungeonRepeat = false;
+            LastBattleLog = "연속 도전 중단: 현재 던전 종료 후 멈춤";
+            NotifyChanged(BattleChangeFlags.Combat | BattleChangeFlags.BattleLog);
+        }
+
+        public void ToggleDungeonRepeatDuringRun()
+        {
+            if (!dungeonRunActive)
+            {
+                return;
+            }
+
+            activeDungeonRepeat = !activeDungeonRepeat;
+            if (activeDungeonRepeat)
+            {
+                activeDungeonStartedWithRepeat = true;
+            }
+
+            LastBattleLog = activeDungeonRepeat
+                ? "연속 도전 켜짐"
+                : "연속 도전 꺼짐: 현재 던전 종료 후 멈춤";
+            NotifyChanged(BattleChangeFlags.Combat | BattleChangeFlags.BattleLog);
+        }
+
+        public void ExitDungeonWithRefund()
+        {
+            if (!dungeonRunActive)
+            {
+                return;
+            }
+
+            DungeonEntryReceipt receipt = activeDungeonReceipt;
+            DungeonKind exitedKind = activeDungeonKind;
+            if (dungeonRepeatStartCoroutine != null)
+            {
+                StopCoroutine(dungeonRepeatStartCoroutine);
+                dungeonRepeatStartCoroutine = null;
+            }
+
+            dungeonRunActive = false;
+            activeDungeonRepeat = false;
+            activeDungeonStartedWithRepeat = false;
+            activeDungeonReceipt = default;
+            dungeonRepeatWaitingForNextRun = false;
+            dungeonProgressManager?.RefundEntry(receipt);
+            visibleEnemies.Clear();
+            ClearTargetLocks();
+            StartStage(false);
+            LastRewardLog = "입장 비용 반환";
+            LastBattleLog = DungeonProgressManager.GetTitle(exitedKind) + " 나가기: 입장 비용 반환";
+            NotifyChanged(BattleChangeFlags.Combat | BattleChangeFlags.BattleLog);
         }
 
         public void ToggleSkillAuto()

@@ -20,6 +20,7 @@ namespace IdleGame.Economy
             saveManager.SaveLong(SaveKeys.HeroTranscendStone, HeroTranscendStone);
             saveManager.SaveLong(SaveKeys.HeroSummonTicket, HeroSummonTicket);
             saveManager.SaveLong(SaveKeys.EquipmentSummonTicket, EquipmentSummonTicket);
+            saveManager.SaveLong(SaveKeys.DungeonTicket, DungeonTicket);
             saveManager.Flush();
         }
 

@@ -53,12 +53,13 @@ namespace IdleGame.Battlefield
                 Vector2 renderPosition = currentPosition + GetHeroAnimationOffset(actor, currentPosition);
                 actor.Root.transform.position = ToWorld(renderPosition);
                 bool alive = battleManager.IsHeroBattleAlive(hero.Definition.Id);
+                bool fortressProtected = CombatMovementService.IsFortressProtectedHero(hero);
                 bool hit = actor.HitPulse > 0f;
                 ConfigureHeroActorVisuals(actor, hero.Definition, alive, hit, isAttacking, isMoving, deltaTime);
-                actor.HpRoot.SetActive(true);
+                actor.HpRoot.SetActive(!fortressProtected);
                 SetActorHp(actor, battleManager.GetHeroHpRatio(hero.Definition.Id), alive ? new Color(0.42f, 0.95f, 0.34f, 1f) : new Color(0.55f, 0.58f, 0.64f, 1f));
 
-                float scale = hero.Definition.Trait == HeroTrait.Defense ? 1.16f : 1f;
+                float scale = fortressProtected ? 0.74f : hero.Definition.Trait == HeroTrait.Defense ? 1.16f : 1f;
                 if (!alive)
                 {
                     scale *= 0.76f;
@@ -152,6 +153,50 @@ namespace IdleGame.Battlefield
                 ConfigureEnemyActorVisuals(actor, i, battleManager.IsBossFight, actor.HitPulse > 0f, actor.AttackPulse > 0f, isMoving, deltaTime);
                 actor.HpRoot.SetActive(true);
                 SetActorHp(actor, battleManager.GetVisibleEnemyHpRatio(i), battleManager.IsBossFight ? new Color(1f, 0.20f, 0.16f, 1f) : new Color(0.40f, 0.95f, 0.24f, 1f));
+            }
+        }
+
+        private void ResetEnemyVisualContinuity()
+        {
+            for (int i = 0; i < enemyActors.Count; i++)
+            {
+                WorldActor actor = enemyActors[i];
+                actor.Root.SetActive(false);
+                actor.LocalPosition = Vector2.zero;
+                actor.LastSpawnSequence = -1;
+                actor.AttackPulse = 0f;
+                actor.HitPulse = 0f;
+                actor.SpawnPulse = 0f;
+                actor.AnimationKey = null;
+                actor.AnimationTime = 0f;
+
+                if (i < enemyLocalPositions.Count)
+                {
+                    enemyLocalPositions[i] = Vector2.zero;
+                }
+            }
+
+            HideTransientCombatVisuals();
+        }
+
+        private void HideTransientCombatVisuals()
+        {
+            for (int i = 0; i < damageFloaters.Count; i++)
+            {
+                damageFloaters[i].Life = 0f;
+                damageFloaters[i].Root.SetActive(false);
+            }
+
+            for (int i = 0; i < projectiles.Count; i++)
+            {
+                projectiles[i].Life = 0f;
+                projectiles[i].Root.SetActive(false);
+            }
+
+            for (int i = 0; i < spriteEffects.Count; i++)
+            {
+                spriteEffects[i].Life = 0f;
+                spriteEffects[i].Root.SetActive(false);
             }
         }
 

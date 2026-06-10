@@ -1,6 +1,8 @@
 using IdleGame.UI.Hero;
 using IdleGame.UI.Hero.Detail;
 using IdleGame.UI.Navigation;
+using IdleGame.Gacha;
+using IdleGame.Progression;
 
 namespace IdleGame.UI.Hud
 {
@@ -40,6 +42,7 @@ namespace IdleGame.UI.Hud
             heroFacilityNoticeText = null;
             fortressViewRefs = null;
             stagePanel = null;
+            dungeonViewRefs = null;
             summonPanel = null;
             shopPanel = null;
             supportPanel = null;
@@ -47,8 +50,17 @@ namespace IdleGame.UI.Hud
             facilityRewardPopup = null;
             guideQuestDot = null;
             gachaText = null;
+            summonViewRefs = null;
             debugText = null;
             facilityRewardPopupListText = null;
+            dungeonTransitionRoot = null;
+            dungeonTransitionCanvasGroup = null;
+            dungeonTransitionTitleText = null;
+            dungeonTransitionSubtitleText = null;
+            dungeonClearPopupRoot = null;
+            dungeonClearPopupTitleText = null;
+            dungeonClearPopupRewardText = null;
+            dungeonEntryTransitionCoroutine = null;
             selectedGrowthLevelStep = 1;
             selectedHeroDetailId = string.Empty;
             heroFormationState.ResetRuntime();
@@ -58,6 +70,22 @@ namespace IdleGame.UI.Hud
             facilityAssignmentModalOpen = false;
             heroTranscendState.ResetRuntime();
             selectedHeroTraitId = "ATK_CORE";
+            selectedSummonPool = GachaPoolKind.Event;
+            selectedEventSummonTargetId = string.Empty;
+            summonResultPopupOpen = false;
+            observedGachaResultSequence = gachaManager != null ? gachaManager.ResultSequence : -1;
+            selectedDungeonKind = DungeonKind.Ruby;
+            selectedDungeonLevel = 1;
+            dungeonDetailOpen = false;
+            dungeonRepeatChallenge = false;
+            dungeonClearPopupOpen = false;
+            observedDungeonClearResultSequence = battleManager != null ? battleManager.DungeonClearResultSequence : -1;
+            dungeonClearPopupKind = DungeonKind.Ruby;
+            dungeonClearPopupLevel = 1;
+            dungeonClearPopupReward = string.Empty;
+            dungeonClearPopupEndedRepeat = false;
+            dungeonClearPopupKeepSelectedLevel = false;
+            dungeonClearPopupCloseOnNextRun = false;
             activeHeroPageTab = HeroPageTab.Formation;
             activeHeroDetailTab = HeroDetailTab.BasicInfo;
             heroDetailPanelOpen = false;

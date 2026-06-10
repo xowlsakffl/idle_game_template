@@ -17,6 +17,7 @@ namespace IdleGame.UI.Hud
         public readonly long HeroTranscendStone;
         public readonly long HeroSummonTicket;
         public readonly long EquipmentSummonTicket;
+        public readonly long DungeonTicket;
 
         private HudWalletSnapshot(CurrencyWallet wallet)
         {
@@ -32,6 +33,7 @@ namespace IdleGame.UI.Hud
             HeroTranscendStone = wallet != null ? wallet.HeroTranscendStone : 0;
             HeroSummonTicket = wallet != null ? wallet.HeroSummonTicket : 0;
             EquipmentSummonTicket = wallet != null ? wallet.EquipmentSummonTicket : 0;
+            DungeonTicket = wallet != null ? wallet.DungeonTicket : 0;
         }
 
         public static HudWalletSnapshot Capture(CurrencyWallet wallet)

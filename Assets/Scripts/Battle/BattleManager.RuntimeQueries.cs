@@ -28,11 +28,22 @@ namespace IdleGame.Battle
 
         public int GetVisibleEnemyDisplayNumber(int visualIndex)
         {
+            if (IsBossFight && dungeonRunActive && activeDungeonKind == DungeonKind.TotemEssence)
+            {
+                return activeDungeonLevel;
+            }
+
             return BattleRuntimeQueryService.GetVisibleEnemyDisplayNumber(IsBossFight, KillsThisStage, visibleEnemies, visualIndex);
         }
 
         public int GetVisibleEnemySpawnSequence(int visualIndex)
         {
+            if (IsBossFight && dungeonRunActive && activeDungeonKind == DungeonKind.TotemEssence)
+            {
+                int boundedLevel = Mathf.Clamp(activeDungeonLevel, 1, int.MaxValue - 1000);
+                return -1000 - boundedLevel;
+            }
+
             return BattleRuntimeQueryService.GetVisibleEnemySpawnSequence(IsBossFight, visibleEnemies, visualIndex);
         }
 

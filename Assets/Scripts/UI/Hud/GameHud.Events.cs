@@ -1,4 +1,5 @@
 using IdleGame.Battle;
+using UnityEngine;
 
 namespace IdleGame.UI.Hud
 {
@@ -7,6 +8,7 @@ namespace IdleGame.UI.Hud
         private void SubscribeEvents()
         {
             progressManager.Changed += OnProgressChanged;
+            dungeonProgressManager.Changed += OnDungeonChanged;
             wallet.Changed += OnWalletChanged;
             accountProgressManager.Changed += OnAccountProgressChanged;
             abilityManager.Changed += OnAbilityChanged;
@@ -21,6 +23,11 @@ namespace IdleGame.UI.Hud
             if (progressManager != null)
             {
                 progressManager.Changed -= OnProgressChanged;
+            }
+
+            if (dungeonProgressManager != null)
+            {
+                dungeonProgressManager.Changed -= OnDungeonChanged;
             }
 
             if (wallet != null)
@@ -64,6 +71,11 @@ namespace IdleGame.UI.Hud
             QueueHudRefresh(HudDirtyFlags.Header | HudDirtyFlags.Battle | HudDirtyFlags.Stage | HudDirtyFlags.Navigation);
         }
 
+        private void OnDungeonChanged()
+        {
+            QueueHudRefresh(HudDirtyFlags.Stage | HudDirtyFlags.Navigation | HudDirtyFlags.Debug);
+        }
+
         private void OnWalletChanged()
         {
             HudWalletSnapshot currentSnapshot = HudWalletSnapshot.Capture(wallet);
@@ -94,11 +106,41 @@ namespace IdleGame.UI.Hud
 
         private void OnBattleChanged(BattleChangeFlags flags)
         {
+            if (battleManager != null
+                && dungeonClearPopupOpen
+                && dungeonClearPopupCloseOnNextRun
+                && battleManager.IsDungeonRunActive)
+            {
+                HideDungeonClearPopupOnly();
+            }
+
+            if (battleManager != null && battleManager.DungeonClearResultSequence != observedDungeonClearResultSequence)
+            {
+                observedDungeonClearResultSequence = battleManager.DungeonClearResultSequence;
+                if (observedDungeonClearResultSequence > 0)
+                {
+                    OpenDungeonClearPopup(
+                        battleManager.LastDungeonClearKind,
+                        battleManager.LastDungeonClearLevel,
+                        battleManager.LastDungeonClearRewardText,
+                        false,
+                        battleManager.LastDungeonClearEndedRepeat,
+                        battleManager.LastDungeonClearContinuesRepeat);
+                    flags |= BattleChangeFlags.BattleLog;
+                }
+            }
+
             QueueHudRefresh(HudBattleDirtyFlagResolver.Resolve(flags));
         }
 
         private void OnGachaChanged()
         {
+            if (gachaManager != null && gachaManager.ResultSequence != observedGachaResultSequence)
+            {
+                observedGachaResultSequence = gachaManager.ResultSequence;
+                summonResultPopupOpen = gachaManager.LastOutcomes.Count > 0;
+            }
+
             QueueHudRefresh(HudDirtyFlags.Summon | HudDirtyFlags.Hero | HudDirtyFlags.HeroDetail | HudDirtyFlags.Navigation);
         }
 

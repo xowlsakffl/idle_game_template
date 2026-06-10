@@ -1,287 +1,369 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
-using System;
 using UnityEngine;
 using IdleGame.Battle;
 using IdleGame.Data;
 using IdleGame.Economy;
+using IdleGame.Save;
 
 namespace IdleGame.Gacha
 {
     public sealed class GachaManager : MonoBehaviour
     {
-        private const int RubyCostPerHeroSummon = 150;
-        private const int RubyCostPerEquipmentSummon = 100;
-        private const int RateWeightTotal = 10000;
-        private static readonly GachaRarityRate[] RarityRates =
-        {
-            new GachaRarityRate(HeroRarity.Common, 4500),
-            new GachaRarityRate(HeroRarity.Uncommon, 3000),
-            new GachaRarityRate(HeroRarity.Rare, 1500),
-            new GachaRarityRate(HeroRarity.Epic, 700),
-            new GachaRarityRate(HeroRarity.Legendary, 250),
-            new GachaRarityRate(HeroRarity.Mythic, 50)
-        };
-
         private readonly System.Random random = new System.Random();
+        private readonly Dictionary<GachaPoolKind, int> totalPullsByPool = new Dictionary<GachaPoolKind, int>();
+        private readonly Dictionary<string, int> pityCountByPool = new Dictionary<string, int>();
+        private readonly List<GachaRollOutcome> lastOutcomes = new List<GachaRollOutcome>(10);
+
         private BattleManager battleManager;
         private CurrencyWallet wallet;
         private EquipmentInventory equipmentInventory;
 
         public event Action Changed;
 
-        public string LastResult { get; private set; } = "뽑기 대기";
-        public static IReadOnlyList<GachaRarityRate> Rates => RarityRates;
+        public string LastResult { get; private set; } = "소환 대기";
+        public IReadOnlyList<GachaRollOutcome> LastOutcomes => lastOutcomes;
+        public int ResultSequence { get; private set; }
+        public IReadOnlyList<GachaPoolDefinition> Pools => GachaPoolDefinitions.All;
+        public static IReadOnlyList<GachaRarityRate> Rates => GachaRateTable.GetRates(1);
 
         public void Initialize(BattleManager battle, CurrencyWallet currency, EquipmentInventory equipment)
         {
             battleManager = battle;
             wallet = currency;
             equipmentInventory = equipment;
+            LoadProgress();
         }
 
         public void Roll(int count)
         {
-            RollHeroes(count);
+            Roll(GachaPoolKind.Hero, count);
         }
 
         public void RollHeroes(int count)
         {
-            count = Mathf.Clamp(count, 1, 10);
-            if (!wallet.SpendHeroSummonCost(count, RubyCostPerHeroSummon))
-            {
-                LastResult = "영웅 뽑기 실패: 뽑기권과 루비 부족";
-                Changed?.Invoke();
-                return;
-            }
-
-            var result = new StringBuilder();
-
-            for (int i = 0; i < count; i++)
-            {
-                RollOne(out HeroDefinition hero, out int shards);
-                battleManager.AddHeroShards(hero.Id, shards);
-                result.Append(hero.RarityLabel)
-                    .Append(" ")
-                    .Append(hero.DisplayName)
-                    .Append(" +")
-                    .Append(shards)
-                    .Append(" 조각");
-
-                if (i < count - 1)
-                {
-                    result.AppendLine();
-                }
-            }
-
-            LastResult = result.ToString();
-            Changed?.Invoke();
+            Roll(GachaPoolKind.Hero, count);
         }
 
         public void RollEquipment(int count)
         {
+            Roll(GachaPoolKind.Equipment, count);
+        }
+
+        public void RollEventHeroes(int count)
+        {
+            Roll(GachaPoolKind.Event, count);
+        }
+
+        public void RollRunes(int count)
+        {
+            Roll(GachaPoolKind.Rune, count);
+        }
+
+        public void Roll(GachaPoolKind kind, int count)
+        {
+            Roll(kind, count, string.Empty);
+        }
+
+        public void Roll(GachaPoolKind kind, int count, string eventTargetId)
+        {
             count = Mathf.Clamp(count, 1, 10);
-            if (!wallet.SpendEquipmentSummonCost(count, RubyCostPerEquipmentSummon))
+            GachaPoolDefinition pool = GachaPoolDefinitions.Get(kind);
+            if (!SpendCost(pool, count))
             {
-                LastResult = "장비 뽑기 실패: 장비 뽑기권과 루비 부족";
+                lastOutcomes.Clear();
+                LastResult = pool.Title + " 실패: 재화 부족";
                 Changed?.Invoke();
                 return;
             }
 
+            lastOutcomes.Clear();
             var result = new StringBuilder();
-
+            GachaEventTargetDefinition eventTarget = kind == GachaPoolKind.Event
+                ? GachaEventTargetDefinitions.Get(eventTargetId)
+                : null;
             for (int i = 0; i < count; i++)
             {
-                EquipmentDefinition equipment = RollEquipmentDefinition(RollRarity());
-                EquipmentState state = equipmentInventory.AddEquipment(equipment.Id, 1);
-                result.Append(equipment.RarityLabel)
-                    .Append(" ")
-                    .Append(equipment.SlotLabel)
-                    .Append(" ")
-                    .Append(equipment.DisplayName)
-                    .Append(" +1개")
-                    .Append(" / 보유 x")
-                    .Append(state != null ? state.Count : equipmentInventory.GetOwnedCount(equipment.Id));
-
-                if (i < count - 1)
-                {
-                    result.AppendLine();
-                }
+                GachaRollOutcome outcome = RollOne(pool, eventTarget);
+                GrantOutcome(outcome);
+                lastOutcomes.Add(outcome);
+                AppendOutcomeLine(result, outcome, i < count - 1);
             }
 
+            SavePoolProgress(pool, eventTarget);
             LastResult = result.ToString();
+            ResultSequence++;
             Changed?.Invoke();
         }
 
-        private void RollOne(out HeroDefinition hero, out int shards)
+        public GachaPoolProgress GetProgress(GachaPoolKind kind)
         {
-            HeroRarity rarity = RollRarity();
-            hero = RollHero(rarity);
-            shards = hero.GetSummonShardReward();
+            return GetProgress(kind, string.Empty);
         }
 
-        private HeroRarity RollRarity()
+        public GachaPoolProgress GetProgress(GachaPoolKind kind, string eventTargetId)
         {
-            int value = random.Next(0, RateWeightTotal);
-            int cumulativeWeight = 0;
-            for (int i = 0; i < RarityRates.Length; i++)
+            GachaPoolDefinition pool = GachaPoolDefinitions.Get(kind);
+            if (kind == GachaPoolKind.Event)
             {
-                cumulativeWeight += RarityRates[i].Weight;
-                if (value < cumulativeWeight)
-                {
-                    return RarityRates[i].Rarity;
-                }
-
+                GachaEventTargetDefinition eventTarget = GachaEventTargetDefinitions.Get(eventTargetId);
+                bool hasPity = eventTarget != null && eventTarget.HasPity;
+                int pityCount = hasPity ? GetPityCount(eventTarget.Id) : 0;
+                return new GachaPoolProgress(pool, GetTotalPulls(kind), pityCount, hasPity, GachaPoolDefinition.HighestGradePityLimit);
             }
 
-            return RarityRates[RarityRates.Length - 1].Rarity;
+            return new GachaPoolProgress(pool, GetTotalPulls(kind), GetPityCount(pool.Id));
+        }
+
+        public GachaPoolDefinition GetPoolDefinition(GachaPoolKind kind)
+        {
+            return GachaPoolDefinitions.Get(kind);
+        }
+
+        public bool CanRoll(GachaPoolKind kind, int count)
+        {
+            count = Mathf.Clamp(count, 1, 10);
+            GachaPoolDefinition pool = GachaPoolDefinitions.Get(kind);
+            if (wallet == null)
+            {
+                return false;
+            }
+
+            if (pool.UsesHeroTicket)
+            {
+                return wallet.CanSpendHeroSummonCost(count, pool.RubyCostPerPull);
+            }
+
+            if (pool.UsesEquipmentTicket)
+            {
+                return wallet.CanSpendEquipmentSummonCost(count, pool.RubyCostPerPull);
+            }
+
+            return wallet.CanSpendRuby((long)count * pool.RubyCostPerPull);
+        }
+
+        public string GetCostText(GachaPoolKind kind, int count)
+        {
+            count = Mathf.Clamp(count, 1, 10);
+            GachaPoolDefinition pool = GachaPoolDefinitions.Get(kind);
+            if (pool.UsesHeroTicket)
+            {
+                long tickets = wallet != null ? wallet.HeroSummonTicket : 0;
+                long ticketUse = Math.Min(tickets, count);
+                long rubyCost = (count - ticketUse) * pool.RubyCostPerPull;
+                return rubyCost > 0 ? "영웅권 " + ticketUse + " + 루비 " + rubyCost.ToString("N0") : "영웅권 " + count;
+            }
+
+            if (pool.UsesEquipmentTicket)
+            {
+                long tickets = wallet != null ? wallet.EquipmentSummonTicket : 0;
+                long ticketUse = Math.Min(tickets, count);
+                long rubyCost = (count - ticketUse) * pool.RubyCostPerPull;
+                return rubyCost > 0 ? "장비권 " + ticketUse + " + 루비 " + rubyCost.ToString("N0") : "장비권 " + count;
+            }
+
+            return "루비 " + ((long)count * pool.RubyCostPerPull).ToString("N0");
+        }
+
+        public string GetFeaturedRewardText(GachaPoolKind kind)
+        {
+            return GetFeaturedRewardText(kind, string.Empty);
+        }
+
+        public string GetFeaturedRewardText(GachaPoolKind kind, string eventTargetId)
+        {
+            GachaPoolDefinition pool = GachaPoolDefinitions.Get(kind);
+            if (pool.Kind == GachaPoolKind.Event)
+            {
+                GachaEventTargetDefinition target = GachaEventTargetDefinitions.Get(eventTargetId);
+                return target != null
+                    ? GachaRateTable.GetRarityLabel(target.Rarity) + " " + target.CategoryLabel + " " + target.DisplayName
+                    : pool.FeaturedLabel;
+            }
+
+            return pool.FeaturedLabel;
+        }
+
+        public string GetRateSummaryText(GachaPoolKind kind)
+        {
+            return GetRateSummaryText(kind, string.Empty);
+        }
+
+        public string GetRateSummaryText(GachaPoolKind kind, string eventTargetId)
+        {
+            GachaEventTargetDefinition eventTarget = kind == GachaPoolKind.Event
+                ? GachaEventTargetDefinitions.Get(eventTargetId)
+                : null;
+            return GachaRollService.GetRateSummaryText(kind, GetProgress(kind, eventTargetId).Level, eventTarget);
         }
 
         public static int GetTotalRateWeight()
         {
-            int total = 0;
-            foreach (GachaRarityRate rate in RarityRates)
-            {
-                total += rate.Weight;
-            }
-
-            return total;
+            return GachaRateTable.RateWeightTotal;
         }
 
         public static int GetRarityRateWeight(HeroRarity rarity)
         {
-            foreach (GachaRarityRate rate in RarityRates)
-            {
-                if (rate.Rarity == rarity)
-                {
-                    return rate.Weight;
-                }
-            }
-
-            return 0;
+            return GachaRateTable.GetRarityRateWeight(rarity, 1);
         }
 
         public static string GetRateSummaryText()
         {
-            var builder = new StringBuilder();
-            for (int i = 0; i < RarityRates.Length; i++)
-            {
-                if (i > 0)
-                {
-                    builder.Append(" / ");
-                }
-
-                builder.Append(GetRarityLabel(RarityRates[i].Rarity))
-                    .Append(" ")
-                    .Append(RarityRates[i].PercentText);
-            }
-
-            return builder.ToString();
+            return GachaRollService.GetRateSummaryText(GachaPoolKind.Hero, 1, null);
         }
 
-        private static string GetRarityLabel(HeroRarity rarity)
+        private GachaRollOutcome RollOne(GachaPoolDefinition pool, GachaEventTargetDefinition eventTarget)
         {
-            switch (rarity)
+            GachaPoolKind kind = pool.Kind;
+            int totalPulls = GetTotalPulls(kind);
+            string pityKey = GetPityKey(pool, eventTarget);
+            int pityCount = !string.IsNullOrEmpty(pityKey) ? GetPityCount(pityKey) : 0;
+            int level = GachaRateTable.GetLevel(totalPulls);
+            bool hasPity = !string.IsNullOrEmpty(pityKey);
+            bool forceHighestGrade = hasPity && pityCount + 1 >= GachaPoolDefinition.HighestGradePityLimit;
+
+            GachaRollOutcome outcome = GachaRollService.Roll(pool, level, forceHighestGrade, random, eventTarget);
+            totalPullsByPool[kind] = totalPulls + 1;
+
+            if (hasPity)
             {
-                case HeroRarity.Common:
-                    return "커먼";
-                case HeroRarity.Uncommon:
-                    return "언커먼";
-                case HeroRarity.Rare:
-                    return "레어";
-                case HeroRarity.Epic:
-                    return "에픽";
-                case HeroRarity.Legendary:
-                    return "전설";
-                case HeroRarity.Mythic:
-                    return "신화";
+                pityCountByPool[pityKey] = outcome.IsHighestGrade ? 0 : Mathf.Clamp(pityCount + 1, 0, GachaPoolDefinition.HighestGradePityLimit);
+            }
+
+            return outcome;
+        }
+
+        private void GrantOutcome(GachaRollOutcome outcome)
+        {
+            switch (outcome.PoolKind)
+            {
+                case GachaPoolKind.Equipment:
+                    equipmentInventory?.AddEquipment(outcome.RewardId, outcome.Amount);
+                    break;
+                case GachaPoolKind.Rune:
+                    battleManager?.AddRuneCount(outcome.RewardId, ToRuneGrade(outcome.Rarity), outcome.Amount);
+                    break;
+                case GachaPoolKind.Event:
+                    if (outcome.CategoryLabel == "장비")
+                    {
+                        equipmentInventory?.AddEquipment(outcome.RewardId, outcome.Amount);
+                    }
+                    else
+                    {
+                        battleManager?.AddHeroShards(outcome.RewardId, outcome.Amount);
+                    }
+
+                    break;
                 default:
-                    return "미정";
+                    battleManager?.AddHeroShards(outcome.RewardId, outcome.Amount);
+                    break;
             }
         }
 
-        private HeroDefinition RollHero(HeroRarity rarity)
+        private bool SpendCost(GachaPoolDefinition pool, int count)
         {
-            int matchCount = 0;
-            foreach (HeroDefinition hero in GameData.Heroes)
+            if (wallet == null)
             {
-                if (hero.Rarity == rarity)
+                return false;
+            }
+
+            if (pool.UsesHeroTicket)
+            {
+                return wallet.SpendHeroSummonCost(count, pool.RubyCostPerPull);
+            }
+
+            if (pool.UsesEquipmentTicket)
+            {
+                return wallet.SpendEquipmentSummonCost(count, pool.RubyCostPerPull);
+            }
+
+            return wallet.SpendRuby((long)count * pool.RubyCostPerPull);
+        }
+
+        private void LoadProgress()
+        {
+            totalPullsByPool.Clear();
+            pityCountByPool.Clear();
+
+            foreach (GachaPoolDefinition pool in GachaPoolDefinitions.All)
+            {
+                totalPullsByPool[pool.Kind] = Mathf.Max(0, PlayerPrefs.GetInt(SaveKeys.GachaTotalPulls(pool.Id), 0));
+                if (pool.HasHighestGradePity)
                 {
-                    matchCount += 1;
+                    pityCountByPool[pool.Id] =
+                        Mathf.Clamp(PlayerPrefs.GetInt(SaveKeys.GachaPityCount(pool.Id), 0), 0, pool.PityLimit);
                 }
             }
 
-            if (matchCount == 0)
+            foreach (GachaEventTargetDefinition eventTarget in GachaEventTargetDefinitions.All)
             {
-                return GameData.Heroes[random.Next(0, GameData.Heroes.Count)];
-            }
-
-            int selected = random.Next(0, matchCount);
-            foreach (HeroDefinition hero in GameData.Heroes)
-            {
-                if (hero.Rarity != rarity)
+                if (!eventTarget.HasPity)
                 {
                     continue;
                 }
 
-                if (selected == 0)
-                {
-                    return hero;
-                }
-
-                selected -= 1;
+                pityCountByPool[eventTarget.Id] =
+                    Mathf.Clamp(
+                        PlayerPrefs.GetInt(SaveKeys.GachaPityCount(GachaPoolDefinitions.Get(GachaPoolKind.Event).Id, eventTarget.Id), 0),
+                        0,
+                        GachaPoolDefinition.HighestGradePityLimit);
             }
-
-            return GameData.Heroes[0];
         }
 
-        private EquipmentDefinition RollEquipmentDefinition(HeroRarity rarity)
+        private void SavePoolProgress(GachaPoolDefinition pool, GachaEventTargetDefinition eventTarget)
         {
-            int matchCount = 0;
-            foreach (EquipmentDefinition equipment in GameData.Equipments)
+            if (pool == null)
             {
-                if (equipment.Rarity == rarity)
-                {
-                    matchCount += 1;
-                }
+                return;
             }
 
-            if (matchCount == 0)
+            PlayerPrefs.SetInt(SaveKeys.GachaTotalPulls(pool.Id), GetTotalPulls(pool.Kind));
+            if (pool.HasHighestGradePity)
             {
-                return GameData.Equipments[random.Next(0, GameData.Equipments.Count)];
+                PlayerPrefs.SetInt(SaveKeys.GachaPityCount(pool.Id), GetPityCount(pool.Id));
             }
 
-            int selected = random.Next(0, matchCount);
-            foreach (EquipmentDefinition equipment in GameData.Equipments)
+            if (eventTarget != null && eventTarget.HasPity)
             {
-                if (equipment.Rarity != rarity)
-                {
-                    continue;
-                }
-
-                if (selected == 0)
-                {
-                    return equipment;
-                }
-
-                selected -= 1;
+                PlayerPrefs.SetInt(SaveKeys.GachaPityCount(pool.Id, eventTarget.Id), GetPityCount(eventTarget.Id));
             }
 
-            return GameData.Equipments[0];
+            PlayerPrefs.Save();
         }
-    }
 
-    public struct GachaRarityRate
-    {
-        public GachaRarityRate(HeroRarity rarity, int weight)
+        private int GetTotalPulls(GachaPoolKind kind)
         {
-            Rarity = rarity;
-            Weight = Mathf.Clamp(weight, 0, 10000);
+            return totalPullsByPool.TryGetValue(kind, out int totalPulls) ? Mathf.Max(0, totalPulls) : 0;
         }
 
-        public HeroRarity Rarity { get; }
-        public int Weight { get; }
-        public float Percent => Weight / 100f;
-        public string PercentText => Percent.ToString("0.##") + "%";
+        private int GetPityCount(string key)
+        {
+            return !string.IsNullOrEmpty(key) && pityCountByPool.TryGetValue(key, out int pityCount) ? Mathf.Max(0, pityCount) : 0;
+        }
+
+        private static string GetPityKey(GachaPoolDefinition pool, GachaEventTargetDefinition eventTarget)
+        {
+            if (pool.Kind == GachaPoolKind.Event)
+            {
+                return eventTarget != null && eventTarget.HasPity ? eventTarget.Id : string.Empty;
+            }
+
+            return pool.HasHighestGradePity ? pool.Id : string.Empty;
+        }
+
+        private static RuneGrade ToRuneGrade(HeroRarity rarity)
+        {
+            return (RuneGrade)Mathf.Clamp((int)rarity, 0, (int)RuneGrade.Mythic);
+        }
+
+        private static void AppendOutcomeLine(StringBuilder result, GachaRollOutcome outcome, bool appendLineBreak)
+        {
+            result.Append(outcome.FormatLine());
+            if (appendLineBreak)
+            {
+                result.AppendLine();
+            }
+        }
     }
 }

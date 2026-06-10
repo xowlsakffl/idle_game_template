@@ -12,6 +12,8 @@ namespace IdleGame.UI.Battle
         public Button SkillAutoButton;
         public Button FeverAutoButton;
         public Button SpeedCycleButton;
+        public Button DungeonRepeatButton;
+        public Button DungeonExitButton;
     }
 
     public static class BattleControlPresenter
@@ -47,6 +49,12 @@ namespace IdleGame.UI.Battle
             {
                 BattlePanelView.RefreshSpeedButton(args.SpeedCycleButton, args.SpeedManager.CurrentMultiplier);
             }
+
+            BattlePanelView.RefreshDungeonRunControls(
+                args.DungeonRepeatButton,
+                args.DungeonExitButton,
+                args.BattleManager != null && args.BattleManager.IsDungeonRunActive,
+                args.BattleManager != null && args.BattleManager.IsDungeonRepeatActive);
         }
     }
 }

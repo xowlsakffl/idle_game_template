@@ -18,9 +18,19 @@ namespace IdleGame.Battle
                 return;
             }
 
+            if (dungeonRepeatWaitingForNextRun)
+            {
+                return;
+            }
+
             TickVisibleEnemySpawnGrace(deltaTime);
             TickBattleActorMovement(deltaTime);
             TickEnemyAttacks(deltaTime);
+            if (dungeonRunActive && (fortressHp <= GameNumber.Zero || TickDungeonTimerFailed(deltaTime)))
+            {
+                return;
+            }
+
             int currentRunSequence = stageRunSequence;
             TickFortressAttack(deltaTime);
             if (stageRunSequence != currentRunSequence)
@@ -112,6 +122,7 @@ namespace IdleGame.Battle
                 IsBossFight,
                 visibleEnemies,
                 ref fortressAttackCooldown,
+                fortressAttackSequence,
                 deltaTime,
                 FortressAttackInterval,
                 FortressAttackRange,
@@ -153,6 +164,11 @@ namespace IdleGame.Battle
 
         private void TickBossTimer(float deltaTime)
         {
+            if (dungeonRunActive)
+            {
+                return;
+            }
+
             StageCombatFlowService.BossTimerResult result = StageCombatFlowService.TickBossTimer(
                 IsBossFight,
                 TargetHp,
@@ -167,6 +183,48 @@ namespace IdleGame.Battle
 
             progressManager.HandleBossFailed();
             LastBattleLog = result.BattleLog;
+            NotifyChanged(BattleChangeFlags.Combat);
+        }
+
+        private bool TickDungeonTimerFailed(float deltaTime)
+        {
+            if (fortressHp <= GameNumber.Zero)
+            {
+                FailDungeon("던전 실패: 요새 파괴");
+                return true;
+            }
+
+            BossTimeRemaining = Mathf.Max(0f, BossTimeRemaining - deltaTime);
+            if (BossTimeRemaining <= 0f)
+            {
+                if (activeDungeonKind == DungeonKind.TotemEssence)
+                {
+                    CompleteTotemBossDungeonRun("토템석 던전 시간 종료");
+                    return true;
+                }
+
+                FailDungeon("던전 실패: 제한 시간 초과");
+                return true;
+            }
+
+            return false;
+        }
+
+        private void FailDungeon(string reason)
+        {
+            DungeonEntryReceipt receipt = activeDungeonReceipt;
+            DungeonKind failedKind = activeDungeonKind;
+            dungeonRunActive = false;
+            activeDungeonRepeat = false;
+            activeDungeonStartedWithRepeat = false;
+            activeDungeonReceipt = default;
+            dungeonRepeatWaitingForNextRun = false;
+            dungeonProgressManager?.RefundEntry(receipt);
+            visibleEnemies.Clear();
+            ClearTargetLocks();
+            StartStage(false);
+            LastRewardLog = "입장 비용 반환";
+            LastBattleLog = reason + " / " + DungeonProgressManager.GetTitle(failedKind) + " 입장 비용 반환";
             NotifyChanged(BattleChangeFlags.Combat);
         }
 

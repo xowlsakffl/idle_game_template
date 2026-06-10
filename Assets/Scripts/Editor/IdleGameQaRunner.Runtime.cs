@@ -109,6 +109,17 @@ namespace IdleGame.Editor
                 yield return PrefDescriptor.Int(SaveKeys.SkillAutoEnabled);
                 yield return PrefDescriptor.Int(SaveKeys.FeverAutoEnabled);
 
+                foreach (GachaPoolDefinition pool in GachaPoolDefinitions.All)
+                {
+                    yield return PrefDescriptor.Int(SaveKeys.GachaTotalPulls(pool.Id));
+                    yield return PrefDescriptor.Int(SaveKeys.GachaPityCount(pool.Id));
+                }
+
+                foreach (GachaEventTargetDefinition target in GachaEventTargetDefinitions.All)
+                {
+                    yield return PrefDescriptor.Int(SaveKeys.GachaPityCount(GachaPoolDefinitions.Get(GachaPoolKind.Event).Id, target.Id));
+                }
+
                 foreach (HeroDefinition hero in GameData.Heroes)
                 {
                     yield return PrefDescriptor.Int(SaveKeys.HeroLevel(hero.Id));

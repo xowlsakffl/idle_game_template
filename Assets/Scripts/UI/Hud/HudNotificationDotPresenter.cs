@@ -48,7 +48,7 @@ namespace IdleGame.UI.Hud
             SetTabNotificationDots(args.TabNotificationDots, HudTab.Fortress, canLevelFortress);
             SetTabNotificationDots(args.TabNotificationDots, HudTab.Facility, false);
             SetTabNotificationDots(args.TabNotificationDots, HudTab.Summon, hasSummonAttention);
-            SetTabNotificationDots(args.TabNotificationDots, HudTab.Stage, hasStageAttention);
+            SetTabNotificationDots(args.TabNotificationDots, HudTab.Stage, false);
             SetTabNotificationDots(args.TabNotificationDots, HudTab.Shop, false);
             SetTabNotificationDots(args.TabNotificationDots, HudTab.Support, hasSupportAttention);
             SetTabNotificationDots(args.TabNotificationDots, HudTab.Debug, false);

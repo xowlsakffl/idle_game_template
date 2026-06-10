@@ -70,11 +70,7 @@ namespace IdleGame.UI.Growth
             foreach (KeyValuePair<int, Button> pair in args.GrowthStepButtons)
             {
                 bool selected = pair.Key == args.SelectedGrowthLevelStep;
-                HudUiFactory.ApplySpriteButtonState(
-                    pair.Value,
-                    HudSpriteKind.BlueMenuButton,
-                    HudSpriteKind.BlueMenuButtonPressed,
-                    selected);
+                HudUiFactory.ApplyNinePatchButton(pair.Value, selected ? HudSpriteKind.BlueMenuButtonPressed : HudSpriteKind.BlueMenuButton, Color.white);
 
                 Text text = pair.Value != null ? pair.Value.GetComponentInChildren<Text>(true) : null;
                 if (text != null)
@@ -109,9 +105,7 @@ namespace IdleGame.UI.Growth
             Button rowButton = text.GetComponentInParent<Button>();
             if (rowButton != null)
             {
-                HudUiFactory.ApplyButtonSprite(rowButton, HudSpriteKind.ParchmentPanel, ability.IsMaxed
-                    ? new Color(0.58f, 0.68f, 0.78f, 1f)
-                    : canBuySelected ? new Color(0.72f, 0.90f, 0.96f, 1f) : new Color(0.46f, 0.56f, 0.68f, 1f));
+                HudUiFactory.ApplyNinePatchButton(rowButton, ability.IsMaxed ? HudSpriteKind.DisabledPanel : HudSpriteKind.SpecialPaperPanel, Color.white);
             }
 
             RefreshCostBadge(args, ability, costText, canBuySelected);
@@ -138,10 +132,7 @@ namespace IdleGame.UI.Growth
             Image badgeImage = costBadgeText.GetComponentInParent<Image>();
             if (badgeImage != null)
             {
-                HudUiFactory.ApplySprite(badgeImage, ability.IsMaxed ? HudSpriteKind.DisabledPanel : HudSpriteKind.BigBlueButton,
-                    ability.IsMaxed
-                        ? new Color(0.58f, 0.64f, 0.72f, 1f)
-                        : canBuySelected ? new Color(0.96f, 1f, 0.86f, 1f) : new Color(0.56f, 0.64f, 0.76f, 1f));
+                HudUiFactory.ApplyNinePatchPanel(badgeImage.gameObject, ability.IsMaxed ? HudSpriteKind.DisabledPanel : HudSpriteKind.BigBlueButton, Color.white);
             }
         }
 

@@ -22,6 +22,8 @@ namespace IdleGame.UI.Battle
         public Button SkillAutoButton;
         public Button FeverAutoButton;
         public Button SpeedCycleButton;
+        public Button DungeonRepeatButton;
+        public Button DungeonExitButton;
         public RectTransform BattlefieldRect;
         public RawImage BattlefieldWorldImage;
         public Text CenterSpawnText;
@@ -51,6 +53,8 @@ namespace IdleGame.UI.Battle
         public Action OnToggleSkillAuto;
         public Action OnToggleFeverAuto;
         public Action OnCycleSpeed;
+        public Action OnToggleDungeonRepeat;
+        public Action OnExitDungeon;
     }
 
     public static class BattlePanelView
@@ -131,6 +135,7 @@ namespace IdleGame.UI.Battle
             progressRect.sizeDelta = new Vector2(300f, 30f);
             progressRect.anchoredPosition = new Vector2(0f, -120f);
 
+            CreateDungeonRunControls(args, refs);
             refs.SupportText = HudUiFactory.CreateText("Support", refs.Panel.transform, 23, FontStyle.Bold, TextAnchor.MiddleLeft);
             RectTransform supportRect = refs.SupportText.GetComponent<RectTransform>();
             supportRect.anchorMin = new Vector2(0f, 1f);
@@ -214,7 +219,7 @@ namespace IdleGame.UI.Battle
             controlRect.anchorMin = new Vector2(1f, 0f);
             controlRect.anchorMax = new Vector2(1f, 0f);
             controlRect.pivot = new Vector2(1f, 0f);
-            controlRect.sizeDelta = new Vector2(390f, 78f);
+            controlRect.sizeDelta = new Vector2(500f, 78f);
             controlRect.anchoredPosition = new Vector2(-26f, 154f);
 
             HorizontalLayoutGroup row = controlRow.AddComponent<HorizontalLayoutGroup>();
@@ -232,6 +237,56 @@ namespace IdleGame.UI.Battle
 
             refs.SpeedCycleButton = CreateAutoControlButton("가속\n1x", controlRow.transform);
             refs.SpeedCycleButton.onClick.AddListener(() => args.OnCycleSpeed?.Invoke());
+        }
+
+        private static void CreateDungeonRunControls(BattlePanelViewBuildArgs args, BattlePanelViewRefs refs)
+        {
+            GameObject controlRow = new GameObject("DungeonRunControls", typeof(RectTransform));
+            controlRow.transform.SetParent(refs.Panel.transform, false);
+            RectTransform controlRect = controlRow.GetComponent<RectTransform>();
+            controlRect.anchorMin = new Vector2(0.5f, 1f);
+            controlRect.anchorMax = new Vector2(0.5f, 1f);
+            controlRect.pivot = new Vector2(0.5f, 1f);
+            controlRect.sizeDelta = new Vector2(380f, 54f);
+            controlRect.anchoredPosition = new Vector2(0f, -154f);
+
+            HorizontalLayoutGroup row = controlRow.AddComponent<HorizontalLayoutGroup>();
+            row.spacing = 12f;
+            row.childControlWidth = true;
+            row.childControlHeight = true;
+            row.childForceExpandWidth = true;
+            row.childForceExpandHeight = true;
+
+            refs.DungeonRepeatButton = HudUiFactory.CreateButton("□ 연속 도전", controlRow.transform, 21, new Color(0.34f, 0.48f, 0.66f, 1f));
+            refs.DungeonRepeatButton.onClick.AddListener(() => args.OnToggleDungeonRepeat?.Invoke());
+
+            refs.DungeonExitButton = HudUiFactory.CreateButton("나가기", controlRow.transform, 21, new Color(0.58f, 0.30f, 0.30f, 1f));
+            refs.DungeonExitButton.onClick.AddListener(() => args.OnExitDungeon?.Invoke());
+        }
+
+        public static void RefreshDungeonRunControls(Button repeatButton, Button exitButton, bool visible, bool repeat)
+        {
+            if (repeatButton != null)
+            {
+                repeatButton.gameObject.SetActive(visible);
+                repeatButton.interactable = visible;
+                if (visible)
+                {
+                    HudUiFactory.ApplyButtonSprite(repeatButton, HudSpriteKind.BlueMenuButton, repeat ? new Color(0.72f, 0.98f, 0.80f, 1f) : new Color(0.82f, 0.90f, 1f, 1f));
+                    HudUiFactory.SetButtonText(repeatButton, repeat ? "☑ 연속 도전" : "☐ 연속 도전");
+                }
+            }
+
+            if (exitButton != null)
+            {
+                exitButton.gameObject.SetActive(visible);
+                exitButton.interactable = visible;
+                if (visible)
+                {
+                    HudUiFactory.ApplyButtonSprite(exitButton, HudSpriteKind.BlueMenuButton, new Color(1f, 0.68f, 0.62f, 1f));
+                    HudUiFactory.SetButtonText(exitButton, "나가기");
+                }
+            }
         }
 
         private static Button CreateAutoControlButton(string label, Transform parent)

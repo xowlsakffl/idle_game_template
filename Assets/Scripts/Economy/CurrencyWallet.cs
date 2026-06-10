@@ -22,6 +22,7 @@ namespace IdleGame.Economy
         public long HeroTranscendStone { get; private set; }
         public long HeroSummonTicket { get; private set; }
         public long EquipmentSummonTicket { get; private set; }
+        public long DungeonTicket { get; private set; }
 
         public void Initialize(SaveManager save)
         {
@@ -37,6 +38,7 @@ namespace IdleGame.Economy
             HeroTranscendStone = GameData.ClampCount(saveManager.LoadLong(SaveKeys.HeroTranscendStone, 0));
             HeroSummonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.HeroSummonTicket, 3));
             EquipmentSummonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.EquipmentSummonTicket, 3));
+            DungeonTicket = GameData.ClampCount(saveManager.LoadLong(SaveKeys.DungeonTicket, 2));
             Save();
             NotifyChanged();
         }

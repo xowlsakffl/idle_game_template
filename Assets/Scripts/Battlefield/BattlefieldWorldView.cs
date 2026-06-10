@@ -18,6 +18,7 @@ namespace IdleGame.Battlefield
         private const float ActorHitPulseDuration = 0.20f;
 
         private static Sprite squareSprite;
+        private static Sprite circleSprite;
 
         private readonly Dictionary<string, WorldActor> heroActors = new Dictionary<string, WorldActor>();
         private readonly List<WorldActor> enemyActors = new List<WorldActor>();
@@ -32,17 +33,34 @@ namespace IdleGame.Battlefield
         private Camera renderCamera;
         private RenderTexture renderTexture;
         private Transform sceneRoot;
+        private Transform fieldMapRoot;
+        private Transform dungeonMapRoot;
         private Transform actorRoot;
         private Transform templateRoot;
         private GameObject heroTemplate;
         private GameObject enemyTemplate;
+        private SpriteRenderer backgroundBaseRenderer;
+        private SpriteRenderer backgroundTextureWashRenderer;
+        private SpriteRenderer dungeonBaseRenderer;
+        private SpriteRenderer dungeonWashRenderer;
+        private SpriteRenderer dungeonGateRenderer;
+        private SpriteRenderer dungeonGateGemRenderer;
         private Transform fortressRoot;
         private SpriteRenderer fortressBaseRenderer;
+        private SpriteRenderer fortressLeftTowerRenderer;
+        private SpriteRenderer fortressRightTowerRenderer;
+        private SpriteRenderer fortressLeftCannonBaseRenderer;
+        private SpriteRenderer fortressRightCannonBaseRenderer;
+        private SpriteRenderer fortressLeftCannonBarrelRenderer;
+        private SpriteRenderer fortressRightCannonBarrelRenderer;
         private SpriteRenderer fortressHpFillRenderer;
         private int observedHitSequence = -1;
         private int observedHeroAttackBatchSequence = -1;
         private int observedMonsterHitSequence = -1;
         private int observedEnemyDefeatSequence = -1;
+        private int observedFortressAttackSequence = -1;
+        private bool observedDungeonSceneModeInitialized;
+        private bool observedDungeonSceneMode;
         private bool sceneCreated;
 
         public Texture OutputTexture
@@ -62,6 +80,9 @@ namespace IdleGame.Battlefield
             observedHeroAttackBatchSequence = battleManager != null ? battleManager.HeroAttackBatchSequence : -1;
             observedMonsterHitSequence = battleManager != null ? battleManager.MonsterHitSequence : -1;
             observedEnemyDefeatSequence = battleManager != null ? battleManager.EnemyDefeatSequence : -1;
+            observedFortressAttackSequence = battleManager != null ? battleManager.FortressAttackSequence : -1;
+            observedDungeonSceneMode = battleManager != null && battleManager.IsDungeonRunActive;
+            observedDungeonSceneModeInitialized = true;
             EnsureScene();
         }
 
@@ -78,6 +99,7 @@ namespace IdleGame.Battlefield
             float rawDeltaTime = Time.deltaTime > 0f ? Time.deltaTime : 1f / 60f;
             float deltaTime = Mathf.Min(rawDeltaTime * speedMultiplier, 0.08f);
             TickActorAnimationState(deltaTime);
+            UpdateSceneTone();
             UpdateFortressVisual();
             UpdateHeroes(deltaTime);
             UpdateEnemies(deltaTime);

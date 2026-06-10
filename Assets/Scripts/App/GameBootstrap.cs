@@ -17,6 +17,7 @@ namespace IdleGame.App
     {
         private SaveManager saveManager;
         private StageProgressManager progressManager;
+        private DungeonProgressManager dungeonProgressManager;
         private CurrencyWallet wallet;
         private AccountProgressManager accountProgressManager;
         private AbilityManager abilityManager;
@@ -53,6 +54,7 @@ namespace IdleGame.App
 
             saveManager = GetOrAddComponent<SaveManager>();
             progressManager = GetOrAddComponent<StageProgressManager>();
+            dungeonProgressManager = GetOrAddComponent<DungeonProgressManager>();
             wallet = GetOrAddComponent<CurrencyWallet>();
             accountProgressManager = GetOrAddComponent<AccountProgressManager>();
             abilityManager = GetOrAddComponent<AbilityManager>();
@@ -64,18 +66,20 @@ namespace IdleGame.App
 
             progressManager.Initialize(saveManager);
             wallet.Initialize(saveManager);
+            dungeonProgressManager.Initialize(saveManager, wallet);
             accountProgressManager.Initialize(saveManager);
             abilityManager.Initialize(wallet, saveManager);
             equipmentInventory.Initialize(saveManager);
             speedManager.Initialize(saveManager);
             battleManager.Initialize(progressManager, wallet, saveManager, abilityManager, speedManager, accountProgressManager);
+            battleManager.InitializeDungeon(dungeonProgressManager);
             gachaManager.Initialize(battleManager, wallet, equipmentInventory);
             battlefieldWorldView.Initialize(battleManager, speedManager);
 
             ApplyOfflineReward();
 
             GameHud hud = GetOrAddComponent<GameHud>();
-            hud.Initialize(progressManager, wallet, accountProgressManager, abilityManager, speedManager, battleManager, gachaManager, equipmentInventory, DebugResetSaveAndReload, battlefieldWorldView);
+            hud.Initialize(progressManager, dungeonProgressManager, wallet, accountProgressManager, abilityManager, speedManager, battleManager, gachaManager, equipmentInventory, DebugResetSaveAndReload, battlefieldWorldView);
         }
 
         private T GetOrAddComponent<T>() where T : Component

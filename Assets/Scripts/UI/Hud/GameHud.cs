@@ -12,6 +12,7 @@ using IdleGame.Economy;
 using IdleGame.Gacha;
 using IdleGame.Progression;
 using IdleGame.Speed;
+using IdleGame.UI.Common;
 using IdleGame.UI.Facility;
 using IdleGame.UI.Fortress;
 using IdleGame.UI.Hero;
@@ -22,6 +23,7 @@ using IdleGame.UI.Hero.TotemRune;
 using IdleGame.UI.Hero.Trait;
 using IdleGame.UI.Hero.Transcend;
 using IdleGame.UI.Navigation;
+using IdleGame.UI.Summon;
 
 namespace IdleGame.UI.Hud
 {
@@ -30,6 +32,7 @@ namespace IdleGame.UI.Hud
         private const float EnemyDeathVisualSeconds = 0.28f;
         private const float HeroTranscendAutoRollIntervalSeconds = 0.14f;
         private StageProgressManager progressManager;
+        private DungeonProgressManager dungeonProgressManager;
         private CurrencyWallet wallet;
         private AccountProgressManager accountProgressManager;
         private AbilityManager abilityManager;
@@ -76,6 +79,7 @@ namespace IdleGame.UI.Hud
         private Text heroFacilityNoticeText;
         private FortressPanelViewRefs fortressViewRefs;
         private GameObject stagePanel;
+        private DungeonPanelViewRefs dungeonViewRefs;
         private GameObject summonPanel;
         private GameObject shopPanel;
         private GameObject supportPanel;
@@ -83,8 +87,17 @@ namespace IdleGame.UI.Hud
         private GameObject facilityRewardPopup;
         private GameObject guideQuestDot;
         private Text gachaText;
+        private SummonScreenViewRefs summonViewRefs;
         private Text debugText;
         private Text facilityRewardPopupListText;
+        private GameObject dungeonTransitionRoot;
+        private CanvasGroup dungeonTransitionCanvasGroup;
+        private Text dungeonTransitionTitleText;
+        private Text dungeonTransitionSubtitleText;
+        private GameObject dungeonClearPopupRoot;
+        private Text dungeonClearPopupTitleText;
+        private Text dungeonClearPopupRewardText;
+        private Coroutine dungeonEntryTransitionCoroutine;
         private int selectedGrowthLevelStep = 1;
         private string selectedHeroDetailId = string.Empty;
         private readonly HeroFormationUiState heroFormationState = new HeroFormationUiState();
@@ -94,6 +107,22 @@ namespace IdleGame.UI.Hud
         private readonly HeroTranscendUiState heroTranscendState = new HeroTranscendUiState();
         private bool facilityAssignmentModalOpen;
         private string selectedHeroTraitId = "ATK_CORE";
+        private GachaPoolKind selectedSummonPool = GachaPoolKind.Event;
+        private string selectedEventSummonTargetId = string.Empty;
+        private bool summonResultPopupOpen;
+        private int observedGachaResultSequence = -1;
+        private DungeonKind selectedDungeonKind = DungeonKind.Ruby;
+        private int selectedDungeonLevel = 1;
+        private bool dungeonDetailOpen;
+        private bool dungeonRepeatChallenge;
+        private bool dungeonClearPopupOpen;
+        private int observedDungeonClearResultSequence = -1;
+        private DungeonKind dungeonClearPopupKind = DungeonKind.Ruby;
+        private int dungeonClearPopupLevel = 1;
+        private string dungeonClearPopupReward = string.Empty;
+        private bool dungeonClearPopupEndedRepeat;
+        private bool dungeonClearPopupKeepSelectedLevel;
+        private bool dungeonClearPopupCloseOnNextRun;
         private HeroPageTab activeHeroPageTab = HeroPageTab.Formation;
         private HeroDetailTab activeHeroDetailTab = HeroDetailTab.BasicInfo;
         private bool heroDetailPanelOpen;
@@ -118,6 +147,7 @@ namespace IdleGame.UI.Hud
 
         public void Initialize(
             StageProgressManager progress,
+            DungeonProgressManager dungeonProgress,
             CurrencyWallet currency,
             AccountProgressManager accountProgress,
             AbilityManager abilities,
@@ -131,6 +161,7 @@ namespace IdleGame.UI.Hud
             UnsubscribeEvents();
 
             progressManager = progress;
+            dungeonProgressManager = dungeonProgress;
             wallet = currency;
             lastWalletSnapshot = HudWalletSnapshot.Capture(wallet);
             accountProgressManager = accountProgress;
@@ -186,6 +217,12 @@ namespace IdleGame.UI.Hud
 
         private void OnDestroy()
         {
+            if (dungeonEntryTransitionCoroutine != null)
+            {
+                StopCoroutine(dungeonEntryTransitionCoroutine);
+                dungeonEntryTransitionCoroutine = null;
+            }
+
             StopHeroTranscendAutoRoll();
             UnsubscribeEvents();
         }
@@ -207,6 +244,7 @@ namespace IdleGame.UI.Hud
             RefreshPanelVisibility(panelState);
             RefreshFacilityPanelVisibility(panelState);
             RefreshHeroOverlayPanels(panelState);
+            RefreshDungeonClearPopup();
             RefreshBottomNavigation(panelState);
             MarkHudRendered();
         }

@@ -55,7 +55,7 @@ namespace IdleGame.UI.Hud
 
             if (panelState.StagePanelOpen)
             {
-                RefreshStagePanel(panelState);
+                RefreshDungeonPanel(panelState);
                 return;
             }
 
@@ -145,7 +145,9 @@ namespace IdleGame.UI.Hud
                 SpeedManager = speedManager,
                 SkillAutoButton = battleHud.SkillAutoButton,
                 FeverAutoButton = battleHud.FeverAutoButton,
-                SpeedCycleButton = battleHud.SpeedCycleButton
+                SpeedCycleButton = battleHud.SpeedCycleButton,
+                DungeonRepeatButton = battleHud.DungeonRepeatButton,
+                DungeonExitButton = battleHud.DungeonExitButton
             });
         }
 
@@ -159,9 +161,12 @@ namespace IdleGame.UI.Hud
             SummonPanelPresenter.Refresh(new SummonPanelPresenterArgs
             {
                 GachaManager = gachaManager,
-                EquipmentInventory = equipmentInventory,
-                ResultText = gachaText,
-                RefreshPanel = true
+                Wallet = wallet,
+                Refs = summonViewRefs,
+                SelectedPool = selectedSummonPool,
+                SelectedEventTargetId = GetSelectedEventSummonTargetId(),
+                RefreshPanel = true,
+                ResultPopupOpen = summonResultPopupOpen
             });
         }
 
@@ -253,23 +258,23 @@ namespace IdleGame.UI.Hud
                 heroHud.PetStatusTexts);
         }
 
-        private void RefreshStagePanel(HudPanelRefreshState panelState)
+        private void RefreshDungeonPanel(HudPanelRefreshState panelState)
         {
             if (!panelState.RefreshStagePanel)
             {
                 return;
             }
 
-            foreach (KeyValuePair<string, Button> pair in stageButtons)
-            {
-                bool unlocked = GameData.IsStageUnlocked(pair.Key, progressManager.HighestStageId);
-                pair.Value.interactable = unlocked;
-                Text text = pair.Value.GetComponentInChildren<Text>(true);
-                if (text != null)
-                {
-                    text.text = pair.Key == progressManager.CurrentStageId ? "[" + pair.Key + "]" : pair.Key;
-                }
-            }
+            SecondaryPanelView.ApplyDungeonPanelState(
+                dungeonViewRefs,
+                wallet,
+                dungeonProgressManager,
+                selectedDungeonKind,
+                selectedDungeonLevel,
+                dungeonRepeatChallenge,
+                dungeonDetailOpen,
+                value => FormatShortNumber(value),
+                FormatCountNumber);
         }
 
     }

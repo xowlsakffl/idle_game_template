@@ -2,6 +2,7 @@ using UnityEngine.UI;
 using UnityEngine;
 using IdleGame.Battle;
 using IdleGame.Data;
+using IdleGame.Progression;
 
 namespace IdleGame.UI.Battle
 {
@@ -71,12 +72,21 @@ namespace IdleGame.UI.Battle
             {
                 if (args.ProgressValueText != null)
                 {
-                    args.ProgressValueText.text = "BOSS " + Mathf.RoundToInt(progressRatio * 100f) + "%";
+                    args.ProgressValueText.text = battleManager.IsDungeonRunActive
+                        && battleManager.ActiveDungeonKind == DungeonKind.TotemEssence
+                            ? "Lv." + battleManager.ActiveDungeonLevel + "  " + Mathf.RoundToInt(progressRatio * 100f) + "%"
+                            : "BOSS " + Mathf.RoundToInt(progressRatio * 100f) + "%";
                 }
 
                 if (args.ProgressText != null)
                 {
-                    args.ProgressText.text = "보스 제한시간 " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초";
+                    args.ProgressText.text = battleManager.IsDungeonRunActive
+                        && battleManager.ActiveDungeonKind == DungeonKind.TotemEssence
+                            ? "처치 " + battleManager.KillsThisStage
+                                + "   남은 시간 " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초"
+                            : battleManager.IsDungeonRunActive
+                        ? "던전 보스 제한시간 " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초"
+                        : "보스 제한시간 " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초";
                 }
 
                 return;
@@ -89,7 +99,9 @@ namespace IdleGame.UI.Battle
 
             if (args.ProgressText != null)
             {
-                args.ProgressText.text = "100마리 처치";
+                args.ProgressText.text = battleManager.IsDungeonRunActive
+                    ? "던전 제한시간 " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초"
+                    : "100마리 처치";
             }
         }
 
@@ -101,6 +113,27 @@ namespace IdleGame.UI.Battle
             }
 
             BattleManager battleManager = args.BattleManager;
+            if (battleManager.IsDungeonRunActive)
+            {
+                if (battleManager.ActiveDungeonKind == DungeonKind.TotemEssence)
+                {
+                    args.GuideQuestText.text = "토템석 던전\n보스 Lv." + battleManager.ActiveDungeonLevel
+                        + " 처치  누적 " + battleManager.KillsThisStage
+                        + "  " + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초";
+                    return;
+                }
+
+                string dungeonGoal = battleManager.IsBossFight
+                    ? DungeonProgressManager.GetTitle(battleManager.ActiveDungeonKind) + " 보스 처치"
+                    : DungeonProgressManager.GetTitle(battleManager.ActiveDungeonKind) + " 100마리 처치";
+                string dungeonProgress = battleManager.IsBossFight
+                    ? Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초 남음"
+                    : battleManager.KillsThisStage + "/" + battleManager.RequiredKills + "  "
+                        + Mathf.CeilToInt(battleManager.BossTimeRemaining) + "초";
+                args.GuideQuestText.text = "던전\n" + dungeonGoal + "  " + dungeonProgress;
+                return;
+            }
+
             string questGoal = battleManager.IsBossFight
                 ? "보스 처치"
                 : "스테이지 " + args.Stage.Id + " 클리어";
