@@ -409,15 +409,22 @@ namespace IdleGame.Battle
             activeDungeonReceipt = receipt;
             dungeonRunActive = true;
             dungeonRepeatWaitingForNextRun = true;
-            IsBossFight = kind == DungeonKind.TotemEssence;
-            RequiredKills = kind == DungeonKind.TotemEssence
+            bool isTotemBossDungeon = kind == DungeonKind.TotemEssence;
+            bool isSingleBossDungeon = IsSingleBossDungeon(kind);
+            bool isBossDungeon = isTotemBossDungeon || isSingleBossDungeon;
+            IsBossFight = isBossDungeon;
+            RequiredKills = isBossDungeon
                 ? 0
                 : DungeonProgressManager.RequiredNormalKills;
-            TargetName = kind == DungeonKind.TotemEssence
+            TargetName = isTotemBossDungeon
                 ? "토템석 보스 Lv.1"
+                : isSingleBossDungeon
+                ? DungeonProgressManager.GetTitle(kind) + " 보스 Lv." + nextLevel
                 : DungeonProgressManager.GetTitle(kind) + " Lv." + nextLevel;
-            TargetMaxHp = kind == DungeonKind.TotemEssence
+            TargetMaxHp = isTotemBossDungeon
                 ? GetTotemDungeonBossHp(1)
+                : isSingleBossDungeon
+                ? GetDungeonBossHp(nextLevel)
                 : GetDungeonEnemyHp(nextLevel);
             TargetHp = GameNumber.Zero;
             BossTimeRemaining = DungeonProgressManager.GetTimeLimitSeconds(kind);

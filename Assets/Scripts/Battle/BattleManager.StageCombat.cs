@@ -121,6 +121,10 @@ namespace IdleGame.Battle
             {
                 StartTotemBossDungeonRun();
             }
+            else if (IsSingleBossDungeon(activeDungeonKind))
+            {
+                StartSingleBossDungeonRun();
+            }
             else
             {
                 SpawnDungeonNormalWave();
@@ -137,6 +141,15 @@ namespace IdleGame.Battle
             BossTimeRemaining = DungeonProgressManager.GetTimeLimitSeconds(activeDungeonKind);
             SpawnTotemDungeonBoss();
             LastBattleLog = "토템석 던전 입장: 보스 Lv.1부터 연속 처치";
+        }
+
+        private void StartSingleBossDungeonRun()
+        {
+            KillsThisStage = 0;
+            RequiredKills = 0;
+            BossTimeRemaining = DungeonProgressManager.GetTimeLimitSeconds(activeDungeonKind);
+            SpawnDungeonBoss();
+            LastBattleLog = DungeonProgressManager.GetTitle(activeDungeonKind) + " Lv." + activeDungeonLevel + " 입장: 보스 처치";
         }
 
         private void SpawnDungeonNormalWave()
@@ -264,6 +277,11 @@ namespace IdleGame.Battle
         {
             int normalizedLevel = Mathf.Max(1, level);
             return GameNumber.FromDouble(1400d + normalizedLevel * 420d);
+        }
+
+        private static bool IsSingleBossDungeon(DungeonKind kind)
+        {
+            return kind == DungeonKind.HeroTranscendStone;
         }
 
         private static GameNumber GetTotemDungeonBossHp(int level)
