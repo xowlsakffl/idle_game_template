@@ -19,6 +19,7 @@ namespace IdleGame.Battlefield
 
         private static Sprite squareSprite;
         private static Sprite circleSprite;
+        private static Sprite fieldBackgroundSprite;
 
         private readonly Dictionary<string, WorldActor> heroActors = new Dictionary<string, WorldActor>();
         private readonly List<WorldActor> enemyActors = new List<WorldActor>();

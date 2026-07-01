@@ -254,6 +254,7 @@ namespace IdleGame.UI.Common
                     + "   실패 시 반환";
             }
 
+            ApplyDungeonCardSelection(refs, selectedDungeon);
             SetDungeonText(refs, DungeonKind.Ruby, dungeonManager, "보유 " + FormatCount(formatCountNumber, wallet != null ? wallet.Ruby : 0));
             SetDungeonText(refs, DungeonKind.Gold, dungeonManager, "보유 " + FormatGameNumber(formatGameNumber, wallet != null ? wallet.Gold : GameNumber.Zero));
             SetDungeonText(refs, DungeonKind.TotemEssence, dungeonManager, "보유 " + FormatCount(formatCountNumber, wallet != null ? wallet.TotemEssence : 0));
@@ -380,10 +381,19 @@ namespace IdleGame.UI.Common
         {
             Button card = HudUiFactory.CreateButton(DungeonProgressManager.GetTitle(kind), parent, 22, color);
             HudUiFactory.ApplyButtonSprite(card, HudSpriteKind.BluePanel, color);
+
+            Image icon = HudUiFactory.CreateIcon(kind + "DungeonIcon", card.transform, GetDungeonIcon(kind), new Vector2(64f, 64f));
+            RectTransform iconRect = icon.GetComponent<RectTransform>();
+            iconRect.anchorMin = new Vector2(0f, 0.5f);
+            iconRect.anchorMax = new Vector2(0f, 0.5f);
+            iconRect.pivot = new Vector2(0f, 0.5f);
+            iconRect.anchoredPosition = new Vector2(22f, 0f);
+            icon.color = Color.white;
+
             Text text = card.GetComponentInChildren<Text>(true);
             RectTransform rect = text.GetComponent<RectTransform>();
-            rect.offsetMin = new Vector2(16f, 10f);
-            rect.offsetMax = new Vector2(-14f, -10f);
+            rect.offsetMin = new Vector2(104f, 12f);
+            rect.offsetMax = new Vector2(-16f, -12f);
             text.alignment = TextAnchor.MiddleLeft;
             text.lineSpacing = 0.86f;
             HudUiFactory.ConfigureBestFitText(text, 12, 22, 0.86f);
@@ -405,8 +415,8 @@ namespace IdleGame.UI.Common
             string reward = dungeonManager != null ? dungeonManager.GetRewardText(kind, next) : "0";
             text.text = DungeonProgressManager.HasSelectableLevel(kind)
                 ? DungeonProgressManager.GetTitle(kind)
-                    + "\n최고 Lv." + highest + "   다음 Lv." + next
-                    + "\n다음 보상 " + reward
+                    + "\n최고 Lv." + highest + "  다음 Lv." + next
+                    + "\n보상 " + reward
                     + "\n" + value
                 : DungeonProgressManager.GetTitle(kind)
                     + "\n최고 보스 " + highest
@@ -466,6 +476,51 @@ namespace IdleGame.UI.Common
             refs.DetailCloseButton = HudUiFactory.CreateButton("X", refs.DetailPopupRoot.transform, 34, new Color(0.35f, 0.46f, 0.66f, 1f));
             SetPopupRect(refs.DetailCloseButton.gameObject, new Vector2(86f, 76f), new Vector2(0f, -470f));
             refs.DetailCloseButton.onClick.AddListener(() => args.OnCloseDungeon?.Invoke());
+        }
+
+        private static void ApplyDungeonCardSelection(DungeonPanelViewRefs refs, DungeonKind selectedDungeon)
+        {
+            if (refs == null)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<DungeonKind, Button> pair in refs.DungeonButtons)
+            {
+                bool selected = pair.Key == selectedDungeon;
+                Color color = GetDungeonCardColor(pair.Key, selected);
+                HudUiFactory.ApplyButtonSprite(pair.Value, selected ? HudSpriteKind.BluePanel : HudSpriteKind.CarvedPanel, color);
+            }
+        }
+
+        private static Color GetDungeonCardColor(DungeonKind kind, bool selected)
+        {
+            switch (kind)
+            {
+                case DungeonKind.Gold:
+                    return selected ? new Color(1f, 0.78f, 0.30f, 1f) : new Color(0.72f, 0.52f, 0.22f, 1f);
+                case DungeonKind.TotemEssence:
+                    return selected ? new Color(0.34f, 0.82f, 0.72f, 1f) : new Color(0.24f, 0.54f, 0.50f, 1f);
+                case DungeonKind.HeroTranscendStone:
+                    return selected ? new Color(0.76f, 0.62f, 1f, 1f) : new Color(0.48f, 0.36f, 0.72f, 1f);
+                default:
+                    return selected ? new Color(1f, 0.50f, 0.72f, 1f) : new Color(0.68f, 0.30f, 0.46f, 1f);
+            }
+        }
+
+        private static HudSpriteKind GetDungeonIcon(DungeonKind kind)
+        {
+            switch (kind)
+            {
+                case DungeonKind.Gold:
+                    return HudSpriteKind.IconGold;
+                case DungeonKind.TotemEssence:
+                    return HudSpriteKind.IconTotemEssence;
+                case DungeonKind.HeroTranscendStone:
+                    return HudSpriteKind.IconTranscendStone;
+                default:
+                    return HudSpriteKind.IconRuby;
+            }
         }
 
         private static void ApplyDungeonDetailState(

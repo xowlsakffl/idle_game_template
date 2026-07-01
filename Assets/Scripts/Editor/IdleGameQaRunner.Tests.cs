@@ -152,6 +152,38 @@ namespace IdleGame.Editor
             AssertEqual(GameNumber.Zero, game.Battle.GetMaxHeroDamageDone(), "damage meter should reset when a new stage starts");
         }
 
+        private static void TestDungeonEntryRefundAndSweep(RuntimeHarness game)
+        {
+            AssertEqual(DungeonProgressManager.DailyFreeEntryLimit, game.Dungeon.FreeEntriesRemaining, "fresh dungeon entries should be available");
+            AssertEqual(2L, game.Wallet.DungeonTicket, "fresh wallet should start with default dungeon tickets");
+
+            AssertTrue(game.Battle.TryEnterDungeon(DungeonKind.Ruby, 1, false), "ruby dungeon should accept a fresh free entry");
+            AssertTrue(game.Battle.IsDungeonRunActive, "battle should enter dungeon run state");
+            AssertEqual(DungeonKind.Ruby, game.Battle.ActiveDungeonKind, "active dungeon kind should be tracked");
+            AssertEqual(2, game.Dungeon.FreeEntriesRemaining, "dungeon entry should consume one free entry");
+
+            game.Battle.ExitDungeonWithRefund();
+            AssertTrue(!game.Battle.IsDungeonRunActive, "exiting dungeon should leave dungeon run state");
+            AssertEqual(DungeonProgressManager.DailyFreeEntryLimit, game.Dungeon.FreeEntriesRemaining, "manual dungeon exit should refund free entry");
+            AssertEqual(2L, game.Wallet.DungeonTicket, "manual dungeon exit should not consume tickets when free entry was used");
+            AssertTrue(!game.Dungeon.CanSweep(DungeonKind.Ruby, 1), "uncleared dungeon level should not be sweepable");
+
+            string clearReward = game.Dungeon.CompleteDungeon(DungeonKind.Ruby, 1);
+            AssertTrue(clearReward.Contains("보석"), "ruby dungeon should grant ruby reward text");
+            AssertEqual(1, game.Dungeon.GetHighestClearLevel(DungeonKind.Ruby), "dungeon clear should unlock sweep for that level");
+            AssertTrue(game.Dungeon.CanSweep(DungeonKind.Ruby, 1), "cleared dungeon level should be sweepable with entry available");
+
+            int entriesBeforeSweep = game.Dungeon.FreeEntriesRemaining;
+            AssertTrue(game.Dungeon.TrySweepDungeon(DungeonKind.Ruby, 1, out string sweepReward), "cleared ruby dungeon should sweep");
+            AssertTrue(sweepReward.Contains("보석"), "ruby dungeon sweep should return ruby reward text");
+            AssertEqual(entriesBeforeSweep - 1, game.Dungeon.FreeEntriesRemaining, "sweep should consume one entry");
+
+            string totemReward = game.Dungeon.CompleteTotemBossDungeon(3);
+            AssertTrue(totemReward.Contains("토템석"), "totem boss dungeon should grant totem reward text");
+            AssertEqual(3, game.Dungeon.GetHighestClearLevel(DungeonKind.TotemEssence), "totem dungeon should persist highest defeated boss");
+            AssertEqual(252L, DungeonProgressManager.GetTotemBossTotalReward(3), "totem boss reward formula should stay stable");
+        }
+
         private static void TestGachaAndSaveRestore(RuntimeHarness game)
         {
             game.Gacha.Roll(3);

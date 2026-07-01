@@ -26,6 +26,7 @@ namespace IdleGame.Editor
                 RunWithFreshPrefs(prefs, TestCombatSpeedEntitlement);
                 RunWithFreshPrefs(prefs, TestBattleAutoControls);
                 RunWithFreshPrefs(prefs, TestHeroDamageMeter);
+                RunWithFreshPrefs(prefs, TestDungeonEntryRefundAndSweep);
                 RunWithFreshPrefs(prefs, TestGachaAndSaveRestore);
                 RunWithFreshPrefs(prefs, TestHeroStarUp);
                 RunWithFreshPrefs(prefs, TestHeroBulkStarUp);

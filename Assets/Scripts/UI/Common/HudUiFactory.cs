@@ -147,6 +147,12 @@ namespace IdleGame.UI.Common
                 return;
             }
 
+            if (IsFlatHudSurface(spriteKind))
+            {
+                ApplyFlatSurface(image, spriteKind, color);
+                return;
+            }
+
             if (HudSpriteCatalog.TryGetNinePatchDefinition(spriteKind, out _))
             {
                 HudNinePatchPanel patch = image.GetComponent<HudNinePatchPanel>();
@@ -224,18 +230,32 @@ namespace IdleGame.UI.Common
 
             ApplySprite(image, spriteKind, color);
             ColorBlock colors = button.colors;
-            colors.normalColor = color;
-            colors.highlightedColor = color;
-            colors.pressedColor = color;
-            colors.selectedColor = color;
-            colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
+            if (IsFlatHudSurface(spriteKind))
+            {
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+                colors.pressedColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+                colors.selectedColor = new Color(1.04f, 1.04f, 1.04f, 1f);
+                colors.disabledColor = new Color(0.52f, 0.52f, 0.52f, 0.55f);
+                colors.colorMultiplier = 1f;
+                button.transition = Selectable.Transition.ColorTint;
+            }
+            else
+            {
+                colors.normalColor = color;
+                colors.highlightedColor = color;
+                colors.pressedColor = color;
+                colors.selectedColor = color;
+                colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
+                button.transition = Selectable.Transition.None;
+            }
+
             button.colors = colors;
-            button.transition = Selectable.Transition.None;
 
             HudNinePatchPanel patch = image.GetComponent<HudNinePatchPanel>();
             if (patch == null || !patch.IsConfigured)
             {
-                image.color = color;
+                image.color = IsFlatHudSurface(spriteKind) ? ResolveFlatSurfaceColor(spriteKind, color) : color;
             }
         }
 
@@ -255,6 +275,21 @@ namespace IdleGame.UI.Common
             }
 
             HudSpriteKind activeKind = pressed ? pressedKind : normalKind;
+            if (IsFlatHudSurface(activeKind))
+            {
+                ApplyFlatSurface(image, activeKind, Color.white);
+                ColorBlock colors = button.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+                colors.pressedColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+                colors.selectedColor = new Color(1.04f, 1.04f, 1.04f, 1f);
+                colors.disabledColor = new Color(0.52f, 0.52f, 0.52f, 0.55f);
+                colors.colorMultiplier = 1f;
+                button.colors = colors;
+                button.transition = Selectable.Transition.ColorTint;
+                return;
+            }
+
             if (HudSpriteCatalog.TryGetNinePatchDefinition(activeKind, out _))
             {
                 HudNinePatchPanel patch = button.GetComponent<HudNinePatchPanel>();
@@ -337,6 +372,133 @@ namespace IdleGame.UI.Common
         {
             Vector4 border = sprite.border;
             return border.x > 0f || border.y > 0f || border.z > 0f || border.w > 0f;
+        }
+
+        private static bool IsFlatHudSurface(HudSpriteKind spriteKind)
+        {
+            switch (spriteKind)
+            {
+                case HudSpriteKind.BigBlueButton:
+                case HudSpriteKind.BlueMenuButton:
+                case HudSpriteKind.BlueMenuButtonPressed:
+                case HudSpriteKind.BigRedButton:
+                case HudSpriteKind.BigRedButtonPressed:
+                case HudSpriteKind.SmallBlueSquareButton:
+                case HudSpriteKind.SmallBlueSquareButtonPressed:
+                case HudSpriteKind.SmallRedSquareButton:
+                case HudSpriteKind.SmallRedSquareButtonPressed:
+                case HudSpriteKind.DisabledPanel:
+                case HudSpriteKind.BluePanel:
+                case HudSpriteKind.CarvedPanel:
+                case HudSpriteKind.ParchmentPanel:
+                case HudSpriteKind.SpecialPaperPanel:
+                case HudSpriteKind.WoodPanel:
+                case HudSpriteKind.Banner:
+                case HudSpriteKind.WoodTable:
+                case HudSpriteKind.BlueRibbon:
+                case HudSpriteKind.RedRibbon:
+                case HudSpriteKind.YellowRibbon:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static void ApplyFlatSurface(Image image, HudSpriteKind spriteKind, Color color)
+        {
+            HudNinePatchPanel ninePatch = image.GetComponent<HudNinePatchPanel>();
+            if (ninePatch != null)
+            {
+                ninePatch.HidePatch();
+            }
+
+            image.enabled = true;
+            image.sprite = null;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.color = ResolveFlatSurfaceColor(spriteKind, color);
+            image.raycastTarget = true;
+
+            Outline outline = image.GetComponent<Outline>();
+            if (outline == null)
+            {
+                outline = image.gameObject.AddComponent<Outline>();
+            }
+
+            outline.effectColor = IsButtonSurface(spriteKind)
+                ? new Color(0.02f, 0.03f, 0.04f, 0.78f)
+                : new Color(0.02f, 0.025f, 0.03f, 0.64f);
+            outline.effectDistance = new Vector2(2f, -2f);
+        }
+
+        private static bool IsButtonSurface(HudSpriteKind spriteKind)
+        {
+            switch (spriteKind)
+            {
+                case HudSpriteKind.BigBlueButton:
+                case HudSpriteKind.BlueMenuButton:
+                case HudSpriteKind.BlueMenuButtonPressed:
+                case HudSpriteKind.BigRedButton:
+                case HudSpriteKind.BigRedButtonPressed:
+                case HudSpriteKind.SmallBlueSquareButton:
+                case HudSpriteKind.SmallBlueSquareButtonPressed:
+                case HudSpriteKind.SmallRedSquareButton:
+                case HudSpriteKind.SmallRedSquareButtonPressed:
+                case HudSpriteKind.DisabledPanel:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static Color ResolveFlatSurfaceColor(HudSpriteKind spriteKind, Color requested)
+        {
+            Color fallback = GetDefaultFlatSurfaceColor(spriteKind);
+            bool useFallback = requested.a <= 0f
+                || (Mathf.Abs(requested.r - 1f) < 0.01f
+                    && Mathf.Abs(requested.g - 1f) < 0.01f
+                    && Mathf.Abs(requested.b - 1f) < 0.01f);
+            Color result = useFallback ? fallback : Color.Lerp(fallback, requested, IsButtonSurface(spriteKind) ? 0.58f : 0.36f);
+            result.a = requested.a > 0f ? requested.a : fallback.a;
+            return result;
+        }
+
+        private static Color GetDefaultFlatSurfaceColor(HudSpriteKind spriteKind)
+        {
+            switch (spriteKind)
+            {
+                case HudSpriteKind.BlueMenuButtonPressed:
+                case HudSpriteKind.SmallBlueSquareButtonPressed:
+                    return new Color(0.10f, 0.30f, 0.40f, 1f);
+                case HudSpriteKind.BigBlueButton:
+                case HudSpriteKind.BlueMenuButton:
+                case HudSpriteKind.SmallBlueSquareButton:
+                    return new Color(0.15f, 0.43f, 0.52f, 1f);
+                case HudSpriteKind.BigRedButton:
+                case HudSpriteKind.BigRedButtonPressed:
+                case HudSpriteKind.SmallRedSquareButton:
+                case HudSpriteKind.SmallRedSquareButtonPressed:
+                    return new Color(0.50f, 0.16f, 0.14f, 1f);
+                case HudSpriteKind.DisabledPanel:
+                    return new Color(0.20f, 0.21f, 0.24f, 1f);
+                case HudSpriteKind.BlueRibbon:
+                case HudSpriteKind.Banner:
+                    return new Color(0.12f, 0.28f, 0.38f, 0.96f);
+                case HudSpriteKind.RedRibbon:
+                    return new Color(0.42f, 0.12f, 0.12f, 0.96f);
+                case HudSpriteKind.YellowRibbon:
+                    return new Color(0.50f, 0.36f, 0.12f, 0.96f);
+                case HudSpriteKind.ParchmentPanel:
+                    return new Color(0.16f, 0.17f, 0.18f, 0.94f);
+                case HudSpriteKind.CarvedPanel:
+                case HudSpriteKind.WoodPanel:
+                case HudSpriteKind.WoodTable:
+                case HudSpriteKind.SpecialPaperPanel:
+                    return new Color(0.10f, 0.13f, 0.17f, 0.94f);
+                case HudSpriteKind.BluePanel:
+                default:
+                    return new Color(0.09f, 0.13f, 0.19f, 0.94f);
+            }
         }
 
         public static void ConfigureBestFitText(Text text, int minSize, int maxSize, float lineSpacing = 1f)
